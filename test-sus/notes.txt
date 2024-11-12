@@ -1,0 +1,316 @@
+ISSUES
+
+  - getting -1073741819 (access violation, probably because arrays on stack are bad)
+  - no hex error code in test.bat
+
+ACTUALLY IMPLEMENTED
+
+  - Top Level Statements
+
+  - Functions
+
+  - Instructions
+
+    - Local symbols
+
+    - Asm instructions
+
+    - Expressions
+    
+      - Operators, String literals, int32 literals
+
+  - Type checking
+
+  - Pointers
+
+  - Primitive Arrays
+
+MISSING
+
+  - Instructions
+
+    - Local symbols
+      non self-assign
+      non-usable before delcaration
+
+    - done
+
+    - Pointers: DRF (Deref), Assignments, Arithmetic
+
+    - Loops
+
+    - Arrays
+
+
+NOTES FOR NEVER
+
+  const/readable type attribute
+
+NOTES FOR FEATURES NOW
+
+{
+  PTR[int8] str = STR"Hello, World!\n";
+  PTR[int8] buffer = ARR[int8](10);
+  
+  int32 a = 14;
+  int32 b = 14;
+  int32 len = 14;
+
+  out(STR"a+b=");
+
+
+}
+
+
+  add parsing and compilation for pointers with following features
+
+    nullptr ?
+
+    referencing
+      int32 someInt;
+      PTR[int32] somePtr = PTR(someInt); ; MISSING: PTR OPERATOR
+      
+    dereferencing
+      [somePtr] = 0;
+      int32 test = [somePtr]; ; MISSING: DEREFERENCE OPERATOR
+      PTR[int32] someArrPtr = ADR(test);
+    
+    arrays/pointer arithmetic
+    
+      [somePtr + 1] = 0; ; MISSING: ASSIGNMENTS: Assignment expression?
+      int32 test2 = [somePtr + 1];
+      
+      PTR[int8] someArrPtr = ARR[int8](12); ; MISSING: ARRAYS FOR CONSTANT SIZES
+
+    variable sized stack?
+      PTR[int8] someArrPtr = ARR[int8](v); ; MISSING: ARRAYS FOR VARIABLE SIZES
+      
+    void pointers
+      ptr asdf;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+RAMBLING SECTION MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  
+
+
+
+
+
+
+
+
+
+
+
+; STANDARD LIBRARY
+
+func exit(int32 code) {
+    asm {
+        extern  _ExitProcess@4
+        push    sus{code}
+        call    _ExitProcess@4
+        hlt
+    }
+}
+
+; PROGRAM
+
+func test(int32 a, int32 b, [int32] r) {
+    [r] = a + b;
+}
+
+[int32] r = [0];
+test(10, 10, r);
+exit([r])
+
+PARSABLE NODES AS SEEN FROM SOURCE TREE
+  root
+    func: name
+        params
+        param: type, name
+        instructions...
+    
+    instructions
+        ins-call: name
+        ins-asm
+        asmline
+            part: asmpart/sus{*variable*}
+        local-symbol-const: type, name
+        expression...
+        ins-assignment: symbol
+        expression: type
+            (operator-two-args: opcode
+            expression...1
+            expression...2) ; note: opcode may be +-*/
+            /
+            (primitive: type value)
+
+
+
+func test() {
+  asm { 
+    push sus{asdf}, sus{bbbb}
+    pop sus{aaa}
+  }
+}
+
+func amongUs(int asdf) {
+   int amongo= fuck + adf;
+}
+
+mow
+https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/itoa-s-itow-s?view=msvc-170
+https://stackoverflow.com/questions/15020621/what-is-between-esp-and-ebp
+https://stackoverflow.com/questions/35735403/writing-functions-in-assembler
+https://www.google.com/search?client=firefox-b-d&q=assembler+local+variables
+https://learn.microsoft.com/en-us/windows/console/getstdhandle
+https://en.wikipedia.org/wiki/X86_calling_conventions
+https://www.google.com/search?client=firefox-b-d&q=windows+asm+window+example
+https://sonictk.github.io/asm_tutorial/
+https://stackoverflow.com/questions/1023593/how-to-write-hello-world-in-assembly-under-windows
+https://stackoverflow.com/questions/40621744/how-are-windows-api-calls-made-on-assembly-level
+https://chatgpt.com/c/671fa584-273c-800a-aef2-1193acbdb4fc
+https://stackoverflow.com/questions/1658294/whats-the-purpose-of-the-lea-instruction
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func test()
+{
+  ASM
+  { 
+    push SUS{asdf}, SUS{bbbb}
+    pop SUS{aaa}
+  }
+}
+
+func amongUs(int asdf)
+{
+  int amongo= fuck + adf;
+  done;
+}
+
+
+{
+  int32 amongo = fuck + adf;
+
+}
+
+{
+  int32 a = 0;
+  int32 b = 0;
+  test(asdf:nig);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+func out(int32 buffer, int32 size) {
+  ASM {
+      extern  _GetStdHandle@4
+      extern  _WriteFile@20
+
+      push    -11
+      call    _GetStdHandle@4
+      mov     ecx, eax    
+      push    0
+      push    0
+      mov     eax, SUS{size}
+      push    eax
+      mov     eax, SUS{buffer}
+      push    eax
+      push    ecx
+      call    _WriteFile@20
+  }
+}
+
+{
+  int32 a = 0;
+  int32 b = 0;
+  out(buffer:a,size:1);
+}
+
+
+
+
+
+
+missing: 
+	operators
+	
+	loops
+	
+
+	referencing
+		int32 someInt;
+		PTR somePtr = PTR[someInt];
+		
+	dereferencing
+		[somePtr] = 0;
+		int32 test = [somePtr];
+		PTR[int32] someArrPtr = PTR[test];
+	
+	arrays/pointer arithmetic
+	
+		[somePtr + 1] = 0;
+		int32 test2 = [somePtr + 1];
+		
+		PTR[int32] someArrPtr = ARR[int8, 12];
+		
+	void pointers
+		ptr asdf;
+		
+		// has no arithmetic, cannot be dereferenced
+	
+	structs
+	
+	types
+	
+		type checking for symbols, assignments, parameters
+		
+		type checking for operators
+		
+		cast?
+		
+			converting between datatypes
+			
+			
+		
+		

@@ -1,0 +1,122 @@
+overview
+
+  top level statements
+
+  declaration: functions, templates
+  data literals: string literals using quotes and \b00 as byte, int literals
+
+  types: pointer, int, region (pointer with size )
+
+  statements: calling functions, calling templates, assembly
+
+  local variables
+
+  structs
+
+  compiletime structs
+
+  types: bit, int(8|16|32), nat(8,16,32), real32, 
+    pointer type syntax: [*any type*]
+
+  variable-spaces: globals, function-locals
+
+EXAMPLES:
+
+  ; structs
+  struct Region (
+    [int8] start;
+    [int8] end;
+  )
+
+  ; functions
+  funct out(Region region) () {
+    [int8] s = region.start;
+    [int8] e = region.end;
+    asm {
+      ; note: sus{s} gets the value of a local sus const
+      mov eax, sus{s}
+    }
+  }
+
+  ; loops
+  func repeat(int32 from, int32 to, int32 interval) {
+    ; note: a string literal gives the Region struct of the standard library
+    Region r = "TEST STRING LITERAL";
+    var int32 counter = from;
+    while (counter <= to) {
+      Region lr = Region(
+        start: r.start;
+        end: counter;  
+      );
+      out(lr);
+      counter = counter + interval;
+    }
+  }
+
+  ; array
+  struct Array<T> {
+    [T] start;
+    [byte] length;
+  }
+
+  ; note: allocate allocates on runtime but there should be a way to allocate on runtime
+  
+  ; global
+  Array<Region> names = Array<Region>(allocate<Region>(5),5); 
+  
+  ; top level statements
+  Array_set<Region>(names, 0, "red");
+  Array_set<Region>(names, 1, "green");
+  Array_set<Region>(names, 2, "blue");
+  Array_set<Region>(names, 3, "cyan");
+  Array_set<Region>(names, 4, "yellow");
+
+RESULTING PARSABLE NODES AS REACHABLE FROM SOURCE TREE:
+  struct: name
+    property: type, name
+
+  func: name
+    params
+      param: type, name
+    instructions...
+  
+  instructions
+    ins-call: name
+    ins-asm
+      asmline
+        part: asmpart/sus{*variable*}
+    local-symbol-const: type, name
+      expression...
+    local-symbol-variable: type, name
+      expression...
+    ins-assignment: symbol
+      expression: type, name
+        (operator-two-args: opcode
+          expression...1
+          expression...2) ; note: opcode may be +-*/
+        (operator-one-arg: opcode
+          expression...) ; note: opcode may be !~
+        /
+        (primitive: type value)
+        /
+        (struct creation
+          argument: parameter
+            expression)
+
+      
+
+  
+
+  
+
+EXAMPLES
+
+top level
+
+  out();
+
+later: 
+  generic type inference
+  objects, interfaces
+  compile-time allocation for non-strings
+  packages

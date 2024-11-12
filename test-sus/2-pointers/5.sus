@@ -1,0 +1,13 @@
+{
+  sus_exit(code:0);
+}
+
+func sus_exit(int32 code) {
+  ASM {
+    extern  _ExitProcess@4
+    mov     eax, SUS{code}
+    push    eax
+    call    _ExitProcess@4
+    hlt
+  }
+}

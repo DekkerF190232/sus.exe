@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>sus.exe</title>
+
+    <script>
+      function download(name, blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+
+      //
+      // ============================== PARSER           ==============================
+      //
+
+      // missing: function calls, pointer types, type templates
+
+      function makeParseState(name, text, i, root, n) {
+        return { name, text, i, root, n };
+      }
+
+      function parseFile(name, text) {
+        if (text.includes('\r')) throw new Error('Can only parse end of line sequence "LF"');
+        let state = makeParseState(name, text, 0, undefined, undefined);
+        parse(state);
+        return state.root;
+      }
+
+      function parse(state) {
+        'use strict';
+
+        function makeNode(name, props, kids) {
+          return { name, props, kids, i: state.i };
+        }
+        // node makers so i don't forget
+        const makeNodeRoot = (_) => makeNode('root', undefined, []);
+        const makeNodeFunc = (name) => makeNode('func', { name }, []);
+        const makeNodeListParam = (_) => makeNode('list-param', undefined, []);
+        const makeNodeParam = (name) => makeNode('param', { name }, []);
+        const makeNodeListInst = (_) => makeNode('list-inst', undefined, []);
+        const makeNodeInsAsm = (_) => makeNode('ins-asm', undefined, []);
+        const makeNodeAsm = (_) => makeNode('asm', undefined, []);
+        const makeNodeAsmPart = (partType, value) => makeNode('asm-part', { partType, value }); // partType: asm/sus
+        const makeNodeInsDone = (_) => makeNode('ins-done');
+        const makeNodeInsSym = (name) => makeNode('ins-sym', { name }, []);
+        const makeNodeInsAssign = (_) => makeNode('ins-ass', {}, []);
+        const makeNodeTarget = (symbol) => makeNode('target', { symbol });
+        const makeNodeExpr = (_) => makeNode('expr', {}, []);
+        const makeNodeExprSym = (symbol) => makeNode('expr-sym', { symbol });
+        const makeNodeExprOp = (op) => makeNode('expr-op', { op }, []);
+        const makeNodeExprLitDecInt = (decInt) => makeNode('expr-lit', { litType: 'dec-int', value: decInt });
+        const makeNodeExprLitPtrStr = (str) => makeNode('expr-lit', { litType: 'ptr-str', value: str });
+        const makeNodeExprArr = () => makeNode('expr-arr', null, []); // kids: type, expression for size
+        const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get address of
+        const makeNodeType = () => makeNode('type', undefined, []);
+        const makeNodeTypePrim = (name) => makeNode('type-prim', { name }, []);
+        const makeNodeInsCall = (name) => makeNode('ins-call', { name }, []);
+        const makeNodeArgument = (name) => makeNode('arg', { name }, []);
+
+        // parser helper functions
+
+        function err(msg) {
+          return new Error('(parse err) ' + msg + ' at ' + locPrevString());
+        }
+
+        function warn(msg) {
+          console.warn(msg + ' at ' + locPrevString());
+        }
+
+        // note: pattern should start with ^
+        // returns the first match found in state.text.slice(state.i) or undefined if not found
+        function test(pattern) {
+          let str = state.text.slice(state.i);
+          let matches = str.match(pattern);
+          if (matches) return matches[0];
+          return undefined;
+        }
+
+        const eatSpace = () => eat(/^[\t ]*/);
+        // const eatEmpty = () => eat(/^[\n\t ]*/);
+        // const eatEmpty = () => eat(/^[\n\t ]*(#.*\n[\n\t ]*)?/);
+        const eatEmpty = () => eat(/^([\n\t ]*(#.*?(\n|$))?)*/);
+        const eatFuncName = () => eat(/^[a-zA-Z0-9_]*[a-zA-Z_]+[a-zA-Z0-9_]*/);
+        const eatSymbol = () => eat(/^[a-zA-Z0-9_]*[a-zA-Z_]+[a-zA-Z0-9_]*/);
+        const eatTypeName = () => eat(/^[a-zA-Z0-9_]*[a-zA-Z_]+[a-zA-Z0-9_]*/);
+        const eatLitIntDec = () => eat(/^-?[0-9]+/);
+        const eatLitStr = () => eat(/^(".*?[^\\]"|"")/);
+
+        // https://stackoverflow.com/a/6969486/13356588
+        function escapeRegExp(string) {
+          return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function eatPicky(str) {
+          if (!eat(new RegExp(`^${escapeRegExp(str)}`))) throw err(`expected "${str}"`);
+        }
+
+        function eat(pattern) {
+          let v = test(pattern);
+          if (v) state.i += v.length;
+          return v;
+        }
+
+        function expect(v, name) {
+          if (!v) throw err('expected ' + name);
+          return v;
+        }
+
+        // adds node to current node and calls sup-parser if defined with current node as added node
+        function append(node, subParser) {
+          state.n.kids.push(node);
+
+          // call sup-parse if given
+          if (subParser) {
+            let prev = state.n;
+            state.n = node;
+            subParser();
+            state.n = prev;
+          }
+        }
+
+        function locPrevString() {
+          let { line, col } = lineNumber(state.text, state.i);
+          let l = state.text.slice(Math.max(0, state.i), Math.min(state.text.length, state.i + 50)).replaceAll('\n', '<LF>') + '...';
+          return state.name + ':' + line + ':' + col + '\n  ...' + l;
+        }
+
+        //
+        // start parsing.
+        //
+
+        // parse loop at top call base parse method
+        state.root = makeNodeRoot();
+        state.n = state.root;
+        eatEmpty();
+        while (!eof()) {
+          let prevI = state.i;
+          parseBase();
+          if (prevI >= state.i) {
+            throw err('unparsable statement');
+          }
+        }
+
+        function eof() {
+          return state.i >= state.text.length;
+        }
+
+        // parse method for top level statements
+
+        // note: parse prefix means the node is appended automatically, eatNode prefix means the method returns the node
+        function parseBase() {
+          if (test(/^func /)) return parseFunc();
+          return parseTls();
+          // throw err('unparsable top level statement')
+        }
+
+        function parseTls() {
+          eatPicky('{');
+          eatEmpty();
+          parseListInst();
+          eatPicky('}');
+          eatEmpty();
+        }
+
+        function parseListInst() {
+          append(makeNodeListInst(), (_) => {
+            while (true) {
+              if (test(/^done[\t \n]*;/)) {
+                parseInstDone();
+                continue;
+              }
+              if (test(/^ASM/)) {
+                parseInstAsm();
+                continue;
+              }
+              if (tryParseAssignment()) {
+                continue;
+              }
+              if (tryParseSym()) {
+                continue;
+              }
+              if (tryParseCall()) {
+                continue;
+              }
+
+              break;
+            }
+          });
+          // warn('empty block');
+        }
+
+        function tryParseCall() {
+          return tryParse((_) => {
+            let name = eatSymbol();
+            if (!name) return;
+            eatEmpty();
+
+            if (!eat(/^\(/)) return;
+            eatEmpty();
+
+            append(makeNodeInsCall(name), (_) => {
+              let first = true;
+              while (!eat(/^\)/)) {
+                if (eof()) throw err('unexpected eof');
+
+                if (!first) {
+                  eatPicky(',');
+                  eatEmpty();
+                }
+                first = false;
+
+                let symbol = eatSymbol();
+                eatEmpty();
+
+                eatPicky(':');
+                eatEmpty();
+
+                append(makeNodeArgument(symbol), (_) => {
+                  append(parseNodeExpr());
+                });
+              }
+
+              eatEmpty();
+              eatPicky(';');
+              eatEmpty();
+            });
+
+            return true;
+          });
+        }
+
+        function tryParseSym() {
+          return tryParse((_) => {
+            let nodeType = tryEatNodeType();
+            if (!nodeType) return undefined;
+            eatEmpty();
+
+            let name = eatSymbol();
+            if (!name) return undefined;
+            eatEmpty();
+
+            eatPicky('=');
+            eatEmpty();
+
+            append(makeNodeInsSym(name), (_) => {
+              append(nodeType);
+              append(parseNodeExpr());
+              eatPicky(';');
+              eatEmpty();
+            });
+
+            return true;
+          });
+        }
+
+        function tryParseAssignment() {
+          return tryParse((_) => {
+            // try parse left hand
+            let nodeTarget = tryParse((_) => {
+              let symbol = eatSymbol();
+              return makeNodeTarget(symbol);
+            });
+            if (!nodeTarget) return;
+            eatEmpty();
+
+            let equals = eat(/^=/);
+            if (!equals) return;
+            eatEmpty();
+
+            append(makeNodeInsAssign(), (_) => {
+              append(nodeTarget);
+              append(parseNodeExpr());
+              eatPicky(';');
+              eatEmpty();
+            });
+
+            return true;
+          });
+        }
+
+        // parses an expression
+        function parseNodeExpr() {
+          let nodeExpr = makeNodeExpr();
+
+          let nodeCurrent = parseNodeExprVal();
+
+          while (true) {
+            let nodeNew = tryParseNodeExprOp(nodeCurrent);
+            if (!nodeNew) break;
+            nodeCurrent = nodeNew;
+          }
+
+          nodeExpr.kids.push(nodeCurrent);
+          return nodeExpr;
+        }
+
+        function parseNodeExprVal() {
+          return expect(
+            tryParse(
+              () => {
+                if (!eat(/^STR[\t ]*(?=")/)) return;
+                let value = eatLitStr();
+                return makeNodeExprLitPtrStr(value);
+              },
+              () => {
+                if (!eat(/^ARR/)) return;
+                eatEmpty();
+                if (!eat(/^\[/)) return;
+                let type = eatNodeType();
+                eatEmpty();
+
+                eatPicky(']');
+                eatEmpty();
+
+                eatPicky('(');
+                eatEmpty();
+
+                let arrayNode = makeNodeExprArr();
+                arrayNode.kids.push(type);
+                arrayNode.kids.push(parseNodeExpr());
+
+                eatPicky(')');
+                eatEmpty();
+
+                return arrayNode;
+              },
+              () => {
+                if (!eat(/^REF/)) return;
+                eatEmpty();
+                if (!eat(/^\(/)) return;
+                eatEmpty();
+                let refNode = makeNodeExprRef();
+                refNode.kids.push(parseNodeExpr());
+                eatPicky(')');
+                eatEmpty();
+                return refNode;
+              },
+              (_) => {
+                let symbol = eatSymbol();
+                if (!symbol) return undefined;
+                eatEmpty();
+                return makeNodeExprSym(symbol);
+              },
+              (_) => {
+                let val = eatLitIntDec();
+                if (!val) return undefined;
+                eatEmpty();
+                return makeNodeExprLitDecInt(val);
+              }
+            ),
+            'value expression'
+          );
+        }
+
+        function tryParseNodeExprOp(nodeExprA) {
+          return tryParse((_) => {
+            let op = eat(/^[+]/);
+            if (!op) return undefined;
+            eatEmpty();
+            let n = makeNodeExprOp(op);
+            n.kids.push(nodeExprA);
+            n.kids.push(parseNodeExprVal());
+            return n;
+          });
+        }
+
+        // note: takes var-arg list of functions. first function to succeed in parsing
+        // returns its value, on failure to parse undefined is returned.
+        function tryParse() {
+          let prevI = state.i;
+          for (const subParser of arguments) {
+            let r = subParser();
+            if (r) return r;
+            state.i = prevI;
+          }
+          return undefined;
+        }
+
+        function parseInstDone() {
+          eatPicky('done;');
+          append(makeNodeInsDone());
+          eatEmpty();
+        }
+
+        function parseInstAsm() {
+          eatPicky('ASM');
+          eatEmpty();
+
+          append(makeNodeInsAsm(), (_) => {
+            eatPicky('{');
+            eatSpace();
+            // eatPicky('\n');
+            expect(eat(/^\n/), 'new line');
+            eatEmpty();
+
+            while (!eat(/^}/)) {
+              if (eof()) throw err('unexpected eof');
+
+              append(makeNodeAsm(), (_) => {
+                while (!eat(/^\n/)) {
+                  if (eof()) throw err('unexpected eof');
+
+                  if (eat(/^SUS[\t\n ]*\{/)) {
+                    eatSpace();
+                    let symbol = expect(eatSymbol(), 'symbol in asm statement');
+                    eatSpace();
+                    eatPicky('}');
+                    eatSpace();
+
+                    append(makeNodeAsmPart('sus', symbol));
+                    continue;
+                  }
+
+                  // note: matches till end of line or till last character before next sus {
+                  let asmPart = eat(/^.*?(?=(SUS[\t ]*\{|\n))/);
+                  if (asmPart) {
+                    append(makeNodeAsmPart('asm', asmPart));
+                    eatSpace();
+                    continue;
+                  }
+
+                  throw err('could not parse asm line');
+                }
+                eatEmpty();
+              });
+            }
+
+            eatEmpty();
+          });
+        }
+
+        function parseFunc() {
+          eatPicky('func ');
+          eatEmpty();
+
+          let name = eatFuncName();
+          eatEmpty();
+
+          append(makeNodeFunc(name), (_) => {
+            eatPicky('(');
+            eatEmpty();
+
+            append(makeNodeListParam(), (_) => {
+              let first = true;
+              while (!test(/^\)/)) {
+                if (eof()) throw err('unexpected eof');
+
+                if (!first) {
+                  eatPicky(',');
+                  eatEmpty();
+                }
+                first = false;
+
+                append(makeNodeParam(name), (_) => {
+                  append(eatNodeType());
+
+                  let paramName = expect(eatSymbol(), 'a symbol');
+                  state.n.props.name = paramName;
+                });
+              }
+            });
+
+            eatPicky(')');
+            eatEmpty();
+
+            eatPicky('{');
+            eatEmpty();
+
+            parseListInst();
+
+            eatPicky('}');
+            eatEmpty();
+          });
+        }
+
+        function tryEatNodeType() {
+          return tryParse((_) => {
+            let kid = tryEatNodeTypeUnwrapped();
+            if (!kid) return;
+            let typeNode = makeNodeType();
+            typeNode.kids.push(kid);
+            return typeNode;
+          });
+        }
+
+        function tryEatNodeTypeUnwrapped() {
+          return tryParse((_) => {
+            let name = eatTypeName();
+            eatEmpty();
+
+            if (!name) return undefined;
+
+            let isPrimitive = true;
+            if (isPrimitive) {
+              if (eat(/^\[/)) {
+                eatEmpty();
+                let insideType = tryEatNodeTypeUnwrapped();
+                if (!eat(/^\]/)) return undefined;
+                eatEmpty();
+                let n = makeNodeTypePrim(name);
+                n.kids.push(insideType);
+                return n;
+              }
+
+              return makeNodeTypePrim(name);
+            }
+
+            return undefined;
+          });
+        }
+
+        function eatNodeType() {
+          return expect(tryEatNodeType(), 'a type');
+        }
+      }
+
+      //
+      // ============================== COMPILER         ==============================
+      //
+
+      // NOTES
+      //  using goofy calling convention (like __stdcall but caller cleans stack instead of callee)
+
+      function makeCompileState(name, text, root, n) {
+        return { name, text, root, n };
+      }
+
+      function compile(state) {
+        'use strict';
+
+        // HELPERS ============================
+
+        function makeImplErr(msg) {
+          return new Error('IMPLEMENTATION ERROR: ' + msg);
+        }
+
+        function makeErr(i, msg) {
+          return new Error('(compile err) ' + msg + ' at ' + getLocErr(i));
+        }
+
+        function getLocErr(i) {
+          let { line, col } = lineNumber(state.text, i);
+          let l = state.text.slice(Math.max(0, i), Math.min(state.text.length, i + 50)).replaceAll('\n', '<LF>') + '...';
+          return state.name + ':' + line + ':' + col + '\n  ...' + l;
+        }
+
+        function getLoc(i) {
+          let { line, col } = lineNumber(state.text, i);
+          return state.name + ':' + line + ':' + col;
+        }
+
+        function line(str = '', indentLevelCount = 1) {
+          if (str == '') return '\n';
+          return '  '.repeat(indentLevelCount) + str + '\n';
+        }
+
+        // STRING LITERALS ============================
+
+        const makeDataTable = (strings) => ({ strings });
+        const makeDataTableRowStr = (asmName) => ({ asmName });
+        const newAsmNameLitPtrStr = () => 'ss_' + (1 + Object.keys(dataTable.strings).length);
+        const findAsmNameLitPtrStr = (value) => dataTable.strings[value]?.asmName;
+        let dataTable = null;
+
+        // /
+
+        // SCOPES ======================================
+
+        const makeSymTable = (rows, size) => ({ rows, size }); // includes params and locals, note that params are not included in size
+        const makeSymTableRow = (symbol, type, off, size) => ({ symbol, type, off, size }); // symbol: name, type: node, off: ebp off bytes.  size: bytes
+        const makeScope = (parent, symTable) => ({ parent, symTable });
+        const makeSymTableLoc = (scopes, row) => ({ scopes, row });
+
+        function findSymTableLoc(scope, sym, scopes = []) {
+          scopes.push(scope);
+
+          if (scope === undefined) return undefined;
+
+          let row = scope.symTable.rows.find((x) => x.symbol === sym);
+          if (row) return makeSymTableLoc(scopes, row);
+
+          return findSymTableLoc(scope.parent, sym);
+        }
+
+        function createScope(listParam, listIns, parent) {
+          let scope = makeScope(parent, makeSymTable([], 0));
+
+          let table = scope.symTable;
+
+          let paramOffset = 8;
+          if (listParam) {
+            for (const param of listParam.kids) {
+              let type = param.kids.find((x) => x.name === 'type');
+              let name = param.props.name;
+              let size = getTypeSizeOnStack(type);
+              if (findSymTableLoc(scope, name)) throw makeErr('duplicate symbol: ' + name);
+              paramOffset += size;
+              table.rows.push(makeSymTableRow(name, type, paramOffset, size));
+            }
+          }
+
+          let symOffset = 0;
+          for (const ins of listIns.kids) {
+            if (ins.name !== 'ins-sym') continue;
+            let type = ins.kids.find((x) => x.name === 'type');
+            let name = ins.props.name;
+            let size = getTypeSizeOnStack(type);
+            if (findSymTableLoc(scope, name)) throw makeErr(ins.i, 'duplicate symbol: ' + name);
+            table.rows.push(makeSymTableRow(name, type, symOffset, size));
+            table.size += size;
+            symOffset -= size;
+          }
+
+          return scope;
+        }
+
+        // /
+
+        // EXPRESSIONS ============================
+
+        function getTypeSizeInArray(type) {
+          let prim = type.kids[0];
+
+          if (prim.name === 'type-prim') {
+            // type.props
+            // if (prim.name.startsWith('')) return 4;
+            switch (prim.props.name) {
+              case 'int8':
+                return 1;
+              case 'PTR':
+              case 'ptr':
+              case 'int32':
+                return 4;
+              default:
+                throw makeErr(type.i, 'unknown type "' + prim.props.name + '"');
+            }
+          } else {
+            throw makeImplErr('unknown type ' + type.name);
+          }
+        }
+
+        function getTypeSizeOnStack(type) {
+          let prim = type.kids[0];
+
+          if (prim.name === 'type-prim') {
+            // type.props
+            // if (prim.name.startsWith('')) return 4;
+            switch (prim.props.name) {
+              case 'PTR':
+              case 'ptr':
+              case 'int32':
+                return 4;
+              default:
+                throw makeErr(type.i, 'unknown type "' + prim.props.name + '"');
+            }
+          } else {
+            throw makeImplErr('unknown type ' + type.name);
+          }
+        }
+
+        // /
+
+        // FUNCTIONS ============================
+
+        function findFunc(name) {
+          return state.root.kids.find((x) => x.name === 'func' && x.props.name === name);
+        }
+
+        function getAsmNameFunc(func) {
+          return 'sf_' + func.props.name;
+        }
+
+        // /
+
+        // ASM HELPERS ============================
+
+        function strLitToAsm(strLit) {
+          let value = strLit.props.value;
+          let v = value.slice(1, value.length - 1);
+          v = v.replace('\\"', '"').replace('\\n', '\n');
+          let val = v.match(/\\[^\\]/);
+          if (val) throw makeErr(strLit.i, 'unknown escape sequence ' + val);
+          v = v.replace('\\\\', '\\');
+          let r = '';
+          let inStr = false;
+          for (let i = 0; i < v.length; i++) {
+            let c = v[i];
+            let newInstr = c.match(/^[a-zA-Z0-9,-_ \.\/]/);
+            if (newInstr) {
+              if (!inStr) {
+                if (r.length > 0) r += ', ';
+                r += "'";
+              }
+              r += c;
+            } else {
+              if (inStr) r += "'";
+              if (r.length > 0) r += ', ';
+              r += c.codePointAt(0);
+            }
+            inStr = newInstr;
+          }
+          if (inStr) r += "'";
+          if (r.length > 0) r += ', ';
+          r += '0';
+          return r;
+        }
+
+        function getOffStr(off) {
+          let mag = Math.abs(off);
+          let offStr = off < 0 ? ' - ' + mag : off > 0 ? ' + ' + mag : '';
+          return offStr;
+        }
+
+        // /
+
+        // TYPE-CHECKING METHODS ===================================
+
+        function isTypePrimitive(type) {
+          return (type.name === 'type' && isTypePrimitive(type.kids[0])) || (type.name === 'type-prim' && ['int32', 'ptr', 'PTR'].includes(type.props.name));
+        }
+
+        function checkType(expr, scope, expectedType) {
+          let exprType = evalType(expr, scope);
+
+          if (typeToString(exprType) !== typeToString(expectedType)) {
+            throw makeErr(expr.i, 'expected type ' + typeToString(expectedType) + ' but got ' + typeToString(exprType));
+          }
+        }
+
+        function checkTypeName(expr, scope, expectedTypeName) {
+          let exprType = evalType(expr, scope);
+
+          if (typeToString(exprType) !== expectedTypeName) {
+            throw makeErr(expr.i, 'expected type ' + expectedTypeName + ' but got ' + typeToString(exprType));
+          }
+        }
+
+        function typeToString(type) {
+          if (type.name === 'type') return typeToString(type.kids[0]);
+
+          if (type.name === 'type-prim') {
+            let r = type.props.name;
+            let kids = type.kids ?? [];
+            if (kids.length > 0) {
+              r += '[';
+              for (let i = 0; i < kids.length; i++) {
+                if (i > 0) r += ',';
+                r += typeToString(kids[i]);
+              }
+              r += ']';
+            }
+            return r;
+          }
+
+          throw makeImplErr('unknown type: ' + type.name);
+        }
+
+        function evalType(expr, scope) {
+          if (expr.name === 'expr') return evalType(expr.kids[0], scope);
+
+          const makeLitType = (kid) => ({ name: 'type', kids: [kid] });
+          const makeLitTypePrim = (typeName, kids = []) => ({ name: 'type-prim', props: { name: typeName }, kids });
+
+          if (expr.name === 'expr-lit') {
+            switch (expr.props.litType) {
+              case 'dec-int':
+                return makeLitType(makeLitTypePrim('int32'));
+              case 'ptr-str':
+                return makeLitType(makeLitTypePrim('PTR', [makeLitTypePrim('int8')]));
+              default:
+                throw makeImplErr('unknown literal type: ' + expr.props.litType);
+            }
+          } else if (expr.name === 'expr-op') {
+            let op = expr.props.op;
+            switch (op) {
+              case '+':
+                let allowed = ['int32'];
+                let a = expr.kids[0];
+                let b = expr.kids[1];
+                let typeA = evalType(a, scope).kids[0];
+                let typeB = evalType(b, scope).kids[0];
+                if (!isTypePrimitive(typeA) || !isTypePrimitive(typeB)) throw makeErr(expr.i, 'cannot use op ' + op + ' for these non-primitive types');
+                if (!allowed.includes(typeA.props.name)) throw makeErr(expr.i, 'op ' + op + ' only allowed for types ' + allowed.join());
+                if (!isSubset(typeA, typeB) && !isSubset(typeB, typeA)) throw makeErr(expr.i, 'cannot use op ' + op + ' for ' + typeToString(typeA) + ' and ' + typeToString(typeB));
+                return typeA;
+              default:
+                throw makeImplErr('unknown op ' + expr.props.op);
+            }
+          } else if (expr.name === 'expr-sym') {
+            let loc = findSymTableLoc(scope, expr.props.symbol);
+            if (!loc) throw makeErr(expr.i, 'can not find symbol ' + expr.props.symbol);
+            return loc.row.type;
+          } else if (expr.name === 'expr-arr') {
+            let type = expr.kids.find((x) => x.name === 'type');
+            if (!type) throw makeImplErr('array expression has no type');
+            return makeLitTypePrim('PTR', [type]);
+          } else if (expr.name === 'expr-ref') {
+            let kidExpr = expr.kids[0];
+            let type = evalType(kidExpr, scope);
+            return makeLitTypePrim('PTR', [type]);
+          } else {
+            throw makeImplErr('unknown expression ' + expr.name);
+          }
+          throw makeImplErr('?');
+        }
+
+        // /
+
+        // COMPILATION METHODS ============================================
+
+        function baseCompileDataTable() {
+          let r = '';
+
+          dataTable = makeDataTable({});
+
+          function traverse(node) {
+            // const makeNodeExprLitPtrStr = (str) => makeNode('expr-lit', { litType: 'ptr-str', value: str });
+            if (node.name === 'expr-lit' && node.props.litType === 'ptr-str') {
+              let value = node.props.value;
+              if (!findAsmNameLitPtrStr(value)) {
+                r += line(`;   str at ${getLoc(node.i)}`, 0);
+                let asmName = newAsmNameLitPtrStr();
+                r += line(asmName + ':', 0);
+                r += line('db ' + strLitToAsm(node));
+                dataTable.strings[value] = makeDataTableRowStr(asmName);
+              }
+            }
+            for (const k of node.kids ?? []) traverse(k);
+          }
+          traverse(state.root);
+
+          return r;
+        }
+
+        function baseCompileTopLevel() {
+          let asm = '';
+          for (const listIns of state.root.kids) {
+            if (listIns.name !== 'list-inst') continue;
+            if (listIns.kids.length === 0) continue;
+
+            asm += line(`;   tls at ${(getLoc(listIns.i) + '   ').padEnd(35, '=')} {`);
+            asm += compileScope(listIns, createScope(undefined, listIns));
+            asm += line(`; } tls at ${getLoc(listIns.i).padEnd(35, ' ')} `);
+            asm += line();
+          }
+          return asm;
+        }
+
+        function compileFunc(func) {
+          let asm = '';
+          asm += line(`;   func at ${(getLoc(func.i) + '   ').padEnd(35, '=')} {`, 0);
+          asm += line(getAsmNameFunc(func) + ':', 0);
+          let listIns = func.kids.find((x) => x.name === 'list-inst');
+          let listParam = func.kids.find((x) => x.name === 'list-param');
+          asm += compileScope(listIns, createScope(listParam, listIns));
+          asm += line(`ret`);
+          asm += line(`; } func at ${getLoc(func.i).padEnd(35, ' ')} `, 0);
+          asm += line();
+          return asm;
+        }
+        
+        // note on offset layout:
+        // ...
+        // ebp
+        // ebp -n   = second local variable, where n is size of first local variable
+        // ebp  0   = first local variable
+        // ebp +4   = base pointer of last scope
+        // ebp +8   = return address
+        // ebp +8+n = first param of scope where n is size of param (params are rtl)
+        // ...
+
+        function compileScope(listIns, scope) {
+          let r = '';
+
+          r += line('push    ebp');
+          r += line('lea     ebp, [esp - 4]'); // ebp points to first variable
+          if (scope.symTable.size > 0) r += line('sub     esp, ' + scope.symTable.size);
+          r += line('');
+
+          for (const ins of listIns.kids) {
+            switch (ins.name) {
+              case 'ins-sym':
+                r += compileInsSym(ins, scope);
+                break;
+              case 'ins-call':
+                r += compileInsCall(ins, scope);
+                break;
+              case 'ins-asm':
+                r += compileInsAsm(ins, scope);
+                break;
+            }
+          }
+
+          r += line('lea     esp, [ebp + 8]');
+          r += line('mov     ebp, [ebp + 4]');
+
+          return r;
+        }
+
+        function compileInsSym(ins, scope) {
+          let r = '';
+
+          // todo: only allow usage of sym after this.
+          let expr = ins.kids.find((x) => x.name === 'expr');
+          let type = ins.kids.find((x) => x.name === 'type');
+
+          checkType(expr, scope, type);
+
+          let symbol = ins.props.name;
+          let loc = findSymTableLoc(scope, symbol);
+          let row = loc.row;
+
+          r += line(`; symbol init: ${symbol}`);
+
+          r += compileExpr(expr, scope);
+
+          // note: only works for 4-byte values
+          r += line('pop     eax');
+          r += line(`mov     [ebp${getOffStr(row.off)}], eax`);
+          r += line();
+
+          return r;
+        }
+
+        function compileInsCall(ins, scope) {
+          let r = '';
+
+          r += line('; call');
+
+          let func = findFunc(ins.props.name);
+          if (!func) throw makeErr(ins.i, 'unknown function: ' + ins.props.name);
+          let params = func.kids.find((x) => x.name === 'list-param').kids;
+          let args = ins.kids.filter((x) => x.name === 'arg');
+          if (params.length < args.length) throw makeErr(ins.i, 'to many arguments for ' + func.props.name);
+
+          let size = 0;
+          for (const param of [...params].reverse()) {
+            let arg = args.find((x) => x.props.name == param.props.name);
+            if (!arg) throw makeErr(ins.i, 'can not find argument for param ' + param.props.name);
+
+            let expr = arg.kids.find((x) => x.name === 'expr');
+            let type = param.kids.find((x) => x.name === 'type');
+
+            checkType(expr, scope, type);
+
+            size += getTypeSizeOnStack(type);
+
+            r += compileExpr(expr, scope);
+          }
+
+          r += line('call    ' + getAsmNameFunc(func));
+
+          if (size > 0) {
+            r += line(`add     esp, ${size}`);
+          }
+
+          r += line();
+
+          return r;
+        }
+
+        function compileInsAsm(ins, scope) {
+          let r = '';
+          r += line('; asm');
+          for (const nodeAsm of ins.kids) {
+            let lineRes = '';
+            for (const part of nodeAsm.kids) {
+              if (part.props.partType === 'asm') {
+                lineRes += part.props.value;
+              } else if (part.props.partType === 'sus') {
+                let symbol = part.props.value;
+                let loc = findSymTableLoc(scope, symbol);
+                if (!loc) throw makeErr(part.i, 'can not find symbol ' + symbol);
+                let row = loc.row;
+
+                // todo: output code for loading symbol from different scope
+                if (loc.scopes.length !== 1) throw makeErr('can only use local variables in asm instructions');
+                lineRes += `[ebp${getOffStr(row.off)}]`; // ; ${symbol}
+              } else throw Error();
+            }
+            r += line(lineRes);
+          }
+          r += line();
+          return r;
+        }
+
+        // always generates asm to push (very inefficient lol)
+        // const makeNodeExpr = (_) => makeNode('expr', 'expr-sym', 'expr-op',  'expr-lit' ('dec-int' 13254, 'ptr-str' "asdf"});
+        function compileExpr(expr, scope) {
+          if (expr.name === 'expr') return compileExpr(expr.kids[0], scope);
+
+          let asm = '';
+          if (expr.name === 'expr-lit') {
+            switch (expr.props.litType) {
+              case 'dec-int':
+                asm += line('push    ' + expr.props.value);
+                break;
+              case 'ptr-str':
+                let asmName = findAsmNameLitPtrStr(expr.props.value);
+                asm += line('push    ' + asmName);
+                break;
+              default:
+                throw makeImplErr('unknown literal type: ' + expr.props.litType);
+            }
+          } else if (expr.name === 'expr-op') {
+            asm += compileExprOp(expr, scope);
+          } else if (expr.name === 'expr-sym') {
+            asm += compileExprSym(expr, scope);
+          } else if (expr.name === 'expr-arr') {
+            asm += compileExprArr(expr, scope);
+          } else if (expr.name === 'expr-ref') {
+            asm += compileExprRef(expr, scope);
+          } else {
+            throw makeImplErr('unknown expression ' + expr.name);
+          }
+          return asm;
+        }
+        function compileExprRef(expr, scope) {
+          let kidExpr = expr.kids[0].kids[0];
+          let asm = '';
+          if (kidExpr.name === 'expr-sym') {
+            return compileExprRefSym(kidExpr, scope);
+          } else {
+            throw makeErr(kidExpr.i, 'can not take reference of expression ' + kidExpr.name);
+          }
+          return asm;
+        }
+
+        function compileExprRefSym(exprSym, scope) {
+          let asm = '';
+          let symbol = exprSym.props.symbol;
+          let loc = findSymTableLoc(scope, symbol);
+          if (!loc) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
+          if (loc.scopes.length !== 1) throw makeErr('can only use local variables in asm instructions');
+          let row = loc.row;
+          // todo: output code for loading symbol from different scope
+          asm += line(`lea     eax, [ebp${getOffStr(row.off)}] ; symbol ref: ${symbol}`);
+          asm += line(`push    eax`);
+          return asm;
+        }
+
+        function compileExprArr(expr, scope) {
+          let asm = '';
+
+          let type = expr.kids[0];
+          let sizeExpr = expr.kids[1];
+
+          let sizeType = typeToString(evalType(sizeExpr, scope));
+          if (sizeType !== 'ptr' && sizeType !== 'int32') throw makeErr(sizeExpr.i, 'expected expression of type ptr or int32');
+
+          // NOTE: EVERY "ARR" EXPRESSION IRREVERSIBLY GROWS THE STACK BY THE ARRAY SIZE FOR THE SCOPE.
+
+          // asm to mov aligned array size in bytes into eax:
+          asm += compileExpr(sizeExpr, scope);
+          asm += line(`pop     eax`);
+          asm += line(`mov     ecx, ${getTypeSizeInArray(type)}`);
+          asm += line(`mul     ecx`);
+          asm += line(`add     eax, 3`);
+          asm += line(`shr     eax, 2`);
+          asm += line(`shl     eax, 2`);
+
+          // push array, push array pointer
+          asm += line(`sub     esp, eax`);
+          asm += line(`push    esp ; array base`);
+
+          return asm;
+        }
+
+        function compileExprOp(exprOp, scope) {
+          let op = exprOp.props.op;
+          switch (op) {
+            case '+':
+              return compileExprOpSimple(exprOp, scope, op, 'add');
+            default:
+              throw makeImplErr('unknown operand ' + op);
+          }
+        }
+
+        // (very inefficient lol)
+        function compileExprOpSimple(exprOp, scope, op, asmOp) {
+          if (exprOp.kids.length != 2) throw makeErr('expected 2 params for op +');
+          let a = exprOp.kids[0];
+          let b = exprOp.kids[1];
+          let asm = '';
+          asm += compileExpr(a, scope);
+          asm += compileExpr(b, scope);
+          asm += line(`pop     eax`);
+          asm += line(`${asmOp.padEnd(8, ' ')}[esp], eax`);
+          return asm;
+        }
+
+        function compileExprSym(exprSym, scope) {
+          let asm = '';
+
+          let symbol = exprSym.props.symbol;
+
+          let loc = findSymTableLoc(scope, symbol);
+          if (!loc) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
+          if (loc.scopes.length !== 1) throw makeErr('can only use local variables in asm instructions');
+          let row = loc.row;
+          // todo: output code for loading symbol from different scope
+
+          asm += line(`mov     eax, [ebp${getOffStr(row.off)}] ; symbol: ${symbol}`);
+          asm += line(`push    eax`);
+
+          return asm;
+        }
+
+        // /
+
+        // compilation start ========================================
+        let dataDefinitions = baseCompileDataTable();
+        let resultTopLevel = baseCompileTopLevel();
+        let resultFunctions = state.root.kids
+          .filter((x) => x.name === 'func')
+          .map((x) => compileFunc(x))
+          .join('');
+        //
+
+        return `
+global _main
+
+; data definitions
+section .text
+${dataDefinitions}
+; code
+section .text
+
+_main:
+${resultTopLevel}
+  extern  _ExitProcess@4
+  push    0
+  call    _ExitProcess@4
+
+  hlt
+
+${resultFunctions}`;
+      }
+
+      function compileFile(name, text) {
+        let root = parseFile(name, text);
+        let state = makeCompileState(name, text, root, root);
+        return compile(state);
+      }
+
+      //
+      // ============================== UTILS            ==============================
+      //
+
+      function lineNumber(str, idx) {
+        let line = 1;
+        let col = 1;
+        for (let i = 0; i < str.length && i <= idx; i++) {
+          const c = str[i];
+          if (c == '\n') {
+            line++;
+            col = 1;
+            continue;
+          }
+          col++;
+        }
+        return { line, col };
+      }
+
+      function onClickViewTree() {
+        let text = document.getElementById('in-code').value;
+        let root = parseFile('in-code.sus', text);
+        let str = JSON.stringify(root, null, 2);
+        document.getElementById('in-code-out').value = str;
+      }
+
+      function onClickCompile() {
+        let text = document.getElementById('in-code').value;
+        let result = compileFile('in-code.sus', text);
+        document.getElementById('in-code-out').value = result;
+      }
+
+      function onClickCompileClipboard() {
+        let text = document.getElementById('in-code').value;
+        let result = compileFile('in-code.sus', text);
+        document.getElementById('in-code-out').value = result;
+        writeClipboardText(result);
+      }
+
+      async function writeClipboardText(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch (error) {
+          console.error(error.message);
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div style="display: flex">
+      <textarea id="in-code" style="height: 30em; width: 40em"></textarea>
+      &nbsp;
+      <textarea id="in-code-out" style="height: 30em; width: 40em"></textarea>
+    </div>
+    <button onclick="onClickViewTree()">View Tree</button>
+    <button onclick="onClickCompile()">Compile</button>
+    <button onclick="onClickCompileClipboard()">Compile to clipboard</button>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+Strings are null-terminated and not writable.
+
+A function is decorated with the sus_func_ prefix.
+
+The calling convention is cdecl.

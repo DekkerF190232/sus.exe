@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>sus.exe</title>
+
+    <script>
+      function download(name, blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+
+      //
+      // ============================== PARSER           ==============================
+      //
+
+      function makeNode(name, props, parent, kids, loc) {
+        return { name, props, parent, kids, loc };
+      }
+
+      function makeParseState(filename, text, index, node) {
+        return { filename, text, index, node };
+      }
+
+      function makeLocation(filename, index) {
+        return { filename, index };
+      }
+
+      function makeType(name) {
+        return {name};
+      }
+
+      function stateLoc(state) {
+        return makeLocation(state.filename, state.index);
+      }
+
+      function locToString(loc) {
+        let { line, col } = lineNumber(loc.index);
+        return loc.filename + ' ' + line + ':' + col;
+      }
+
+      function parse(filename, text) {
+        let state = makeParseState(filename, text, 0, undefined);
+        let nodeRoot = makeNode('root', undefined, undefined, {}, stateLoc(state));
+        state.node = nodeRoot;
+        parseWhitespace(state);
+        while (state.index < state.text.length) {
+          parseBase(state);
+        }
+        return nodeRoot;
+      }
+
+      function parseBase(state) {
+        if (continues(state.text, state.index, 'func ')) {
+          parseFunc(state);
+          return;
+        }
+
+        return parseInstructions(state);
+      }
+
+      function parseFunc(state) {
+        state.index += 'func '.length;
+        parseWhitespace(state);
+
+        let name = parseValue(state, (x) => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'.includes(x));
+        parseWhitespace(state);
+
+        state.index += '('.length;
+        parseWhitespace(state);
+
+        let params = [];
+        while (!continues(state.text, state.index, ')')) {
+          if (continues(state.text, state.index, ',')) {
+            state.index++;
+            parseWhitespace(state);
+          }
+          // let param = parseValue(state, (x) => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'.includes(x));
+          
+          let nodeParam = makeNode('param', undefined, state.node)
+
+          parseWhitespace(state);
+          params.push(param);
+        }
+
+        let nodeTemplate = makeNode('func', { name, params }, state.node, [], stateLoc(state));
+        state.node.kids.push(nodeTemplate);
+        let prev = state.node;
+        state.node = nodeTemplate;
+
+        state.index += ')'.length;
+        parseWhitespace(state);
+
+        state.index += '{'.length;
+        parseWhitespace(state);
+
+        parseInstructions(state);
+
+        state.index += '}'.length;
+        parseWhitespace(state);
+
+        state.node = prev;
+      }
+
+      function parseInstructions(state) {
+        if (continues(state.text, state.index, 'asm ')) {
+          parseInstructionsAssembly(state);
+        } else {
+          parseInstructionsTemplate(state);
+        }
+      }
+
+      function parseInstructionsAssembly(state) {
+        let nodeAsm = makeNode('instruction-asm', undefined, state.node, [], stateLoc(state));
+        state.node.kids.push(nodeAsm);
+        let prev = state.node;
+        state.node = nodeAsm;
+
+        state.index += 'asm '.length;
+        parseWhitespace(state);
+
+        state.index += '{'.length;
+        parseWhitespace(state);
+
+        while (!continues(state.text, state.index, '}')) {
+          // let asmLine = parseValue(state, (x) => x !== '\n');
+          // parseWhitespace(state);
+          // let nodeAsmLine = makeNode('asm-line', { line: asmLine }, state.node, undefined, stateLoc(state));
+          // state.node.kids.push(nodeAsmLine);
+          parseInstructionsAssemblyLine(state);
+        }
+
+        state.index += '}'.length;
+        parseWhitespace(state);
+
+        state.node = prev;
+      }
+
+      function parseInstructionsAssemblyLine(state) {
+        
+      }
+
+      function parseInstructionsTemplate(state) {
+        let name = parseValue(state, (x) => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'.includes(x));
+        parseWhitespace(state);
+
+        state.index += '('.length;
+        parseWhitespace(state);
+
+        let args = {};
+        while (!continues(state.text, state.index, ')')) {
+          if (continues(state.text, state.index, ',')) {
+            state.index++;
+            parseWhitespace(state);
+          }
+
+          let param = parseValue(state, (x) => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'.includes(x));
+          parseWhitespace(state);
+          state.index += ':'.length;
+          parseWhitespace(state);
+          let arg = parseValue(state, (x) => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'.includes(x));
+          parseWhitespace(state);
+
+          args[param] = arg;
+        }
+
+        state.index += ')'.length;
+        parseWhitespace(state);
+
+        let templateNode = makeNode('instruction-template', { name, args }, state.node, undefined, stateLoc(state));
+        state.node.kids.push(templateNode);
+      }
+
+      function parseLine(state) {
+        return line;
+      }
+
+      function lineNumber(str, idx) {
+        let line = 1;
+        let col = 1;
+        for (let i = 0; i < str.length && i <= idx; i++) {
+          const c = str[i];
+          if (c == '\n') {
+            line++;
+            col = 1;
+            continue;
+          }
+          col++;
+        }
+        return { line, col };
+      }
+
+      function parseWhitespace(state) {
+        return parseValue(state, (x) => '\n\r\t '.includes(x));
+      }
+
+      function parseSpace(state) {
+        return parseValue(state, (x) => '\t '.includes(x));
+      }
+
+      function parseNewline(state) {
+        return parseValue(state, (x) => '\n\r'.includes(x));
+      }
+
+      function parseValue(state, test) {
+        let l = 0;
+        while (state.index < state.text.length && test(state.text[state.index])) {
+          l++;
+          state.index++;
+        }
+        return state.text.substr(state.index - l, l);
+      }
+
+      function continues(text, start, value) {
+        if (text.length - start < value.length) return false;
+        for (let i = 0; i < value.length; i++) {
+          if (value[i] !== text[start + i]) return false;
+        }
+        return true;
+      }
+
+      //
+      // ============================== COMPILER         ==============================
+      //
+
+      function makeCompileState(root) {
+        return { root };
+      }
+
+      function compileTopLevelStatements(state, root) {
+        let result = '';
+        for (const kid of root.kids) {
+          if (kid.name.startsWith('instruction')) {
+            result += '; ' + kid.name + ' at ' + locToString(kid.loc) + '\n';
+            result += compileInstruction(kid);
+          }
+        }
+        return result;
+      }
+
+      function compileInstruction(state, node) {
+        if (node.name === 'instruction-template') {
+          return compileInstructionTemplate(state, node);
+        }
+
+        if (node.name === 'instruction-asm') {
+          return compileInstructionAssembly(state, node);
+        }
+
+        throw new Error('not an instruction: ' + node.name + ' at ' + locToString(kid.loc));
+      }
+
+      function compileInstructionAssembly(state, node) {
+        let instructions = node.kids;
+        for (const inst of object) {
+          
+        }
+      }
+
+      function compileInstructionTemplate(state, node) {
+        let name = node.props.name;
+        let args = node.props.args;
+
+        let definition = state.root.kids.find((x) => x.name === 'definition-template' && x.props.name === name);
+        if (!definition) throw new Error('not a known template: ' + name + ' at ' + locToString(node.loc));
+
+        let r = '';
+        for (const instruction of definition.kids) {
+          r += compileInstruction(state, instruction);
+        }
+        return r;
+      }
+
+      function compile() {
+        let inProgram = document.getElementById('in-code').value;
+
+
+        let program = `
+          out(addr_start_str: amongus, addr_end_str: amongus_end)
+        `;
+
+        let root = parse('test.sus', program + '\n' + libDefault);
+
+        let state = makeCompileState(root);
+        let compiled = compileTopLevelStatements(state, root);
+
+        console.log(test);
+
+        return compiled;
+      }
+
+      function onClickCompile() {
+        let asmContent = compile();
+
+        download(
+          'sus.asm',
+          new Blob([asmContent], {
+            type: 'text/plain',
+          })
+        );
+      }
+
+      async function onClickCompileClipboard() {
+        let asmContent = compile();
+
+        try {
+          await navigator.clipboard.writeText(asmContent);
+        } catch (error) {
+          console.error(error.message);
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div>
+      <textarea id="in-code" style="height: 40em; width: 40em"></textarea>
+    </div>
+    <button onclick="onClickCompile()">Compile</button>
+    <button onclick="onClickCompileClipboard()">Compile to clipboard</button>
+  </body>
+</html>

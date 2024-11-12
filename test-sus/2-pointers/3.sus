@@ -1,0 +1,94 @@
+{
+  int32 bufferSize = 128;
+
+  sus_out_buffer(buffer: STR"Hallo\n", size:6);
+
+  int32 test = -123;
+
+  PTR[int8] intBuffer = ARR[int8](bufferSize);
+  
+
+  _iota_s(
+    value: test,
+    buffer:  intBuffer, 
+    size:    bufferSize, 
+    radix:   10
+  );
+  
+  strnlen(buffer: intBuffer, size: bufferSize);
+
+}
+
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+
+func exit(int32 code) {
+  ASM {
+    extern  _ExitProcess@4
+    mov eax, SUS{code}
+    push    eax
+    call    _ExitProcess@4
+    hlt
+  }
+}
+
+func strnlen(PTR[int8] buffer, int32 size) {
+  ASM {
+    extern  _strnlen
+    mov     eax, SUS{size}
+    push    eax
+    mov     eax, SUS{buffer}
+    push    eax
+    call    _strnlen
+  }
+}
+
+func _iota_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) {
+  ASM {
+    extern  __itoa_s
+    mov     eax, SUS{radix}
+    push    eax
+    mov     eax, SUS{size}
+    push    eax
+    mov     eax, SUS{buffer}
+    push    eax
+    mov     eax, SUS{value}
+    push    eax
+    call    __itoa_s
+  }
+}
+
+func sus_out_buffer(PTR[int8] buffer, int32 size) {
+  ASM {
+      extern  _GetStdHandle@4
+      extern  _WriteFile@20
+      push    -11
+      call    _GetStdHandle@4
+      mov     ecx, eax    
+      push    0
+      push    0
+      mov     eax, SUS{size} ; inserts [ebp+SIZE OFFSET]
+      push    eax
+      mov     eax, SUS{buffer}
+      push    eax
+      push    ecx
+      call    _WriteFile@20
+  }
+}

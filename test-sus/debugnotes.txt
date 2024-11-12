@@ -1,0 +1,1 @@
+symload hw.exe, "I:\Fun\sus.exe\asm\hw.pdb", 1
