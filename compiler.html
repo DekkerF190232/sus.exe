@@ -59,7 +59,8 @@
         const makeNodeExprLitDecInt = (decInt) => makeNode('expr-lit', { litType: 'dec-int', value: decInt });
         const makeNodeExprLitPtrStr = (str) => makeNode('expr-lit', { litType: 'ptr-str', value: str });
         const makeNodeExprArr = () => makeNode('expr-arr', null, []); // kids: type, expression for size
-        const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get address of
+        const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get pointer of
+        const makeNodeExprDrf = () => makeNode('expr-drf', null, []); // kids: expression to express value of
         const makeNodeType = () => makeNode('type', undefined, []);
         const makeNodeTypePrim = (name) => makeNode('type-prim', { name }, []);
         const makeNodeInsCall = (name) => makeNode('ins-call', { name }, []);
@@ -346,6 +347,17 @@
               eatPicky(')');
               eatEmpty();
               return refNode;
+            },
+            () => {
+              if (!eat(/^DRF/)) return;
+              eatEmpty();
+              if (!eat(/^\(/)) return;
+              eatEmpty();
+              let drfNode = makeNodeExprDrf();
+              drfNode.kids.push(parseNodeExpr());
+              eatPicky(')');
+              eatEmpty();
+              return drfNode;
             },
             (_) => {
               let symbol = eatSymbol();
@@ -812,6 +824,14 @@
             let kidExpr = expr.kids[0];
             let type = evalType(kidExpr, scope);
             return makeLitTypePrim('PTR', [type]);
+          } else if (expr.name === 'expr-drf') {
+            let kidExpr = expr.kids[0];
+            let type = evalType(kidExpr, scope).kids[0];
+            if (!isTypePrimitive(type)) throw makeErr(expr.i, 'dereferencing non-pointer type ' + typeToString(type));
+            if (type.props.name != 'PTR') throw makeErr(expr.i, 'dereferencing non-pointer type ' + typeToString(type));
+            let pointedType = type.kids[0];
+            // console.log(typeToString(type) + ' -> ' + typeToString(pointedType));
+            return pointedType;
           } else {
             throw makeImplErr('unknown expression ' + expr.name);
           }
@@ -916,10 +936,26 @@
           return r;
         }
 
-        function compileAssExpr(targetExpr, expr, scope) {
+        function compileInsAss(ins, scope) {
           let r = '';
 
+          let targetExpr = ins.kids[0].kids[0].kids[0]; // ins.target.expr.kids[0]
+          let expr = ins.kids[1].kids[0]; // ins.expr.kids[0]
+
+          let targetType = evalType(targetExpr, scope);
+          let exprType = evalType(expr, scope);
+          if (!typeEquals(targetType, exprType)) throw makeErr(ins.i, 'target of type ' + typeToString(targetType) + ' can not be assigned to type ' + typeToString(exprType));
+
           switch (targetExpr.name) {
+            case 'expr-drf':
+              r += line(`; deref assign`);
+              r += compileExpr(targetExpr.kids[0], scope);
+              r += compileExpr(expr, scope);
+              r += line(`pop     eax`);
+              r += line(`pop     ecx`);
+              r += line(`mov     [ecx], eax`);
+              r += line();
+              break;
             case 'expr-sym':
               let symbol = targetExpr.props.symbol;
               let loc = findSymTableLoc(scope, symbol);
@@ -932,23 +968,8 @@
               r += line();
               break;
             default:
-              throw makeErr(state.i, 'expression ' + targetExpr.name + ' can not be assigned');
+              throw makeErr(targetExpr.i, 'expression ' + targetExpr.name + ' can not be assigned');
           }
-
-          return r;
-        }
-
-        function compileInsAss(ins, scope) {
-          let r = '';
-
-          let targetExpr = ins.kids[0].kids[0].kids[0];
-          let expr = ins.kids[1].kids[0];
-
-          let targetType = evalType(targetExpr, scope);
-          let exprType = evalType(expr, scope);
-          if (!typeEquals(targetType, exprType)) throw makeErr(ins.i, 'target of type ' + typeToString(targetType) + ' can not be assigned to type ' + typeToString(exprType));
-
-          r += compileAssExpr(targetExpr, expr, scope);
 
           return r;
         }

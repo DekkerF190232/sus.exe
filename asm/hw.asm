@@ -3,68 +3,44 @@ global _main
 
 ; data definitions
 section .text
-;   str at in-code.sus:3:39
+;   str at in-code.sus:56:34
 ss_1:
-  db 'Hallo', 10, 0
-;   str at in-code.sus:60:34
-ss_2:
   db 10, 0
 
 ; code
 section .text
 
 _main:
-  ;   tls at in-code.sus:3:4   ================= {
+  ;   tls at in-code.sus:2:4   ================= {
   push    ebp
   lea     ebp, [esp - 4]
   sub     esp, 4
 
-  ; call
-  push    6
-  push    ss_1
-  call    sf_sus_out_buffer
-  add     esp, 8
-
-  ; symbol init: test
-  push    -123
+  ; symbol init: result
+  push    0
   pop     eax
   mov     [ebp], eax
 
   ; call
-  mov     eax, [ebp] ; symbol: test
+  lea     eax, [ebp] ; symbol ref: result
+  push    eax
+  push    3
+  push    4
+  call    sf_add
+  add     esp, 12
+
+  ; call
+  mov     eax, [ebp] ; symbol: result
   push    eax
   call    sf_sus_out_int32
   add     esp, 4
 
   ; call
   call    sf_sus_out_line
-
-  ; call
-  mov     eax, [ebp] ; symbol: test
-  push    eax
-  call    sf_sus_out_int32
-  add     esp, 4
-
-  ; call
-  call    sf_sus_out_line
-
-  ; call
-  mov     eax, [ebp] ; symbol: test
-  push    eax
-  call    sf_sus_out_int32
-  add     esp, 4
-
-  ; call
-  call    sf_sus_out_line
-
-  ; call
-  push    0
-  call    sf_sus_exit
-  add     esp, 4
 
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
-  ; } tls at in-code.sus:3:4                     
+  ; } tls at in-code.sus:2:4                     
 
 
   extern  _ExitProcess@4
@@ -73,7 +49,30 @@ _main:
 
   hlt
 
-;   func at in-code.sus:39:20   =============== {
+;   func at in-code.sus:10:10   =============== {
+sf_add:
+  push    ebp
+  lea     ebp, [esp - 4]
+
+  ; deref assign
+  mov     eax, [ebp + 20] ; symbol: result
+  push    eax
+  mov     eax, [ebp + 12] ; symbol: a
+  push    eax
+  mov     eax, [ebp + 16] ; symbol: b
+  push    eax
+  pop     eax
+  add     [esp], eax
+  pop     eax
+  pop     ecx
+  mov     [ecx], eax
+
+  lea     esp, [ebp + 8]
+  mov     ebp, [ebp + 4]
+  ret
+; } func at in-code.sus:10:10                   
+
+;   func at in-code.sus:35:20   =============== {
 sf_sus_out_int32:
   push    ebp
   lea     ebp, [esp - 4]
@@ -135,25 +134,25 @@ sf_sus_out_int32:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:39:20                   
+; } func at in-code.sus:35:20                   
 
-;   func at in-code.sus:59:19   =============== {
+;   func at in-code.sus:55:19   =============== {
 sf_sus_out_line:
   push    ebp
   lea     ebp, [esp - 4]
 
   ; call
   push    1
-  push    ss_2
+  push    ss_1
   call    sf_sus_out_buffer
   add     esp, 8
 
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:59:19                   
+; } func at in-code.sus:55:19                   
 
-;   func at in-code.sus:63:15   =============== {
+;   func at in-code.sus:59:15   =============== {
 sf_sus_exit:
   push    ebp
   lea     ebp, [esp - 4]
@@ -168,9 +167,9 @@ sf_sus_exit:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:63:15                   
+; } func at in-code.sus:59:15                   
 
-;   func at in-code.sus:73:17   =============== {
+;   func at in-code.sus:69:17   =============== {
 sf_sus_length:
   push    ebp
   lea     ebp, [esp - 4]
@@ -188,9 +187,9 @@ sf_sus_length:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:73:17                   
+; } func at in-code.sus:69:17                   
 
-;   func at in-code.sus:86:17   =============== {
+;   func at in-code.sus:82:17   =============== {
 sf_sus_iota_s:
   push    ebp
   lea     ebp, [esp - 4]
@@ -210,9 +209,9 @@ sf_sus_iota_s:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:86:17                   
+; } func at in-code.sus:82:17                   
 
-;   func at in-code.sus:101:21   ============== {
+;   func at in-code.sus:97:21   =============== {
 sf_sus_out_buffer:
   push    ebp
   lea     ebp, [esp - 4]
@@ -235,5 +234,5 @@ sf_sus_out_buffer:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:101:21                  
+; } func at in-code.sus:97:21                   
 
