@@ -225,7 +225,7 @@ sf_sus_out_buffer:
   mov     ecx, eax    
   push    0
   push    0
-  mov     eax, [ebp + 16]; inserts [ebp+SIZE OFFSET]
+  mov     eax, [ebp + 16]
   push    eax
   mov     eax, [ebp + 12]
   push    eax
