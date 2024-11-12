@@ -896,6 +896,9 @@
               case 'ins-sym':
                 r += compileInsSym(ins, scope);
                 break;
+              case 'ins-ass':
+                r += compileInsAss(ins, scope);
+                break;
               case 'ins-call':
                 r += compileInsCall(ins, scope);
                 break;
@@ -909,6 +912,43 @@
 
           r += line('lea     esp, [ebp + 8]');
           r += line('mov     ebp, [ebp + 4]');
+
+          return r;
+        }
+
+        function compileAssExpr(targetExpr, expr, scope) {
+          let r = '';
+
+          switch (targetExpr.name) {
+            case 'expr-sym':
+              let symbol = targetExpr.props.symbol;
+              let loc = findSymTableLoc(scope, symbol);
+              if (!loc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
+              let row = loc.row;
+              r += line(`; symbol assign: ${symbol}`);
+              r += compileExpr(expr, scope);
+              r += line('pop     eax');
+              r += line(`mov     [ebp${getOffStr(row.off)}], eax`);
+              r += line();
+              break;
+            default:
+              throw makeErr(state.i, 'expression ' + targetExpr.name + ' can not be assigned');
+          }
+
+          return r;
+        }
+
+        function compileInsAss(ins, scope) {
+          let r = '';
+
+          let targetExpr = ins.kids[0].kids[0].kids[0];
+          let expr = ins.kids[1].kids[0];
+
+          let targetType = evalType(targetExpr, scope);
+          let exprType = evalType(expr, scope);
+          if (!typeEquals(targetType, exprType)) throw makeErr(ins.i, 'target of type ' + typeToString(targetType) + ' can not be assigned to type ' + typeToString(exprType));
+
+          r += compileAssExpr(targetExpr, expr, scope);
 
           return r;
         }
