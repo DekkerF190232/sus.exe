@@ -52,7 +52,7 @@
         const makeNodeInsDone = (_) => makeNode('ins-done');
         const makeNodeInsSym = (name) => makeNode('ins-sym', { name }, []);
         const makeNodeInsAssign = (_) => makeNode('ins-ass', {}, []);
-        const makeNodeTarget = (symbol) => makeNode('target', { symbol });
+        const makeNodeTarget = (expr) => makeNode('target', undefined, [expr]);
         const makeNodeExpr = (_) => makeNode('expr', {}, []);
         const makeNodeExprSym = (symbol) => makeNode('expr-sym', { symbol });
         const makeNodeExprOp = (op) => makeNode('expr-op', { op }, []);
@@ -264,19 +264,19 @@
         function tryParseAssignment() {
           return tryParse((_) => {
             // try parse left hand
-            let nodeTarget = tryParse((_) => {
-              let symbol = eatSymbol();
-              return makeNodeTarget(symbol);
+            let nodeTargetExpr = tryParse((_) => {
+              let expr = tryParseNodeExpr();
+              if (!expr) return;
+              return makeNodeTarget(expr);
             });
-            if (!nodeTarget) return;
-            eatEmpty();
+            if (!nodeTargetExpr) return;
 
             let equals = eat(/^=/);
             if (!equals) return;
             eatEmpty();
 
             append(makeNodeInsAssign(), (_) => {
-              append(nodeTarget);
+              append(nodeTargetExpr);
               append(parseNodeExpr());
               eatPicky(';');
               eatEmpty();
@@ -286,11 +286,16 @@
           });
         }
 
-        // parses an expression
         function parseNodeExpr() {
+          return expect(tryParseNodeExpr(), 'expression');
+        }
+
+        // parses an expression
+        function tryParseNodeExpr() {
           let nodeExpr = makeNodeExpr();
 
-          let nodeCurrent = parseNodeExprVal();
+          let nodeCurrent = tryParseNodeExprVal();
+          if (!nodeCurrent) return undefined;
 
           while (true) {
             let nodeNew = tryParseNodeExprOp(nodeCurrent);
@@ -302,61 +307,58 @@
           return nodeExpr;
         }
 
-        function parseNodeExprVal() {
-          return expect(
-            tryParse(
-              () => {
-                if (!eat(/^STR[\t ]*(?=")/)) return;
-                let value = eatLitStr();
-                return makeNodeExprLitPtrStr(value);
-              },
-              () => {
-                if (!eat(/^ARR/)) return;
-                eatEmpty();
-                if (!eat(/^\[/)) return;
-                let type = eatNodeType();
-                eatEmpty();
+        function tryParseNodeExprVal() {
+          return tryParse(
+            () => {
+              if (!eat(/^STR[\t ]*(?=")/)) return;
+              let value = eatLitStr();
+              return makeNodeExprLitPtrStr(value);
+            },
+            () => {
+              if (!eat(/^ARR/)) return;
+              eatEmpty();
+              if (!eat(/^\[/)) return;
+              let type = eatNodeType();
+              eatEmpty();
 
-                eatPicky(']');
-                eatEmpty();
+              eatPicky(']');
+              eatEmpty();
 
-                eatPicky('(');
-                eatEmpty();
+              eatPicky('(');
+              eatEmpty();
 
-                let arrayNode = makeNodeExprArr();
-                arrayNode.kids.push(type);
-                arrayNode.kids.push(parseNodeExpr());
+              let arrayNode = makeNodeExprArr();
+              arrayNode.kids.push(type);
+              arrayNode.kids.push(parseNodeExpr());
 
-                eatPicky(')');
-                eatEmpty();
+              eatPicky(')');
+              eatEmpty();
 
-                return arrayNode;
-              },
-              () => {
-                if (!eat(/^REF/)) return;
-                eatEmpty();
-                if (!eat(/^\(/)) return;
-                eatEmpty();
-                let refNode = makeNodeExprRef();
-                refNode.kids.push(parseNodeExpr());
-                eatPicky(')');
-                eatEmpty();
-                return refNode;
-              },
-              (_) => {
-                let symbol = eatSymbol();
-                if (!symbol) return undefined;
-                eatEmpty();
-                return makeNodeExprSym(symbol);
-              },
-              (_) => {
-                let val = eatLitIntDec();
-                if (!val) return undefined;
-                eatEmpty();
-                return makeNodeExprLitDecInt(val);
-              }
-            ),
-            'value expression'
+              return arrayNode;
+            },
+            () => {
+              if (!eat(/^REF/)) return;
+              eatEmpty();
+              if (!eat(/^\(/)) return;
+              eatEmpty();
+              let refNode = makeNodeExprRef();
+              refNode.kids.push(parseNodeExpr());
+              eatPicky(')');
+              eatEmpty();
+              return refNode;
+            },
+            (_) => {
+              let symbol = eatSymbol();
+              if (!symbol) return undefined;
+              eatEmpty();
+              return makeNodeExprSym(symbol);
+            },
+            (_) => {
+              let val = eatLitIntDec();
+              if (!val) return undefined;
+              eatEmpty();
+              return makeNodeExprLitDecInt(val);
+            }
           );
         }
 
@@ -367,7 +369,7 @@
             eatEmpty();
             let n = makeNodeExprOp(op);
             n.kids.push(nodeExprA);
-            n.kids.push(parseNodeExprVal());
+            n.kids.push(tryParseNodeExprVal());
             return n;
           });
         }
@@ -870,7 +872,7 @@
           asm += line();
           return asm;
         }
-        
+
         // note on offset layout:
         // ...
         // ebp
@@ -900,6 +902,8 @@
               case 'ins-asm':
                 r += compileInsAsm(ins, scope);
                 break;
+              default:
+                throw makeErr(ins.i, 'unexpected expression: ' + ins.name);
             }
           }
 
