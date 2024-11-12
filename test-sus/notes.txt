@@ -1,7 +1,6 @@
 ISSUES
 
-  - getting -1073741819 (access violation, probably because arrays on stack are bad)
-  - no hex error code in test.bat
+  - asdfasdfa
 
 ACTUALLY IMPLEMENTED
 
@@ -29,9 +28,12 @@ MISSING
 
   - Instructions
 
+    - Expressions:
+      type checking for addition
+
     - Local symbols
       non self-assign
-      non-usable before delcaration
+      non-usable before declaration
 
     - done
 

@@ -1,19 +1,8 @@
 {
+  # sus_out_buffer(buffer: STR"Hallo\n", size:6);
 
-  sus_out_buffer(buffer: STR"Hallo\n", size:6);
-
-  int32 test = -123;
-
-  sus_out_int32(integer: test);
+  sus_out_int32(integer: 123);
   sus_out_line();
-
-  sus_out_int32(integer: test);
-  sus_out_line();
-
-  sus_out_int32(integer: test);
-  sus_out_line();
-  
-  sus_exit(code:0);
 }
 
 #
@@ -53,7 +42,20 @@ func sus_out_int32(int32 integer) {
     length: REF(length)
   );
 
-  sus_out_buffer(buffer: intBuffer, size: length);
+  # sus_out_buffer(buffer: intBuffer, size: length);
+
+
+  sus_out_buffer(buffer: STR"intBuffer+0=", size: 12);
+  sus_out_buffer(buffer: intBuffer+0, size: 1);
+  sus_out_line();
+  
+  sus_out_buffer(buffer: STR"intBuffer+1=", size: 12);
+  sus_out_buffer(buffer: intBuffer+1, size: 1);
+  sus_out_line();
+
+  sus_out_buffer(buffer: STR"intBuffer+2=", size: 12);
+  sus_out_buffer(buffer: intBuffer+2, size: 1);
+  sus_out_line();
 }
 
 func sus_out_line() {
