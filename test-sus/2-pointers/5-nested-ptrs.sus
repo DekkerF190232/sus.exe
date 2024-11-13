@@ -1,14 +1,15 @@
 {
   int32 result = 0;
+  PTR[int32] ref = REF(result);
 
-  add(a: 4, b: 3, result: REF(result));
+  add(a: 4, b: 3, result: REF(ref));
 
   sus_out_int32(integer: result);
   sus_out_line();
 }
 
-func add(int32 a, int32 b, PTR[int32] result) {
-  DRF(result) = a + b;
+func add(int32 a, int32 b, PTR[PTR[int32]] result) {
+  DRF(DRF(result)) = a + b;
 }
 
 

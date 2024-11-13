@@ -3,7 +3,7 @@ global _main
 
 ; data definitions
 section .text
-;   str at in-code.sus:56:34
+;   str at in-code.sus:57:34
 ss_1:
   db 10, 0
 
@@ -14,15 +14,21 @@ _main:
   ;   tls at in-code.sus:2:4   ================= {
   push    ebp
   lea     ebp, [esp - 4]
-  sub     esp, 4
+  sub     esp, 8
 
   ; symbol init: result
   push    0
   pop     eax
   mov     [ebp], eax
 
-  ; call
+  ; symbol init: ref
   lea     eax, [ebp] ; symbol ref: result
+  push    eax
+  pop     eax
+  mov     [ebp - 4], eax
+
+  ; call
+  lea     eax, [ebp - 4] ; symbol ref: ref
   push    eax
   push    3
   push    4
@@ -49,13 +55,16 @@ _main:
 
   hlt
 
-;   func at in-code.sus:10:10   =============== {
+;   func at in-code.sus:11:10   =============== {
 sf_add:
   push    ebp
   lea     ebp, [esp - 4]
 
   ; deref assign
   mov     eax, [ebp + 20] ; symbol: result
+  push    eax
+  pop     eax
+  mov     eax, [eax]
   push    eax
   mov     eax, [ebp + 12] ; symbol: a
   push    eax
@@ -70,9 +79,9 @@ sf_add:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:10:10                   
+; } func at in-code.sus:11:10                   
 
-;   func at in-code.sus:35:20   =============== {
+;   func at in-code.sus:36:20   =============== {
 sf_sus_out_int32:
   push    ebp
   lea     ebp, [esp - 4]
@@ -134,9 +143,9 @@ sf_sus_out_int32:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:35:20                   
+; } func at in-code.sus:36:20                   
 
-;   func at in-code.sus:55:19   =============== {
+;   func at in-code.sus:56:19   =============== {
 sf_sus_out_line:
   push    ebp
   lea     ebp, [esp - 4]
@@ -150,9 +159,9 @@ sf_sus_out_line:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:55:19                   
+; } func at in-code.sus:56:19                   
 
-;   func at in-code.sus:59:15   =============== {
+;   func at in-code.sus:60:15   =============== {
 sf_sus_exit:
   push    ebp
   lea     ebp, [esp - 4]
@@ -167,9 +176,9 @@ sf_sus_exit:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:59:15                   
+; } func at in-code.sus:60:15                   
 
-;   func at in-code.sus:69:17   =============== {
+;   func at in-code.sus:70:17   =============== {
 sf_sus_length:
   push    ebp
   lea     ebp, [esp - 4]
@@ -187,9 +196,9 @@ sf_sus_length:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:69:17                   
+; } func at in-code.sus:70:17                   
 
-;   func at in-code.sus:82:17   =============== {
+;   func at in-code.sus:83:17   =============== {
 sf_sus_iota_s:
   push    ebp
   lea     ebp, [esp - 4]
@@ -209,9 +218,9 @@ sf_sus_iota_s:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:82:17                   
+; } func at in-code.sus:83:17                   
 
-;   func at in-code.sus:97:21   =============== {
+;   func at in-code.sus:98:21   =============== {
 sf_sus_out_buffer:
   push    ebp
   lea     ebp, [esp - 4]
@@ -234,5 +243,5 @@ sf_sus_out_buffer:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:97:21                   
+; } func at in-code.sus:98:21                   
 
