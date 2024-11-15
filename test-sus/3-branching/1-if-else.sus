@@ -1,0 +1,179 @@
+{
+  printB(b:no||no);
+  printB(b:yes||no);
+  printB(b:yes||yes);
+  printB(b:no||yes);
+
+  printLn();
+
+  boo result = yes;
+  testIfEquals(a: 0, b: 0, result: REF(result), expected: yes);
+  testIfEquals(a: 10, b: 10, result: REF(result), expected: yes);
+  testIfEquals(a: 10, b: 0, result: REF(result), expected: no);
+  testIfEquals(a: 0, b: 10, result: REF(result), expected: no);
+  
+  # testIfEquals(a: 0, b: 0, result: REF(result), expected: no);
+}
+
+func testIfEquals(int32 a, int32 b, PTR[boo] result, boo expected ) {
+  printI(i: a);
+  printS(s: STR", ");
+  printI(i: b);
+  printS(s: STR"    ");
+
+  boo t = a == b;
+  boo r = no;
+  PTR[boo] pt = ARR[boo](1);
+  
+  if (t) {
+    printS(s: STR"equal");
+    r = yes;
+    DRF(pt) = r;
+    printB(b:DRF(pt));
+
+  } else {
+    printS(s: STR"not equal");
+    r = no;
+    DRF(pt) = r;
+
+    printB(b: DRF(pt));
+  }
+
+  DRF(result) = r;
+
+  printS(s: STR"     ");
+  printB(b:DRF(result));
+  printB(b:r);
+  printB(b:expected);
+  printB(b:DRF(pt));
+  
+  if (DRF(result) != expected || DRF(pt) != DRF(result))
+    printS(s: STR"        FAILURE");
+
+
+  printLn();
+}
+
+func printB(boo b) {
+  if (b) sus_out_int32(integer:1);
+  else sus_out_int32(integer:0);
+}
+
+func printI(int32 i) {
+  sus_out_int32(integer:i);
+}
+
+func printS(PTR[int8] s) {
+  int32 length = 0;
+  sus_length(
+    buffer: s,
+    size: 10000,
+    length: REF(length)
+  );
+  sus_out_buffer(buffer: s, size: length);
+}
+
+func printLn() {
+  printS(s: STR "\n");
+}
+
+
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+
+func sus_out_int32(int32 integer) {
+  int32 bufferSize = 128;
+  PTR[int8] intBuffer = ARR[int8](bufferSize);
+  
+  int32 length = 0;
+  sus_iota_s(
+    value:  integer,
+    buffer: intBuffer, 
+    size:   bufferSize, 
+    radix:  10
+  );
+  sus_length(
+    buffer: intBuffer,
+    size: bufferSize,
+    length: REF(length)
+  );
+
+  sus_out_buffer(buffer: intBuffer, size: length);
+}
+
+func sus_out_line() {
+  sus_out_buffer(buffer: STR"\n", size:1);
+}
+
+func sus_exit(int32 code) {
+  ASM {
+    extern  _ExitProcess@4
+    mov     eax, SUS{code}
+    push    eax
+    call    _ExitProcess@4
+    hlt
+  }
+}
+
+func sus_length(PTR[int8] buffer, int32 size, PTR[int32] length) {
+  ASM {
+    extern  _strnlen
+    mov     eax, SUS{size}
+    push    eax
+    mov     eax, SUS{buffer}
+    push    eax
+    call    _strnlen
+    mov     ecx, SUS{length}
+    mov     [ecx], eax
+  }
+}
+
+func sus_iota_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) {
+  ASM {
+    extern  __itoa_s
+    mov     eax, SUS{radix}
+    push    eax
+    mov     eax, SUS{size}
+    push    eax
+    mov     eax, SUS{buffer}
+    push    eax
+    mov     eax, SUS{value}
+    push    eax
+    call    __itoa_s
+  }
+}
+
+func sus_out_buffer(PTR[int8] buffer, int32 size) {
+  ASM {
+      extern  _GetStdHandle@4
+      extern  _WriteFile@20
+      push    -11
+      call    _GetStdHandle@4
+      mov     ecx, eax    
+      push    0
+      push    0
+      mov     eax, SUS{size}
+      push    eax
+      mov     eax, SUS{buffer}
+      push    eax
+      push    ecx
+      call    _WriteFile@20
+  }
+}

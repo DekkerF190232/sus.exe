@@ -1,47 +1,40 @@
 ISSUES
-
-  - asdfasdfa
+  - Expressions:
+    - type checking for addition
+    - REF chaining
+    - arithmetic operators
+  - Local symbols
+    non self-assign
+    non-usable before declaration
 
 ACTUALLY IMPLEMENTED
-
   - Top Level Statements
-
   - Functions
-
+    - Parameters
   - Instructions
-
     - Local symbols
-
+      - Initializing, Assigning
     - Asm instructions
-
     - Expressions
-    
       - Operators, String literals, int32 literals
+    - Branching
+      - Conditions
+    - Blocks/Scopes
 
   - Type checking
-
   - Pointers
+    - Arithmetic Referencing, Dereferencing, Assigning
+  - Stack-Arrays
 
-  - Primitive Arrays
+
 
 MISSING
-
   - Instructions
-
-    - Expressions:
-      type checking for addition
-
-    - Local symbols
-      non self-assign
-      non-usable before declaration
-
     - done
-
-    - Pointers: DRF (Deref), Assignments, Arithmetic
-
+    - Conditions
     - Loops
-
-    - Arrays
+  - Structures
+    - 
 
 
 NOTES FOR NEVER

@@ -49,14 +49,18 @@
         const makeNodeInsAsm = (_) => makeNode('ins-asm', undefined, []);
         const makeNodeAsm = (_) => makeNode('asm', undefined, []);
         const makeNodeAsmPart = (partType, value) => makeNode('asm-part', { partType, value }); // partType: asm/sus
+        const makeNodeInstBlock = () => makeNode('ins-block', undefined, []); // kids: list-inst
         const makeNodeInsDone = (_) => makeNode('ins-done');
         const makeNodeInsSym = (name) => makeNode('ins-sym', { name }, []);
         const makeNodeInsAssign = (_) => makeNode('ins-ass', {}, []);
+        const makeNodeInsIf = (_) => makeNode('ins-if', undefined, []); // kids: expr, list-inst
+        const makeNodeElse = (_) => makeNode('else', undefined, []); // kids: expr, list-inst
         const makeNodeTarget = (expr) => makeNode('target', undefined, [expr]);
         const makeNodeExpr = (_) => makeNode('expr', {}, []);
         const makeNodeExprSym = (symbol) => makeNode('expr-sym', { symbol });
         const makeNodeExprOp = (op) => makeNode('expr-op', { op }, []);
         const makeNodeExprLitDecInt = (decInt) => makeNode('expr-lit', { litType: 'dec-int', value: decInt });
+        const makeNodeExprLitBoo = (val) => makeNode('expr-lit', { litType: 'dec-boo', value: val });
         const makeNodeExprLitPtrStr = (str) => makeNode('expr-lit', { litType: 'ptr-str', value: str });
         const makeNodeExprArr = () => makeNode('expr-arr', null, []); // kids: type, expression for size
         const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get pointer of
@@ -93,6 +97,7 @@
         const eatSymbol = () => eat(/^[a-zA-Z0-9_]*[a-zA-Z_]+[a-zA-Z0-9_]*/);
         const eatTypeName = () => eat(/^[a-zA-Z0-9_]*[a-zA-Z_]+[a-zA-Z0-9_]*/);
         const eatLitIntDec = () => eat(/^-?[0-9]+/);
+        const eatLitBoo = () => eat(/^(yes|no)/);
         const eatLitStr = () => eat(/^(".*?[^\\]"|"")/);
 
         // https://stackoverflow.com/a/6969486/13356588
@@ -126,6 +131,18 @@
             subParser();
             state.n = prev;
           }
+        }
+
+        function kidnap(parserFunc) {
+          let lastNode = state.n;
+          state.n = { name: null, props: {}, kids: [] };
+          parserFunc();
+          if (state.n.kids.length !== 1) {
+            throw new Error('no single node appended');
+          }
+          let captured = state.n.kids[0];
+          state.n = lastNode;
+          return captured;
         }
 
         function locPrevString() {
@@ -173,32 +190,86 @@
 
         function parseListInst() {
           append(makeNodeListInst(), (_) => {
-            while (true) {
-              if (test(/^done[\t \n]*;/)) {
-                parseInstDone();
-                continue;
-              }
-              if (test(/^ASM/)) {
-                parseInstAsm();
-                continue;
-              }
-              if (tryParseAssignment()) {
-                continue;
-              }
-              if (tryParseSym()) {
-                continue;
-              }
-              if (tryParseCall()) {
-                continue;
-              }
-
-              break;
-            }
+            while (tryParseInst());
           });
-          // warn('empty block');
         }
 
-        function tryParseCall() {
+        function tryParseInstBlock() {
+          return tryParse(() => {
+            if (!eat(/^\{/)) return;
+            eatEmpty();
+
+            append(makeNodeInstBlock(), () => {
+              parseListInst();
+            });
+
+            eatPicky('}');
+            eatEmpty();
+            return true;
+          });
+        }
+
+        function tryParseInst() {
+          if (tryParseInstBlock()) return true;
+          if (tryParseInstDone()) return true;
+          if (tryParseInstAsm()) return true;
+          if (tryParseInstAssignment()) return true;
+          if (tryParseInstSym()) return true;
+          if (tryParseInstIf()) return true;
+          if (tryParseInstCall()) return true;
+          return false;
+        }
+
+        function tryParseInstIf() {
+          return tryParse(() => {
+            if (!eat(/^if/)) return;
+            eatEmpty();
+
+            if (!eat(/^\(/)) return;
+            eatEmpty();
+
+            let nodeIf = makeNodeInsIf();
+
+            nodeIf.kids.push(parseNodeExpr()); // if: expr
+
+            eatPicky(')');
+            eatEmpty();
+
+            nodeIf.kids.push(
+              expect(
+                kidnap(() => tryParseInst()),
+                'a statement'
+              )
+            ); // if: any instruction
+
+            // else
+
+            let nodeElse = tryParse(() => {
+              if (!eat(/^else/)) return;
+
+              let space = eatEmpty();
+              if (!space || space.length === 0) return;
+
+              let n = makeNodeElse();
+
+              n.kids.push(
+                expect(
+                  kidnap(() => tryParseInst()),
+                  'a statement'
+                )
+              ); // else: any instruction
+
+              return n;
+            });
+
+            if (nodeElse) nodeIf.kids.push(nodeElse);
+
+            append(nodeIf);
+            return true;
+          });
+        }
+
+        function tryParseInstCall() {
           return tryParse((_) => {
             let name = eatSymbol();
             if (!name) return;
@@ -238,7 +309,7 @@
           });
         }
 
-        function tryParseSym() {
+        function tryParseInstSym() {
           return tryParse((_) => {
             let nodeType = tryEatNodeType();
             if (!nodeType) return undefined;
@@ -262,7 +333,7 @@
           });
         }
 
-        function tryParseAssignment() {
+        function tryParseInstAssignment() {
           return tryParse((_) => {
             // try parse left hand
             let nodeTargetExpr = tryParse((_) => {
@@ -360,6 +431,12 @@
               return drfNode;
             },
             (_) => {
+              let val = eatLitBoo();
+              if (!val) return undefined;
+              eatEmpty();
+              return makeNodeExprLitBoo(val);
+            },
+            (_) => {
               let symbol = eatSymbol();
               if (!symbol) return undefined;
               eatEmpty();
@@ -376,7 +453,7 @@
 
         function tryParseNodeExprOp(nodeExprA) {
           return tryParse((_) => {
-            let op = eat(/^[+]/);
+            let op = eat(/^([+]|==|!=|\|\|)/);
             if (!op) return undefined;
             eatEmpty();
             let n = makeNodeExprOp(op);
@@ -398,56 +475,65 @@
           return undefined;
         }
 
-        function parseInstDone() {
-          eatPicky('done;');
-          append(makeNodeInsDone());
-          eatEmpty();
+        function tryParseInstDone() {
+          return tryParse(() => {
+            if (!eat(/^done/)) return;
+            eatEmpty();
+            if (!eat(/^;/)) return;
+            eatEmpty();
+            append(makeNodeInsDone());
+            return true;
+          });
         }
 
-        function parseInstAsm() {
-          eatPicky('ASM');
-          eatEmpty();
-
-          append(makeNodeInsAsm(), (_) => {
-            eatPicky('{');
-            eatSpace();
-            // eatPicky('\n');
-            expect(eat(/^\n/), 'new line');
+        function tryParseInstAsm() {
+          return tryParse(() => {
+            if (!eat(/^ASM/)) return;
             eatEmpty();
 
-            while (!eat(/^}/)) {
-              if (eof()) throw err('unexpected eof');
-
-              append(makeNodeAsm(), (_) => {
-                while (!eat(/^\n/)) {
-                  if (eof()) throw err('unexpected eof');
-
-                  if (eat(/^SUS[\t\n ]*\{/)) {
-                    eatSpace();
-                    let symbol = expect(eatSymbol(), 'symbol in asm statement');
-                    eatSpace();
-                    eatPicky('}');
-                    eatSpace();
-
-                    append(makeNodeAsmPart('sus', symbol));
-                    continue;
-                  }
-
-                  // note: matches till end of line or till last character before next sus {
-                  let asmPart = eat(/^.*?(?=(SUS[\t ]*\{|\n))/);
-                  if (asmPart) {
-                    append(makeNodeAsmPart('asm', asmPart));
-                    eatSpace();
-                    continue;
-                  }
-
-                  throw err('could not parse asm line');
-                }
-                eatEmpty();
-              });
-            }
-
+            if (!eat(/^{/)) return;
             eatEmpty();
+
+            append(makeNodeInsAsm(), (_) => {
+              // eatPicky('\n');
+              // expect(eat(/^\n/), 'new line');
+              // eatEmpty();
+
+              while (!eat(/^}/)) {
+                if (eof()) throw err('unexpected eof');
+
+                append(makeNodeAsm(), (_) => {
+                  while (!eat(/^\n/)) {
+                    if (eof()) throw err('unexpected eof');
+
+                    if (eat(/^SUS[\t ]*\{/)) {
+                      eatSpace();
+                      let symbol = expect(eatSymbol(), 'symbol in asm statement');
+                      eatSpace();
+                      eatPicky('}');
+                      eatSpace();
+
+                      append(makeNodeAsmPart('sus', symbol));
+                      continue;
+                    }
+
+                    // note: matches till end of line or till last character before next sus {
+                    let asmPart = eat(/^.*?(?=(SUS[\t ]*\{|\n))/);
+                    if (asmPart) {
+                      append(makeNodeAsmPart('asm', asmPart));
+                      eatSpace();
+                      continue;
+                    }
+
+                    throw err('could not parse asm line');
+                  }
+                  eatEmpty();
+                });
+              }
+
+              eatEmpty();
+            });
+            return true;
           });
         }
 
@@ -477,6 +563,7 @@
                   append(eatNodeType());
 
                   let paramName = expect(eatSymbol(), 'a symbol');
+                  eatEmpty();
                   state.n.props.name = paramName;
                 });
               }
@@ -571,9 +658,17 @@
           return state.name + ':' + line + ':' + col;
         }
 
+        let currentIndent = 0;
+
+        function indented(compileFunc) {
+          currentIndent++;
+          compileFunc();
+          currentIndent--;
+        }
+
         function line(str = '', indentLevelCount = 1) {
           if (str == '') return '\n';
-          return '  '.repeat(indentLevelCount) + str + '\n';
+          return '  '.repeat(currentIndent + indentLevelCount) + str + '\n';
         }
 
         // STRING LITERALS ============================
@@ -588,20 +683,31 @@
 
         // SCOPES ======================================
 
+        // note on offset layout:
+        // ...
+        // ebp -n   = second local variable, where n is size of first local variable
+        // ebp      = first local variable
+        // ebp +4   = base pointer of last scope
+        // ebp +8   = return address
+        // ebp +8+n = first param of scope where n is size of param (params are rtl)
+        // ...
+        //
+        // also: in functions the caller does the stack cleanup.
+
         const makeSymTable = (rows, size) => ({ rows, size }); // includes params and locals, note that params are not included in size
         const makeSymTableRow = (symbol, type, off, size) => ({ symbol, type, off, size }); // symbol: name, type: node, off: ebp off bytes.  size: bytes
         const makeScope = (parent, symTable) => ({ parent, symTable });
         const makeSymTableLoc = (scopes, row) => ({ scopes, row });
 
         function findSymTableLoc(scope, sym, scopes = []) {
-          scopes.push(scope);
-
           if (scope === undefined) return undefined;
+
+          scopes.push(scope);
 
           let row = scope.symTable.rows.find((x) => x.symbol === sym);
           if (row) return makeSymTableLoc(scopes, row);
 
-          return findSymTableLoc(scope.parent, sym);
+          return findSymTableLoc(scope.parent, sym, scopes);
         }
 
         function createScope(listParam, listIns, parent) {
@@ -647,6 +753,7 @@
             // type.props
             // if (prim.name.startsWith('')) return 4;
             switch (prim.props.name) {
+              case 'boo':
               case 'int8':
                 return 1;
               case 'PTR':
@@ -670,6 +777,7 @@
             switch (prim.props.name) {
               case 'PTR':
               case 'ptr':
+              case 'boo':
               case 'int32':
                 return 4;
               default:
@@ -687,6 +795,8 @@
         function findFunc(name) {
           return state.root.kids.find((x) => x.name === 'func' && x.props.name === name);
         }
+
+        // note on valid nasm names: letters, numbers, _, $, #, @, ~, ., and ?. The only characters which may be used as the first character of an identifier are letters, .
 
         function getAsmNameFunc(func) {
           return 'sf_' + func.props.name;
@@ -738,7 +848,7 @@
         // TYPE-CHECKING METHODS ===================================
 
         function isTypePrimitive(type) {
-          return (type.name === 'type' && isTypePrimitive(type.kids[0])) || (type.name === 'type-prim' && ['int32', 'ptr', 'PTR'].includes(type.props.name));
+          return (type.name === 'type' && isTypePrimitive(type.kids[0])) || (type.name === 'type-prim' && ['boo', 'int32', 'ptr', 'PTR'].includes(type.props.name));
         }
 
         function checkType(expr, scope, expectedType) {
@@ -784,31 +894,45 @@
         function evalType(expr, scope) {
           if (expr.name === 'expr') return evalType(expr.kids[0], scope);
 
-          const makeLitType = (kid) => ({ name: 'type', kids: [kid] });
-          const makeLitTypePrim = (typeName, kids = []) => ({ name: 'type-prim', props: { name: typeName }, kids });
+          const makeArtType = (kid) => ({ name: 'type', kids: [kid] });
+          const makeArtTypePrim = (typeName, kids = []) => ({ name: 'type-prim', props: { name: typeName }, kids });
 
           if (expr.name === 'expr-lit') {
             switch (expr.props.litType) {
+              case 'dec-boo':
+                return makeArtType(makeArtTypePrim('boo'));
               case 'dec-int':
-                return makeLitType(makeLitTypePrim('int32'));
+                return makeArtType(makeArtTypePrim('int32'));
               case 'ptr-str':
-                return makeLitType(makeLitTypePrim('PTR', [makeLitTypePrim('int8')]));
+                return makeArtType(makeArtTypePrim('PTR', [makeArtTypePrim('int8')]));
               default:
                 throw makeImplErr('unknown literal type: ' + expr.props.litType);
             }
           } else if (expr.name === 'expr-op') {
+            function allowedNum(type) {
+              if (!isTypePrimitive(type)) return false;
+              if (!['int32', 'ptr', 'PTR'].includes(typeBaseName(type))) return false;
+              return true;
+            }
+            function allowedEq(type) {
+              if (!isTypePrimitive(type)) return false;
+              if (!['boo', 'int32', 'ptr', 'PTR'].includes(typeBaseName(type))) return false;
+              return true;
+            }
+            function allowedBoo(type) {
+              if (!isTypePrimitive(type)) return false;
+              if (typeBaseName(type) !== 'boo') return false;
+              return true;
+            }
             let op = expr.props.op;
             switch (op) {
+              case '!=':
+              case '==':
+                return evalBinOp(op, expr, scope, allowedEq, (a,b) => true, (a,b) => makeArtType(makeArtTypePrim('boo')));
               case '+':
-                let allowed = ['int32', 'ptr', 'PTR'];
-                let a = expr.kids[0];
-                let b = expr.kids[1];
-                let typeA = evalType(a, scope).kids[0];
-                let typeB = evalType(b, scope).kids[0];
-                if (!isTypePrimitive(typeA) || !isTypePrimitive(typeB)) throw makeErr(expr.i, 'cannot use op ' + op + ' for these non-primitive types');
-                if (!allowed.includes(typeA.props.name)) throw makeErr(expr.i, 'op ' + op + ' only allowed for types ' + allowed.join());
-                // if (!typeEquals(typeA, typeB)) throw makeErr(expr.i, 'cannot use op ' + op + ' for ' + typeToString(typeA) + ' and ' + typeToString(typeB));
-                return typeA;
+                return evalBinOp(op, expr, scope, allowedNum, (a,b) => true, (a,b) => a);
+              case '||':
+                return evalBinOp(op, expr, scope, allowedBoo, (a,b) => true, (a,b) => a);
               default:
                 throw makeImplErr('unknown op ' + expr.props.op);
             }
@@ -819,11 +943,11 @@
           } else if (expr.name === 'expr-arr') {
             let type = expr.kids.find((x) => x.name === 'type');
             if (!type) throw makeImplErr('array expression has no type');
-            return makeLitTypePrim('PTR', [type]);
+            return makeArtTypePrim('PTR', [type]);
           } else if (expr.name === 'expr-ref') {
             let kidExpr = expr.kids[0];
             let type = evalType(kidExpr, scope);
-            return makeLitTypePrim('PTR', [type]);
+            return makeArtTypePrim('PTR', [type]);
           } else if (expr.name === 'expr-drf') {
             let kidExpr = expr.kids[0];
             let type = evalType(kidExpr, scope);
@@ -836,6 +960,22 @@
             throw makeImplErr('unknown expression ' + expr.name);
           }
           throw makeImplErr('?');
+        }
+
+        function typeBaseName(type) {
+          if (type.name === 'type') type = type.kids[0];
+          return type.props.name;
+        }
+
+        function evalBinOp(op, expr, scope, allowedFunc, compatibleFunc, typeFunc) {
+          let a = expr.kids[0];
+          let b = expr.kids[1];
+          let typeA = evalType(a, scope);
+          let typeB = evalType(b, scope);
+          if (!allowedFunc(typeA)) throw makeErr(expr.i, 'op ' + op + ' not supported for type ' + typeToString(typeA));
+          if (!allowedFunc(typeB)) throw makeErr(expr.i, 'op ' + op + ' not supported for type ' + typeToString(typeB));
+          if (!compatibleFunc(typeA, typeB)) throw makeErr(expr.i, 'op ' + op + ' not compatible for types ' + typeToString(typeA) + ' and ' +  typeToString(typeB));
+          return typeFunc(typeA, typeB);
         }
 
         // /
@@ -893,16 +1033,6 @@
           return asm;
         }
 
-        // note on offset layout:
-        // ...
-        // ebp
-        // ebp -n   = second local variable, where n is size of first local variable
-        // ebp  0   = first local variable
-        // ebp +4   = base pointer of last scope
-        // ebp +8   = return address
-        // ebp +8+n = first param of scope where n is size of param (params are rtl)
-        // ...
-
         function compileScope(listIns, scope) {
           let r = '';
 
@@ -912,26 +1042,93 @@
           r += line('');
 
           for (const ins of listIns.kids) {
-            switch (ins.name) {
-              case 'ins-sym':
-                r += compileInsSym(ins, scope);
-                break;
-              case 'ins-ass':
-                r += compileInsAss(ins, scope);
-                break;
-              case 'ins-call':
-                r += compileInsCall(ins, scope);
-                break;
-              case 'ins-asm':
-                r += compileInsAsm(ins, scope);
-                break;
-              default:
-                throw makeErr(ins.i, 'unexpected expression: ' + ins.name);
-            }
+            r += compileIns(ins, scope);
           }
 
           r += line('lea     esp, [ebp + 8]');
           r += line('mov     ebp, [ebp + 4]');
+
+          return r;
+        }
+
+        function compileIns(ins, scope) {
+          let r = '';
+          switch (ins.name) {
+            case 'ins-sym':
+              r += compileInsSym(ins, scope);
+              break;
+            case 'ins-ass':
+              r += compileInsAss(ins, scope);
+              break;
+            case 'ins-call':
+              r += compileInsCall(ins, scope);
+              break;
+            case 'ins-asm':
+              r += compileInsAsm(ins, scope);
+              break;
+            case 'ins-block':
+              r += compileInsBlock(ins, scope);
+              break;
+            case 'ins-if':
+              r += compileInsIf(ins, scope);
+              break;
+            default:
+              throw makeImplErr('unsupported statement: ' + ins.name);
+          }
+          return r;
+        }
+
+        function getAsmNameIf(insIf) {
+          let { line, col } = lineNumber(state.text, insIf.i);
+          return 'ss__if_' + line + '_' + col;
+        }
+
+        function compileInsIf(insIf, scope) {
+          let r = '';
+
+          let asmName = getAsmNameIf(insIf);
+          let asmNameYes = asmName + '_yes';
+          let asmNameElse = asmName + '_else';
+          let asmNameEnd = asmName + '_end';
+
+          let expr = insIf.kids[0];
+          let ins = insIf.kids[1];
+          let nodeElse = insIf.kids.length >= 3 ? insIf.kids[2] : undefined;
+
+          checkTypeName(expr, scope, 'boo');
+
+          r += compileExpr(expr, scope);
+          r += line(`pop     eax`);
+          r += line(`cmp     eax, 1`);
+          r += line(`jne     ${nodeElse ? asmNameElse : asmNameEnd}`);
+
+          r += line(asmNameYes + ':');
+          indented(() => {
+            r += compileIns(ins, scope);
+            r += line(`jmp     ${asmNameEnd}`);
+          });
+
+          if (nodeElse) {
+            let elseIns = nodeElse.kids[0];
+            r += line(asmNameElse + ':');
+            indented(() => {
+              r += compileIns(elseIns, scope);
+            });
+          }
+
+          r += line(asmNameEnd + ':');
+          r += line();
+
+          return r;
+        }
+
+        function compileInsBlock(block, scope) {
+          let r = '';
+          let listIns = block.kids[0];
+
+          r += line(`;   bloc at ${(getLoc(block.i) + '   ').padEnd(35, '=')} {`);
+          indented(() => (r += compileScope(listIns, createScope(undefined, listIns, scope))));
+          r += line(`; } bloc at ${getLoc(block.i).padEnd(35, ' ')} `, 0);
 
           return r;
         }
@@ -957,21 +1154,49 @@
               r += line();
               break;
             case 'expr-sym':
-              let symbol = targetExpr.props.symbol;
-              let loc = findSymTableLoc(scope, symbol);
-              if (!loc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
-              let row = loc.row;
-              r += line(`; symbol assign: ${symbol}`);
-              r += compileExpr(expr, scope);
-              r += line('pop     eax');
-              r += line(`mov     [ebp${getOffStr(row.off)}], eax`);
-              r += line();
+              r += compileInsAssSym(targetExpr, expr, scope);
               break;
             default:
               throw makeErr(targetExpr.i, 'expression ' + targetExpr.name + ' can not be assigned');
           }
 
           return r;
+        }
+
+        function compileInsAssSym(exprSym, expr, scope) {
+          let r = '';
+
+          let symbol = exprSym.props.symbol;
+
+          let loc = findSymTableLoc(scope, symbol);
+          if (!loc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
+          let row = loc.row;
+
+          r += line(`; symbol assign: ${symbol}`);
+
+          r += compileExpr(expr, scope);
+
+          let symRes = resolveSymbolBase(loc);
+
+          r += symRes.asm;
+
+          r += line('pop     eax');
+          r += line(`mov     [${symRes.register}${getOffStr(row.off)}], eax`);
+          r += line();
+
+          return r;
+        }
+
+        // note: does not preserve edx
+        function resolveSymbolBase(loc) {
+          let r = '';
+          let amount = loc.scopes.length - 1;
+          if (amount === 0) return { asm: r, register: 'ebp' };
+          r += line(`mov     edx, [ebp + 4]`);
+          for (let i = 1; i < amount; i++) {
+            r += line(`mov     edx, [edx + 4]`);
+          }
+          return { asm: r, register: 'edx' };
         }
 
         function compileInsSym(ins, scope) {
@@ -991,9 +1216,13 @@
 
           r += compileExpr(expr, scope);
 
+          let symRes = resolveSymbolBase(loc);
+
+          r += symRes.asm;
+
           // note: only works for 4-byte values
           r += line('pop     eax');
-          r += line(`mov     [ebp${getOffStr(row.off)}], eax`);
+          r += line(`mov     [${symRes.register}${getOffStr(row.off)}], eax`);
           r += line();
 
           return r;
@@ -1048,9 +1277,9 @@
                 let symbol = part.props.value;
                 let loc = findSymTableLoc(scope, symbol);
                 if (!loc) throw makeErr(part.i, 'can not find symbol ' + symbol);
+                if (loc.scopes.length > 1) throw makeErr(part.i, 'can only use symbols in same scope');
                 let row = loc.row;
 
-                // todo: output code for loading symbol from different scope
                 if (loc.scopes.length !== 1) throw makeErr('can only use local variables in asm instructions');
                 lineRes += `[ebp${getOffStr(row.off)}]`; // ; ${symbol}
               } else throw Error();
@@ -1071,6 +1300,9 @@
             switch (expr.props.litType) {
               case 'dec-int':
                 asm += line('push    ' + expr.props.value);
+                break;
+              case 'dec-boo':
+                asm += line('push    ' + (expr.props.value === 'yes' ? 1 : 0));
                 break;
               case 'ptr-str':
                 let asmName = findAsmNameLitPtrStr(expr.props.value);
@@ -1122,10 +1354,13 @@
           let symbol = exprSym.props.symbol;
           let loc = findSymTableLoc(scope, symbol);
           if (!loc) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
-          if (loc.scopes.length !== 1) throw makeErr('can only use local variables in asm instructions');
           let row = loc.row;
-          // todo: output code for loading symbol from different scope
-          asm += line(`lea     eax, [ebp${getOffStr(row.off)}] ; symbol ref: ${symbol}`);
+
+          let symRes = resolveSymbolBase(loc);
+
+          asm += symRes.asm;
+
+          asm += line(`lea     eax, [${symRes.register}${getOffStr(row.off)}] ; symbol ref: ${symbol}`);
           asm += line(`push    eax`);
           return asm;
         }
@@ -1160,11 +1395,35 @@
         function compileExprOp(exprOp, scope) {
           let op = exprOp.props.op;
           switch (op) {
+            case '==':
+              return compileExprOpComp(exprOp, scope, 'sete');
+            case '!=':
+              return compileExprOpComp(exprOp, scope, 'setne');
             case '+':
               return compileExprOpSimple(exprOp, scope, op, 'add');
+            case '||':
+              return compileExprOpSimple(exprOp, scope, op, 'or');
             default:
               throw makeImplErr('unknown operand ' + op);
           }
+        }
+
+        function compileExprOpComp(exprOp, scope, inst) {
+          let a = exprOp.kids[0];
+          let b = exprOp.kids[1];
+          let asm = '';
+          asm += compileExpr(a, scope);
+          asm += compileExpr(b, scope);
+          // comparing: https://stackoverflow.com/questions/77062912/how-to-move-the-zero-flag-into-a-register-in-x86-64
+          // setz:      https://browncs1260.github.io/misc/assembly#directive-reference
+          asm += line(`xor     eax, eax`);
+          asm += line(`pop     ecx`);
+          asm += line(`pop     edx`);
+          asm += line(`cmp     ecx, edx`);
+          asm += line(`${inst.padEnd(8, ' ')}al`);
+          asm += line(`push    eax`);
+
+          return asm;
         }
 
         // (very inefficient lol)
@@ -1187,11 +1446,13 @@
 
           let loc = findSymTableLoc(scope, symbol);
           if (!loc) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
-          if (loc.scopes.length !== 1) throw makeErr('can only use local variables in asm instructions');
           let row = loc.row;
-          // todo: output code for loading symbol from different scope
 
-          asm += line(`mov     eax, [ebp${getOffStr(row.off)}] ; symbol: ${symbol}`);
+          let symRes = resolveSymbolBase(loc);
+
+          asm += symRes.asm;
+
+          asm += line(`mov     eax, [${symRes.register}${getOffStr(row.off)}] ; symbol: ${symbol}`);
           asm += line(`push    eax`);
 
           return asm;
