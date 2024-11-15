@@ -453,7 +453,7 @@
 
         function tryParseNodeExprOp(nodeExprA) {
           return tryParse((_) => {
-            let op = eat(/^([+]|==|!=|\|\|)/);
+            let op = eat(/^([+-]|==|!=|>|<|>=|<=|\|\||\&\&)/);
             if (!op) return undefined;
             eatEmpty();
             let n = makeNodeExprOp(op);
@@ -696,7 +696,7 @@
 
         const makeSymTable = (rows, size) => ({ rows, size }); // includes params and locals, note that params are not included in size
         const makeSymTableRow = (symbol, type, off, size) => ({ symbol, type, off, size }); // symbol: name, type: node, off: ebp off bytes.  size: bytes
-        const makeScope = (parent, symTable) => ({ parent, symTable });
+        const makeScope = (endAsmName, parent, symTable) => ({ endAsmName, parent, symTable });
         const makeSymTableLoc = (scopes, row) => ({ scopes, row });
 
         function findSymTableLoc(scope, sym, scopes = []) {
@@ -710,8 +710,8 @@
           return findSymTableLoc(scope.parent, sym, scopes);
         }
 
-        function createScope(listParam, listIns, parent) {
-          let scope = makeScope(parent, makeSymTable([], 0));
+        function createScope(endAsmName, listParam, listIns, parent) {
+          let scope = makeScope(endAsmName, parent, makeSymTable([], 0));
 
           let table = scope.symTable;
 
@@ -792,14 +792,33 @@
 
         // FUNCTIONS ============================
 
-        function findFunc(name) {
-          return state.root.kids.find((x) => x.name === 'func' && x.props.name === name);
+        function findFunc(name, paramNames) {
+          paramNames = [...paramNames].sort();
+
+          return state.root.kids.find((x) => {
+            if (x.name !== 'func' || x.props.name !== name) return false;
+
+            let params = x.kids[0].kids; // func.list-param.kids
+            let pn = params.map((x) => x.props.name).sort();
+
+            if (pn.length !== paramNames.length) return false;
+            for (let i = 0; i < paramNames.length; i++) {
+              if (pn[i] !== paramNames[i]) return false;
+            }
+
+            return true;
+          });
         }
 
         // note on valid nasm names: letters, numbers, _, $, #, @, ~, ., and ?. The only characters which may be used as the first character of an identifier are letters, .
 
         function getAsmNameFunc(func) {
-          return 'sf_' + func.props.name;
+          let params = func.kids[0].kids; // func.list-param.kids
+          let paramString = params
+            .map((x) => x.props.name)
+            .sort()
+            .join('#');
+          return 'sf_' + func.props.name + '@' + paramString;
         }
 
         // /
@@ -919,6 +938,7 @@
               if (!['boo', 'int32', 'ptr', 'PTR'].includes(typeBaseName(type))) return false;
               return true;
             }
+            const allowedComp = allowedEq;
             function allowedBoo(type) {
               if (!isTypePrimitive(type)) return false;
               if (typeBaseName(type) !== 'boo') return false;
@@ -928,11 +948,22 @@
             switch (op) {
               case '!=':
               case '==':
-                return evalBinOp(op, expr, scope, allowedEq, (a,b) => true, (a,b) => makeArtType(makeArtTypePrim('boo')));
+                // prettier-ignore
+                return evalBinOp(op, expr, scope, allowedEq, (a, b) => true, (a, b) => makeArtType(makeArtTypePrim('boo')) );
+              case '<':
+              case '>':
+              case '<=':
+              case '>=':
+                // prettier-ignore
+                return evalBinOp(op, expr, scope, allowedComp, (a, b) => true, (a, b) => makeArtType(makeArtTypePrim('boo')) );
               case '+':
-                return evalBinOp(op, expr, scope, allowedNum, (a,b) => true, (a,b) => a);
+              case '-':
+                // prettier-ignore
+                return evalBinOp(op, expr, scope, allowedNum, (a, b) => true, (a, b) => a );
               case '||':
-                return evalBinOp(op, expr, scope, allowedBoo, (a,b) => true, (a,b) => a);
+              case '&&':
+                // prettier-ignore
+                return evalBinOp(op, expr, scope, allowedBoo, (a, b) => true, (a, b) => a );
               default:
                 throw makeImplErr('unknown op ' + expr.props.op);
             }
@@ -974,7 +1005,7 @@
           let typeB = evalType(b, scope);
           if (!allowedFunc(typeA)) throw makeErr(expr.i, 'op ' + op + ' not supported for type ' + typeToString(typeA));
           if (!allowedFunc(typeB)) throw makeErr(expr.i, 'op ' + op + ' not supported for type ' + typeToString(typeB));
-          if (!compatibleFunc(typeA, typeB)) throw makeErr(expr.i, 'op ' + op + ' not compatible for types ' + typeToString(typeA) + ' and ' +  typeToString(typeB));
+          if (!compatibleFunc(typeA, typeB)) throw makeErr(expr.i, 'op ' + op + ' not compatible for types ' + typeToString(typeA) + ' and ' + typeToString(typeB));
           return typeFunc(typeA, typeB);
         }
 
@@ -1006,14 +1037,20 @@
           return r;
         }
 
+        function getAsmNameTls(ins) {
+          let { line, col } = lineNumber(state.text, ins.i);
+          return 'st__tls_' + line + '_' + col;
+        }
+
         function baseCompileTopLevel() {
           let asm = '';
           for (const listIns of state.root.kids) {
             if (listIns.name !== 'list-inst') continue;
             if (listIns.kids.length === 0) continue;
+            let endAsmName = getAsmNameTls(listIns) + '_end';
 
             asm += line(`;   tls at ${(getLoc(listIns.i) + '   ').padEnd(35, '=')} {`);
-            asm += compileScope(listIns, createScope(undefined, listIns));
+            asm += compileScope(listIns, createScope(endAsmName, undefined, listIns));
             asm += line(`; } tls at ${getLoc(listIns.i).padEnd(35, ' ')} `);
             asm += line();
           }
@@ -1022,11 +1059,13 @@
 
         function compileFunc(func) {
           let asm = '';
+          let asmName = getAsmNameFunc(func);
+          let asmNameEnd = getAsmNameFunc(func) + '@end';
           asm += line(`;   func at ${(getLoc(func.i) + '   ').padEnd(35, '=')} {`, 0);
-          asm += line(getAsmNameFunc(func) + ':', 0);
+          asm += line(asmName + ':', 0);
           let listIns = func.kids.find((x) => x.name === 'list-inst');
           let listParam = func.kids.find((x) => x.name === 'list-param');
-          asm += compileScope(listIns, createScope(listParam, listIns));
+          asm += compileScope(listIns, createScope(asmNameEnd, listParam, listIns));
           asm += line(`ret`);
           asm += line(`; } func at ${getLoc(func.i).padEnd(35, ' ')} `, 0);
           asm += line();
@@ -1045,6 +1084,8 @@
             r += compileIns(ins, scope);
           }
 
+          r += line(scope.endAsmName + ':', 0);
+
           r += line('lea     esp, [ebp + 8]');
           r += line('mov     ebp, [ebp + 4]');
 
@@ -1052,29 +1093,40 @@
         }
 
         function compileIns(ins, scope) {
-          let r = '';
           switch (ins.name) {
             case 'ins-sym':
-              r += compileInsSym(ins, scope);
-              break;
+              return compileInsSym(ins, scope);
             case 'ins-ass':
-              r += compileInsAss(ins, scope);
-              break;
+              return compileInsAss(ins, scope);
             case 'ins-call':
-              r += compileInsCall(ins, scope);
-              break;
+              return compileInsCall(ins, scope);
             case 'ins-asm':
-              r += compileInsAsm(ins, scope);
-              break;
+              return compileInsAsm(ins, scope);
             case 'ins-block':
-              r += compileInsBlock(ins, scope);
-              break;
+              return compileInsBlock(ins, scope);
             case 'ins-if':
-              r += compileInsIf(ins, scope);
-              break;
+              return compileInsIf(ins, scope);
+            case 'ins-done':
+              return compileInsDone(ins, scope);
             default:
               throw makeImplErr('unsupported statement: ' + ins.name);
           }
+        }
+
+        function compileInsDone(insIf, scope) {
+          let r = '';
+
+          let { root, scopes } = (function findRoot(s, scopes = []) {
+            scopes.push(s);
+            return s.parent === undefined ? { root: s, scopes } : findRoot(s.parent, scopes);
+          })(scope);
+
+          for (let i = 1; i < scopes.length; i++) {
+            r += line('lea     esp, [ebp + 8]');
+            r += line('mov     ebp, [ebp + 4]');
+          }
+          r += line(`jmp     ${root.endAsmName}`);
+
           return r;
         }
 
@@ -1122,12 +1174,19 @@
           return r;
         }
 
+        function getAsmNameBlock(ins) {
+          let { line, col } = lineNumber(state.text, ins.i);
+          return 'ss__bloc_' + line + '_' + col;
+        }
+
         function compileInsBlock(block, scope) {
           let r = '';
           let listIns = block.kids[0];
 
+          let asmNameBlockEnd = getAsmNameBlock(block) + '_end';
+
           r += line(`;   bloc at ${(getLoc(block.i) + '   ').padEnd(35, '=')} {`);
-          indented(() => (r += compileScope(listIns, createScope(undefined, listIns, scope))));
+          indented(() => (r += compileScope(listIns, createScope(asmNameBlockEnd, undefined, listIns, scope))));
           r += line(`; } bloc at ${getLoc(block.i).padEnd(35, ' ')} `, 0);
 
           return r;
@@ -1233,10 +1292,13 @@
 
           r += line('; call');
 
-          let func = findFunc(ins.props.name);
+          let args = ins.kids.filter((x) => x.name === 'arg');
+          let paramNames = args.map((x) => x.props.name).sort();
+
+          let func = findFunc(ins.props.name, paramNames);
           if (!func) throw makeErr(ins.i, 'unknown function: ' + ins.props.name);
           let params = func.kids.find((x) => x.name === 'list-param').kids;
-          let args = ins.kids.filter((x) => x.name === 'arg');
+
           if (params.length < args.length) throw makeErr(ins.i, 'to many arguments for ' + func.props.name);
 
           let size = 0;
@@ -1399,10 +1461,22 @@
               return compileExprOpComp(exprOp, scope, 'sete');
             case '!=':
               return compileExprOpComp(exprOp, scope, 'setne');
+            case '>':
+              return compileExprOpComp(exprOp, scope, 'setg');
+            case '<':
+              return compileExprOpComp(exprOp, scope, 'setl');
+            case '>=':
+              return compileExprOpComp(exprOp, scope, 'setge');
+            case '<=':
+              return compileExprOpComp(exprOp, scope, 'setle');
+            case '-':
+              return compileExprOpSimple(exprOp, scope, op, 'sub');
             case '+':
               return compileExprOpSimple(exprOp, scope, op, 'add');
             case '||':
               return compileExprOpSimple(exprOp, scope, op, 'or');
+            case '&&':
+              return compileExprOpSimple(exprOp, scope, op, 'and');
             default:
               throw makeImplErr('unknown operand ' + op);
           }
@@ -1417,8 +1491,8 @@
           // comparing: https://stackoverflow.com/questions/77062912/how-to-move-the-zero-flag-into-a-register-in-x86-64
           // setz:      https://browncs1260.github.io/misc/assembly#directive-reference
           asm += line(`xor     eax, eax`);
-          asm += line(`pop     ecx`);
           asm += line(`pop     edx`);
+          asm += line(`pop     ecx`);
           asm += line(`cmp     ecx, edx`);
           asm += line(`${inst.padEnd(8, ' ')}al`);
           asm += line(`push    eax`);

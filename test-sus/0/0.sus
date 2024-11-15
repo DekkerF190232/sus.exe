@@ -1,63 +1,22 @@
 {
-  print(b:no||no);
-  print(b:yes||no);
-  print(b:yes||yes);
-  print(b:no||yes);
-  printLn();
-  print(b:no&&no);
-  print(b:yes&&no);
-  print(b:yes&&yes);
-  print(b:no&&yes);
-
-  printLn();
-
-  boo result = yes;
-  testIfEquals(a: 0, b: 0, result: REF(result), expected: yes);
-  testIfEquals(a: 10, b: 10, result: REF(result), expected: yes);
-  testIfEquals(a: 10, b: 0, result: REF(result), expected: no);
-  testIfEquals(a: 0, b: 10, result: REF(result), expected: no);
-  
-  # testIfEquals(a: 0, b: 0, result: REF(result), expected: no);
+  print(s: STR"before\n");
+  test();
+  print(s: STR"after\n");
 }
 
-func testIfEquals(int32 a, int32 b, PTR[boo] result, boo expected ) {
-  print(i: a);
-  print(s: STR", ");
-  print(i: b);
-  print(s: STR"    ");
-
-  boo t = a == b;
-  boo r = no;
-  PTR[boo] pt = ARR[boo](1);
-  
-  if (t) {
-    print(s: STR"equal");
-    r = yes;
-    DRF(pt) = r;
-    print(b:DRF(pt));
-
-  } else {
-    print(s: STR"not equal");
-    r = no;
-    DRF(pt) = r;
-
-    print(b: DRF(pt));
+func test() {
+  print(s: STR"callee: outside\n");
+  {
+    print(s: STR"callee: inside\n");
+    done;
+    print(s: STR"callee: DEAD\n");
   }
-
-  DRF(result) = r;
-
-  print(s: STR"     ");
-  print(b: DRF(result));
-  print(b: r);
-  print(b: expected);
-  print(b: DRF(pt));
-  
-  if (DRF(result) != expected || DRF(pt) != DRF(result))
-    print(s: STR"        FAILURE");
-
-
-  printLn();
+  print(s: STR"callee: DEAD\n");
 }
+
+#
+# ============================================================================= 
+#
 
 func print(boo b) {
   if (b) sus_out_int32(integer:1);
