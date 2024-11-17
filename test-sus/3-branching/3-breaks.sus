@@ -1,11 +1,40 @@
 {
-  test();
+  test1();
+  test2();
+  test3();
+  print(s:STR"expected6\n");
 }
 
-func test() {
+func test1() {
   {
-    done;
+    break;
+    print(s:STR"FAILED\n");
   }
+  print(s:STR"expected1\n");
+}
+
+func test2() {
+  {
+    print(s:STR"expected2\n");
+    done;
+    print(s:STR"FAILED\n");
+  }
+  print(s:STR"FAILED\n");
+}
+
+func test3() {
+  {
+    {
+      print(s:STR"expected3\n");
+      {
+        break 2;
+        print(s:STR"FAILED\n");
+      }
+      print(s:STR"FAILED\n");
+    }
+    print(s:STR"expected4\n");
+  }
+  print(s:STR"expected5\n");
 }
 
 #

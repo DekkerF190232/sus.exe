@@ -18,7 +18,7 @@ ACTUALLY IMPLEMENTED
     - Expressions
       - Operators, String literals, int32 literals
     - Branching
-      - Conditions, Boo logic
+      - Conditions, Boo logic, done, break
     - Blocks/Scopes
 
   - Type checking
@@ -29,9 +29,7 @@ ACTUALLY IMPLEMENTED
 
 
 MISSING
-  - Instructions
-    - Functions: done;
-    - Loops: break <int levels>;
+  - Function pointers
   - Structures
   - Packages
   - Multiple Files, Automatic linking and running

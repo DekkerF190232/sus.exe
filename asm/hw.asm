@@ -3,28 +3,28 @@ global _main
 
 ; data definitions
 section .text
-;   str at in-code.sus:14:20
+;   str at in-code.sus:5:28
 ss_1:
-  db '  ', 0
-;   str at in-code.sus:22:23
+  db 'expected6', 10, 0
+;   str at in-code.sus:11:27
 ss_2:
-  db '<10', 0
-;   str at in-code.sus:28:23
+  db 'FAILED', 10, 0
+;   str at in-code.sus:13:28
 ss_3:
-  db '<20', 0
-;   str at in-code.sus:34:23
+  db 'expected1', 10, 0
+;   str at in-code.sus:18:30
 ss_4:
-  db '<30', 0
-;   str at in-code.sus:40:23
+  db 'expected2', 10, 0
+;   str at in-code.sus:28:32
 ss_5:
-  db '<40', 0
-;   str at in-code.sus:46:23
+  db 'expected3', 10, 0
+;   str at in-code.sus:35:30
 ss_6:
-  db '<50', 0
-;   str at in-code.sus:51:22
+  db 'expected4', 10, 0
+;   str at in-code.sus:37:28
 ss_7:
-  db '>=50', 0
-;   str at in-code.sus:74:21
+  db 'expected5', 10, 0
+;   str at in-code.sus:64:21
 ss_8:
   db 10, 0
 
@@ -37,43 +37,17 @@ _main:
   lea     ebp, [esp - 4]
 
   ; call
-  push    -100
-  call    sf_round10@a
-  add     esp, 4
+  call    sf_test1@
 
   ; call
-  push    -3
-  call    sf_round10@a
-  add     esp, 4
+  call    sf_test2@
 
   ; call
-  push    3
-  call    sf_round10@a
-  add     esp, 4
+  call    sf_test3@
 
   ; call
-  push    7
-  call    sf_round10@a
-  add     esp, 4
-
-  ; call
-  push    13
-  call    sf_round10@a
-  add     esp, 4
-
-  ; call
-  push    17
-  call    sf_round10@a
-  add     esp, 4
-
-  ; call
-  push    48
-  call    sf_round10@a
-  add     esp, 4
-
-  ; call
-  push    57
-  call    sf_round10@a
+  push    ss_1
+  call    sf_print@s
   add     esp, 4
 
 st__tls_2_4_end:
@@ -88,169 +62,83 @@ st__tls_2_4_end:
 
   hlt
 
-;   func at in-code.sus:12:14   =============== {
-sf_round10@a:
+;   func at in-code.sus:8:12   ================ {
+sf_test1@:
   push    ebp
   lea     ebp, [esp - 4]
 
-  ; call
-  mov     eax, [ebp + 12] ; symbol: a
-  push    eax
-  call    sf_print@i
-  add     esp, 4
+  ;   bloc at in-code.sus:10:6   ================ {
+    push    ebp
+    lea     ebp, [esp - 4]
 
+    jmp     ss__bloc_10_6_end
+    ; call
+    push    ss_2
+    call    sf_print@s
+    add     esp, 4
+
+  ss__bloc_10_6_end:
+    lea     esp, [ebp + 8]
+    mov     ebp, [ebp + 4]
+; } bloc at in-code.sus:10:6                    
   ; call
-  push    ss_1
+  push    ss_3
   call    sf_print@s
   add     esp, 4
 
-  ; symbol assign: a
-  mov     eax, [ebp + 12] ; symbol: a
-  push    eax
-  push    5
-  pop     eax
-  add     [esp], eax
-  pop     eax
-  mov     [ebp + 12], eax
+sf_test1@@end:
+  lea     esp, [ebp + 8]
+  mov     ebp, [ebp + 4]
+  ret
+; } func at in-code.sus:8:12                    
+
+;   func at in-code.sus:16:12   =============== {
+sf_test2@:
+  push    ebp
+  lea     ebp, [esp - 4]
 
   ;   bloc at in-code.sus:18:6   ================ {
     push    ebp
     lea     ebp, [esp - 4]
 
-    ; symbol assign: a
-    mov     edx, [ebp + 4]
-    mov     eax, [edx + 12] ; symbol: a
-    push    eax
-    push    5
-    pop     eax
-    sub     [esp], eax
-    mov     edx, [ebp + 4]
-    pop     eax
-    mov     [edx + 12], eax
+    ; call
+    push    ss_4
+    call    sf_print@s
+    add     esp, 4
+
+    lea     esp, [ebp + 8]
+    mov     ebp, [ebp + 4]
+    jmp     sf_test2@@end
+    ; call
+    push    ss_2
+    call    sf_print@s
+    add     esp, 4
 
   ss__bloc_18_6_end:
     lea     esp, [ebp + 8]
     mov     ebp, [ebp + 4]
 ; } bloc at in-code.sus:18:6                    
-  mov     eax, [ebp + 12] ; symbol: a
-  push    eax
-  push    10
-  xor     eax, eax
-  pop     edx
-  pop     ecx
-  cmp     ecx, edx
-  setl    al
-  push    eax
-  pop     eax
-  cmp     eax, 1
-  jne     ss__if_21_8_end
-  ss__if_21_8_yes:
-    ;   bloc at in-code.sus:22:6   ================ {
-      push    ebp
-      lea     ebp, [esp - 4]
+  ; call
+  push    ss_2
+  call    sf_print@s
+  add     esp, 4
 
-      ; call
-      push    ss_2
-      call    sf_print@s
-      add     esp, 4
+sf_test2@@end:
+  lea     esp, [ebp + 8]
+  mov     ebp, [ebp + 4]
+  ret
+; } func at in-code.sus:16:12                   
 
-      ; call
-      call    sf_printLn@
+;   func at in-code.sus:25:12   =============== {
+sf_test3@:
+  push    ebp
+  lea     ebp, [esp - 4]
 
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-      jmp     sf_round10@a@end
-    ss__bloc_22_6_end:
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-  ; } bloc at in-code.sus:22:6                    
-    jmp     ss__if_21_8_end
-  ss__if_21_8_end:
+  ;   bloc at in-code.sus:27:6   ================ {
+    push    ebp
+    lea     ebp, [esp - 4]
 
-  mov     eax, [ebp + 12] ; symbol: a
-  push    eax
-  push    20
-  xor     eax, eax
-  pop     edx
-  pop     ecx
-  cmp     ecx, edx
-  setl    al
-  push    eax
-  pop     eax
-  cmp     eax, 1
-  jne     ss__if_27_8_end
-  ss__if_27_8_yes:
-    ;   bloc at in-code.sus:28:6   ================ {
-      push    ebp
-      lea     ebp, [esp - 4]
-
-      ; call
-      push    ss_3
-      call    sf_print@s
-      add     esp, 4
-
-      ; call
-      call    sf_printLn@
-
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-      jmp     sf_round10@a@end
-    ss__bloc_28_6_end:
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-  ; } bloc at in-code.sus:28:6                    
-    jmp     ss__if_27_8_end
-  ss__if_27_8_end:
-
-  mov     eax, [ebp + 12] ; symbol: a
-  push    eax
-  push    30
-  xor     eax, eax
-  pop     edx
-  pop     ecx
-  cmp     ecx, edx
-  setl    al
-  push    eax
-  pop     eax
-  cmp     eax, 1
-  jne     ss__if_33_8_end
-  ss__if_33_8_yes:
-    ;   bloc at in-code.sus:34:6   ================ {
-      push    ebp
-      lea     ebp, [esp - 4]
-
-      ; call
-      push    ss_4
-      call    sf_print@s
-      add     esp, 4
-
-      ; call
-      call    sf_printLn@
-
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-      jmp     sf_round10@a@end
-    ss__bloc_34_6_end:
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-  ; } bloc at in-code.sus:34:6                    
-    jmp     ss__if_33_8_end
-  ss__if_33_8_end:
-
-  mov     eax, [ebp + 12] ; symbol: a
-  push    eax
-  push    40
-  xor     eax, eax
-  pop     edx
-  pop     ecx
-  cmp     ecx, edx
-  setl    al
-  push    eax
-  pop     eax
-  cmp     eax, 1
-  jne     ss__if_39_8_end
-  ss__if_39_8_yes:
-    ;   bloc at in-code.sus:40:6   ================ {
+    ;   bloc at in-code.sus:28:8   ================ {
       push    ebp
       lea     ebp, [esp - 4]
 
@@ -259,66 +147,52 @@ sf_round10@a:
       call    sf_print@s
       add     esp, 4
 
+      ;   bloc at in-code.sus:30:10   =============== {
+        push    ebp
+        lea     ebp, [esp - 4]
+
+        lea     esp, [ebp + 8]
+        mov     ebp, [ebp + 4]
+        jmp     ss__bloc_28_8_end
+        ; call
+        push    ss_2
+        call    sf_print@s
+        add     esp, 4
+
+      ss__bloc_30_10_end:
+        lea     esp, [ebp + 8]
+        mov     ebp, [ebp + 4]
+    ; } bloc at in-code.sus:30:10                   
       ; call
-      call    sf_printLn@
-
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-      jmp     sf_round10@a@end
-    ss__bloc_40_6_end:
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-  ; } bloc at in-code.sus:40:6                    
-    jmp     ss__if_39_8_end
-  ss__if_39_8_end:
-
-  mov     eax, [ebp + 12] ; symbol: a
-  push    eax
-  push    50
-  xor     eax, eax
-  pop     edx
-  pop     ecx
-  cmp     ecx, edx
-  setl    al
-  push    eax
-  pop     eax
-  cmp     eax, 1
-  jne     ss__if_45_8_end
-  ss__if_45_8_yes:
-    ;   bloc at in-code.sus:46:6   ================ {
-      push    ebp
-      lea     ebp, [esp - 4]
-
-      ; call
-      push    ss_6
+      push    ss_2
       call    sf_print@s
       add     esp, 4
 
-      ; call
-      call    sf_printLn@
-
+    ss__bloc_28_8_end:
       lea     esp, [ebp + 8]
       mov     ebp, [ebp + 4]
-      jmp     sf_round10@a@end
-    ss__bloc_46_6_end:
-      lea     esp, [ebp + 8]
-      mov     ebp, [ebp + 4]
-  ; } bloc at in-code.sus:46:6                    
-    jmp     ss__if_45_8_end
-  ss__if_45_8_end:
+  ; } bloc at in-code.sus:28:8                    
+    ; call
+    push    ss_6
+    call    sf_print@s
+    add     esp, 4
 
+  ss__bloc_27_6_end:
+    lea     esp, [ebp + 8]
+    mov     ebp, [ebp + 4]
+; } bloc at in-code.sus:27:6                    
   ; call
   push    ss_7
   call    sf_print@s
   add     esp, 4
 
-sf_round10@a@end:
+sf_test3@@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:12:14                   
+; } func at in-code.sus:25:12                   
 
-;   func at in-code.sus:54:12   =============== {
+;   func at in-code.sus:44:12   =============== {
 sf_print@b:
   push    ebp
   lea     ebp, [esp - 4]
@@ -327,29 +201,29 @@ sf_print@b:
   push    eax
   pop     eax
   cmp     eax, 1
-  jne     ss__if_55_8_else
-  ss__if_55_8_yes:
+  jne     ss__if_45_8_else
+  ss__if_45_8_yes:
     ; call
     push    1
     call    sf_sus_out_int32@integer
     add     esp, 4
 
-    jmp     ss__if_55_8_end
-  ss__if_55_8_else:
+    jmp     ss__if_45_8_end
+  ss__if_45_8_else:
     ; call
     push    0
     call    sf_sus_out_int32@integer
     add     esp, 4
 
-  ss__if_55_8_end:
+  ss__if_45_8_end:
 
 sf_print@b@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:54:12                   
+; } func at in-code.sus:44:12                   
 
-;   func at in-code.sus:59:12   =============== {
+;   func at in-code.sus:49:12   =============== {
 sf_print@i:
   push    ebp
   lea     ebp, [esp - 4]
@@ -364,9 +238,9 @@ sf_print@i@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:59:12                   
+; } func at in-code.sus:49:12                   
 
-;   func at in-code.sus:63:12   =============== {
+;   func at in-code.sus:53:12   =============== {
 sf_print@s:
   push    ebp
   lea     ebp, [esp - 4]
@@ -398,9 +272,9 @@ sf_print@s@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:63:12                   
+; } func at in-code.sus:53:12                   
 
-;   func at in-code.sus:73:14   =============== {
+;   func at in-code.sus:63:14   =============== {
 sf_printLn@:
   push    ebp
   lea     ebp, [esp - 4]
@@ -414,9 +288,9 @@ sf_printLn@@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:73:14                   
+; } func at in-code.sus:63:14                   
 
-;   func at in-code.sus:98:20   =============== {
+;   func at in-code.sus:88:20   =============== {
 sf_sus_out_int32@integer:
   push    ebp
   lea     ebp, [esp - 4]
@@ -479,9 +353,9 @@ sf_sus_out_int32@integer@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:98:20                   
+; } func at in-code.sus:88:20                   
 
-;   func at in-code.sus:118:19   ============== {
+;   func at in-code.sus:108:19   ============== {
 sf_sus_out_line@:
   push    ebp
   lea     ebp, [esp - 4]
@@ -496,9 +370,9 @@ sf_sus_out_line@@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:118:19                  
+; } func at in-code.sus:108:19                  
 
-;   func at in-code.sus:122:15   ============== {
+;   func at in-code.sus:112:15   ============== {
 sf_sus_exit@code:
   push    ebp
   lea     ebp, [esp - 4]
@@ -514,9 +388,9 @@ sf_sus_exit@code@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:122:15                  
+; } func at in-code.sus:112:15                  
 
-;   func at in-code.sus:132:17   ============== {
+;   func at in-code.sus:122:17   ============== {
 sf_sus_length@buffer#length#size:
   push    ebp
   lea     ebp, [esp - 4]
@@ -535,9 +409,9 @@ sf_sus_length@buffer#length#size@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:132:17                  
+; } func at in-code.sus:122:17                  
 
-;   func at in-code.sus:145:17   ============== {
+;   func at in-code.sus:135:17   ============== {
 sf_sus_iota_s@buffer#radix#size#value:
   push    ebp
   lea     ebp, [esp - 4]
@@ -558,9 +432,9 @@ sf_sus_iota_s@buffer#radix#size#value@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:145:17                  
+; } func at in-code.sus:135:17                  
 
-;   func at in-code.sus:160:21   ============== {
+;   func at in-code.sus:150:21   ============== {
 sf_sus_out_buffer@buffer#size:
   push    ebp
   lea     ebp, [esp - 4]
@@ -584,5 +458,5 @@ sf_sus_out_buffer@buffer#size@end:
   lea     esp, [ebp + 8]
   mov     ebp, [ebp + 4]
   ret
-; } func at in-code.sus:160:21                  
+; } func at in-code.sus:150:21                  
 

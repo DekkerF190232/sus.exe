@@ -42,6 +42,8 @@
         }
         // node makers so i don't forget
         const makeNodeRoot = (_) => makeNode('root', undefined, []);
+        const makeNodeStruct = (name) => makeNode('struct', {name}, []);
+        const makeNodeMember = (name) => makeNode('member', {name}, []);
         const makeNodeFunc = (name) => makeNode('func', { name }, []);
         const makeNodeListParam = (_) => makeNode('list-param', undefined, []);
         const makeNodeParam = (name) => makeNode('param', { name }, []);
@@ -51,6 +53,7 @@
         const makeNodeAsmPart = (partType, value) => makeNode('asm-part', { partType, value }); // partType: asm/sus
         const makeNodeInstBlock = () => makeNode('ins-block', undefined, []); // kids: list-inst
         const makeNodeInsDone = (_) => makeNode('ins-done');
+        const makeNodeInsBreak = (levels) => makeNode('ins-break', { levels });
         const makeNodeInsSym = (name) => makeNode('ins-sym', { name }, []);
         const makeNodeInsAssign = (_) => makeNode('ins-ass', {}, []);
         const makeNodeInsIf = (_) => makeNode('ins-if', undefined, []); // kids: expr, list-inst
@@ -175,9 +178,38 @@
 
         // note: parse prefix means the node is appended automatically, eatNode prefix means the method returns the node
         function parseBase() {
-          if (test(/^func /)) return parseFunc();
+          if (test(/^func[\n\t ]/)) return parseFunc();
+          if (tryParseStruct()) return;
+          
           return parseTls();
           // throw err('unparsable top level statement')
+        }
+
+        function tryParseStruct() {
+          return tryParse(() => {
+            if (!eat(/^struct/)) return;
+            eatEmpty();
+
+            if (!eat(/^struct /)) return;
+
+            let struct = makeNodeStruct(undefined);
+
+            let name = expect(eatSymbol(), 'a struct name');
+            struct.props.name = name;
+            eatEmpty();
+
+            eatPicky('(');
+            eatEmpty();
+
+            while (!eat(/^)/)) {
+              if (eof()) throw err('unexpected eof');
+              let node = makeNodeMember();
+              node.kids.push(eatNodeType());
+            }
+            eatEmpty();
+
+            return true;
+          });
         }
 
         function parseTls() {
@@ -212,6 +244,7 @@
         function tryParseInst() {
           if (tryParseInstBlock()) return true;
           if (tryParseInstDone()) return true;
+          if (tryParseInstBreak()) return true;
           if (tryParseInstAsm()) return true;
           if (tryParseInstAssignment()) return true;
           if (tryParseInstSym()) return true;
@@ -248,7 +281,7 @@
               if (!eat(/^else/)) return;
 
               let space = eatEmpty();
-              if (!space || space.length === 0) return;
+              if ((!space || space.length === 0) && !test(/^\{/)) return;
 
               let n = makeNodeElse();
 
@@ -311,7 +344,7 @@
 
         function tryParseInstSym() {
           return tryParse((_) => {
-            let nodeType = tryEatNodeType();
+            let nodeType = tryParseNodeType();
             if (!nodeType) return undefined;
             eatEmpty();
 
@@ -486,6 +519,27 @@
           });
         }
 
+        function tryParseInstBreak() {
+          return tryParse(() => {
+            if (!eat(/^break/)) return;
+
+            let space = eatEmpty();
+            if ((!space || space.length === 0) && !test(/^;/)) return;
+
+            let levels = eat(/^[0-9]+/);
+            eatEmpty();
+
+            if (!eat(/^;/)) return;
+            eatEmpty();
+
+            if (!levels) levels = 1;
+            else levels = +levels;
+
+            append(makeNodeInsBreak(levels));
+            return true;
+          });
+        }
+
         function tryParseInstAsm() {
           return tryParse(() => {
             if (!eat(/^ASM/)) return;
@@ -582,9 +636,9 @@
           });
         }
 
-        function tryEatNodeType() {
+        function tryParseNodeType() {
           return tryParse((_) => {
-            let kid = tryEatNodeTypeUnwrapped();
+            let kid = tryParseNodeTypeUnwrapped();
             if (!kid) return;
             let typeNode = makeNodeType();
             typeNode.kids.push(kid);
@@ -592,7 +646,7 @@
           });
         }
 
-        function tryEatNodeTypeUnwrapped() {
+        function tryParseNodeTypeUnwrapped() {
           return tryParse((_) => {
             let name = eatTypeName();
             eatEmpty();
@@ -603,7 +657,7 @@
             if (isPrimitive) {
               if (eat(/^\[/)) {
                 eatEmpty();
-                let insideType = tryEatNodeTypeUnwrapped();
+                let insideType = tryParseNodeTypeUnwrapped();
                 if (!eat(/^\]/)) return undefined;
                 eatEmpty();
                 let n = makeNodeTypePrim(name);
@@ -619,7 +673,7 @@
         }
 
         function eatNodeType() {
-          return expect(tryEatNodeType(), 'a type');
+          return expect(tryParseNodeType(), 'a type');
         }
       }
 
@@ -1108,26 +1162,43 @@
               return compileInsIf(ins, scope);
             case 'ins-done':
               return compileInsDone(ins, scope);
+            case 'ins-break':
+              return compileInsBreak(ins, scope);
             default:
               throw makeImplErr('unsupported statement: ' + ins.name);
           }
         }
 
-        function compileInsDone(insIf, scope) {
+        function compileExit(ins, scope, levels) {
           let r = '';
 
-          let { root, scopes } = (function findRoot(s, scopes = []) {
+          let scopes = (function findRoot(s, scopes = []) {
             scopes.push(s);
-            return s.parent === undefined ? { root: s, scopes } : findRoot(s.parent, scopes);
+            return s.parent === undefined ? scopes : findRoot(s.parent, scopes);
           })(scope);
 
-          for (let i = 1; i < scopes.length; i++) {
+          let lv = scopes.length - 1;
+          if (levels) {
+            if (levels < 1) throw makeErr(ins.i, 'break level to small');
+            if (levels >= scopes.length) throw makeErr(ins.i, 'use done instead');
+            lv = levels - 1;
+          }
+
+          for (let i = 0; i < lv; i++) {
             r += line('lea     esp, [ebp + 8]');
             r += line('mov     ebp, [ebp + 4]');
           }
-          r += line(`jmp     ${root.endAsmName}`);
+          r += line(`jmp     ${scopes[lv].endAsmName}`);
 
           return r;
+        }
+
+        function compileInsBreak(ins, scope) {
+          return compileExit(ins, scope, ins.props.levels);
+        }
+
+        function compileInsDone(ins, scope) {
+          return compileExit(ins, scope);
         }
 
         function getAsmNameIf(insIf) {
