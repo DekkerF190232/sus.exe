@@ -1,0 +1,4 @@
+struct Test();
+struct Test(int32 test);
+struct Test(int32 test);
+struct Test(int32 test, boo t);

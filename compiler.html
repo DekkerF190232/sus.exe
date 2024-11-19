@@ -187,10 +187,8 @@
 
         function tryParseStruct() {
           return tryParse(() => {
-            if (!eat(/^struct/)) return;
+            if (!eat(/^struct[ \n\t]/)) return;
             eatEmpty();
-
-            if (!eat(/^struct /)) return;
 
             let struct = makeNodeStruct(undefined);
 
@@ -201,12 +199,31 @@
             eatPicky('(');
             eatEmpty();
 
-            while (!eat(/^)/)) {
+            let first = true;
+            while (!eat(/^\)/)) {
               if (eof()) throw err('unexpected eof');
+              
+              if (!first) {
+                eatPicky(',');
+                eatEmpty();
+              }
+              first = false;
+
               let node = makeNodeMember();
-              node.kids.push(eatNodeType());
+              node.kids.push(parseNodeType());
+
+              let name = expect(eatSymbol(), 'a member name');
+              eatEmpty();
+              node.props.name = name;
+
+              struct.kids.push(node);
             }
             eatEmpty();
+
+            eatPicky(';');
+            eatEmpty();
+
+            append(struct);
 
             return true;
           });
@@ -423,7 +440,7 @@
               if (!eat(/^ARR/)) return;
               eatEmpty();
               if (!eat(/^\[/)) return;
-              let type = eatNodeType();
+              let type = parseNodeType();
               eatEmpty();
 
               eatPicky(']');
@@ -462,6 +479,17 @@
               eatPicky(')');
               eatEmpty();
               return drfNode;
+            },
+            () => {
+              let structName = eatSymbol();
+              if (!structName) return;
+
+              eatEmpty();
+              if (!eat(/^\(/)) return;
+
+              let ctr = makeNodeCtr(structName);
+
+              return ctr;
             },
             (_) => {
               let val = eatLitBoo();
@@ -614,7 +642,7 @@
                 first = false;
 
                 append(makeNodeParam(name), (_) => {
-                  append(eatNodeType());
+                  append(parseNodeType());
 
                   let paramName = expect(eatSymbol(), 'a symbol');
                   eatEmpty();
@@ -672,7 +700,7 @@
           });
         }
 
-        function eatNodeType() {
+        function parseNodeType() {
           return expect(tryParseNodeType(), 'a type');
         }
       }
