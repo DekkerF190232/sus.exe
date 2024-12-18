@@ -9,14 +9,21 @@ struct Test(
 
   Test t = Test ( 1_ = a, 2_ = b); 
 
+  Test t2 = t;
+
   print(i: a);
   printLn();
   print(i: b);
   printLn();
 
-  print(i: t.1_);
+  print(i: t2.1_);
   printLn();
-  print(i: t.2_);
+  print(i: t2.2_);
+  printLn();
+
+  t.2_ = 123;
+
+  print(i: t2.2_);
   printLn();
 }
 

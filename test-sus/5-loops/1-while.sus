@@ -1,33 +1,10 @@
-struct Test(
-  int32 1_,
-  int32 2_
-);
-
 {
-  int32 a = 2;
-  int32 b = 4;
-
-  Test t = Test ( 1_ = a, 2_ = b); 
-
-  print(i: a);
-  printLn();
-  print(i: b);
-  printLn();
-
-  print(i: t.1_);
-  printLn();
-  print(i: t.2_);
-  printLn();
+  int32 i = 0;
+  while (i < 10) {
+    print(i: i);
+    i++;
+  }
 }
-
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
-
-
 
 #
 # ============================================================================= 

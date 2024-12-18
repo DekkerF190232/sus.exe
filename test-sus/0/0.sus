@@ -1,12 +1,22 @@
+struct Test(
+  int32 1_
+);
+
 {
-  test();
+  Test t = Test ( 1_ = 2); 
+
+  print(i: t.1_);
+  printLn();
 }
 
-func test() {
-  {
-    done;
-  }
-}
+# func print(Test t) {
+#   sus_out_buffer(
+#     buffer:	t.start,
+#     size: 	convert[int32](t.end - t.start)
+#   );
+# }
+
+
 
 #
 # ============================================================================= 
