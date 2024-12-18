@@ -1,20 +1,10 @@
-struct Test(
-  int32 1_
-);
 
 {
-  Test t = Test ( 1_ = 2); 
-
-  print(i: t.1_);
-  printLn();
+  int32 i = 0;
+  if (i==0) {
+    print(b:yes);
+  }
 }
-
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
 
 
 

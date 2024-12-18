@@ -607,7 +607,8 @@
                 eatEmpty();
 
                 let memberInit = makeNodeMemberInit(symbol);
-                let expr = parseNodeExpr();
+                let expr = tryParseNodeExpr();
+                if (!expr) return;
                 memberInit.kids.push(expr);
                 ctr.kids.push(memberInit);
               }
@@ -1366,6 +1367,8 @@
               return compileInsBlock(ins, scope);
             case 'ins-if':
               return compileInsIf(ins, scope);
+            case 'ins-while':
+              return compileInsWhile(ins, scope);
             case 'ins-done':
               return compileInsDone(ins, scope);
             case 'ins-break':
@@ -1385,7 +1388,7 @@
 
           let lv = scopes.length - 1;
           if (levels) {
-            if (levels < 1) throw makeErr(ins.i, 'break level to small');
+            if (levels < 1) throw makeErr(ins.i, 'break level too small');
             if (levels >= scopes.length) throw makeErr(ins.i, 'use done instead');
             lv = levels - 1;
           }
@@ -1410,6 +1413,11 @@
         function getAsmNameIf(insIf) {
           let { line, col } = lineNumber(state.text, insIf.i);
           return 'ss__if_' + line + '_' + col;
+        }
+
+        function getAsmNameWhile(insIf) {
+          let { line, col } = lineNumber(state.text, insIf.i);
+          return 'ss__while_' + line + '_' + col;
         }
 
         function compileInsIf(insIf, scope) {
@@ -1444,6 +1452,35 @@
               r += compileIns(elseIns, scope);
             });
           }
+
+          r += line(asmNameEnd + ':');
+          r += line();
+
+          return r;
+        }
+
+        function compileInsWhile(insIf, scope) {
+          let r = '';
+
+          let asmName = getAsmNameWhile(insIf);
+          let asmNameTop = asmName + '_top';
+          let asmNameEnd = asmName + '_end';
+
+          let expr = insIf.kids[0];
+          let ins = insIf.kids[1];
+
+          checkTypeName(expr, scope, 'boo');
+
+          r += line(`${asmNameTop}:`);
+          r += compileExpr(expr, scope);
+          r += line(`pop     eax`);
+          r += line(`cmp     eax, 1`);
+          r += line(`jne     ${asmNameEnd}`);
+
+          indented(() => {
+            r += compileIns(ins, scope);
+            r += line(`jmp     ${asmNameTop}`);
+          });
 
           r += line(asmNameEnd + ':');
           r += line();
