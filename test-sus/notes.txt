@@ -19,6 +19,7 @@ ACTUALLY IMPLEMENTED
       - Operators, String literals, int32 literals
     - Branching
       - Conditions, Boo logic, done, break
+      - While Loop
     - Blocks/Scopes
 
   - Type checking
@@ -31,6 +32,13 @@ ACTUALLY IMPLEMENTED
 MISSING
   - Function pointers
   - Structures
+    - Copying
+      - Init: [x] Symbol
+      - Assign: [s] Symbol, [ ] Deref
+    - Using members
+      - Read member: [x] Symbol, [ ] Deref, [x] Member chaining
+      - Set member: [x] Symbol, [ ] Deref, [x] Member chaining
+    - Heap allocation
   - Packages
   - Multiple Files, Automatic linking and running
   - Mogroft

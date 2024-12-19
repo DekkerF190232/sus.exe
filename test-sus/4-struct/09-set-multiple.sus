@@ -1,25 +1,47 @@
 struct Test(
   int32 a,
-  int32 b
+  int32 b,
+  int32 c
 );
 
 {
-  Test t0 = Test(a = 1, b = 2);
+  print(s:STR"08-set.sus\n");
 
-  Test t1 = t0;
+  Test test = Test(a = 1, b = 2, c = 3);
 
-  print(i: t0.a);
-  print(s: STR" ");
-  print(i: t1.a);
+  
+
+  print(s:STR"expecting 1 2 3\n");
+
+  print(i:test.a);
+  print(s:STR" ");
+  print(i:test.b);
+  print(s:STR" ");
+  print(i:test.c);
+  printLn();
+
+  test.b = 123;
+
+  print(s:STR"expecting 1 123 3\n");
+
+  print(i:test.a);
+  print(s:STR" ");
+  print(i:test.b);
+  print(s:STR" ");
+  print(i:test.c);
+  printLn();
+
+  test.c = 456;
+
+  print(s:STR"expecting 1 123 456\n");
+
+  print(i:test.a);
+  print(s:STR" ");
+  print(i:test.b);
+  print(s:STR" ");
+  print(i:test.c);
+  printLn();
 }
-
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
-
 
 
 #

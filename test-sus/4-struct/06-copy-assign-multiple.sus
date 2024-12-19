@@ -4,22 +4,19 @@ struct Test(
 );
 
 {
+  print(s: STR"6-copy-assign-multiple.sus\n");
+
   Test t0 = Test(a = 1, b = 2);
+  
+  Test t1 = Test(a = 111, b = 222);
 
-  Test t1 = t0;
-
-  print(i: t0.a);
-  print(s: STR" ");
+  t1 = t0;
+  
+  print(s: STR"expecting 1 2\n");
   print(i: t1.a);
+  print(s: STR" ");
+  print(i: t1.b);
 }
-
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
-
 
 
 #

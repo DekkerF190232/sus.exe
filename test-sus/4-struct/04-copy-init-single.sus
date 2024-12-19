@@ -1,25 +1,15 @@
 struct Test(
-  int32 a,
-  int32 b
+  int32 a
 );
 
 {
-  Test t0 = Test(a = 1, b = 2);
+  Test t0 = Test(a = 1);
 
   Test t1 = t0;
 
-  print(i: t0.a);
-  print(s: STR" ");
+  print(s: STR"expecting 1\n");
   print(i: t1.a);
 }
-
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
-
 
 
 #

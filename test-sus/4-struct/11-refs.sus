@@ -1,39 +1,28 @@
-struct Test(
-  int32 1_,
-  int32 2_
+struct Test (
+  int32 a,
+  int32 b
 );
 
 {
-  int32 a = 2;
-  int32 b = 4;
+  print(s:STR"11-refs.sus\n");
 
-  Test t = Test ( 1_ = a, 2_ = b); 
+  Test test = Test(a=1, b=2);
 
-  Test t2 = t;
+  PTR[Test] _test = REF(test);
+  DRF(_test).a = 123;
 
-  print(i: a);
-  printLn();
-  print(i: b);
-  printLn();
-
-  print(i: t2.1_);
-  printLn();
-  print(i: t2.2_);
-  printLn();
-
-  t.2_ = 123;
-
-  print(i: t2.2_);
+  print(s: STR "expected: 123 2, 123 2\n");
+  print(i: DRF(_test).a);
+  print(s: STR " ");
+  print(i: DRF(_test).b);
+  print(s: STR ", ");
+  print(i: test.a);
+  print(s: STR " ");
+  print(i: test.b);
   printLn();
 }
 
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
-
+# additional tests: ref and drf a structs member itself.
 
 
 #

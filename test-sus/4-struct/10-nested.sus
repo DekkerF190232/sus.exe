@@ -1,25 +1,48 @@
-struct Test(
+struct Inner (
+  int32 b,
+  int32 c
+);
+
+struct Outer (
   int32 a,
-  int32 b
+  Inner inner,
+  int32 d
 );
 
 {
-  Test t0 = Test(a = 1, b = 2);
+  print(s:STR"10-nested.sus\n");
 
-  Test t1 = t0;
+  Outer outer = Outer(a=1, inner=Inner(b=2, c=3), d=4);
+  print(s:STR"expected: 1234\n");
+  print(i:outer.a);
+  print(i:outer.inner.b);
+  print(i:outer.inner.c);
+  print(i:outer.d);
+  printLn();
 
-  print(i: t0.a);
-  print(s: STR" ");
-  print(i: t1.a);
+  outer.inner.c = 123;
+  print(s:STR"expected: 1 2 123 4\n");
+  print(i:outer.a);
+  print(s:STR" ");
+  print(i:outer.inner.b);
+  print(s:STR" ");
+  print(i:outer.inner.c);
+  print(s:STR" ");
+  print(i:outer.d);
+  printLn();
+
+  outer.inner = Inner(b=6, c=5);
+  print(s:STR"expected: 1 6 5 4\n");
+  print(i:outer.a);
+  print(s:STR" ");
+  print(i:outer.inner.b);
+  print(s:STR" ");
+  print(i:outer.inner.c);
+  print(s:STR" ");
+  print(i:outer.d);
+  print(s:STR" ");
+  printLn();
 }
-
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
-
 
 
 #

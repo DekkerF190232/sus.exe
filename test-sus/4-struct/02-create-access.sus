@@ -1,31 +1,20 @@
-struct Test(
-  int32 1_,
-  int32 2_
+struct S (
+  int32 a,
+  int32 b,
+  int32 c
 );
 
 {
-  int32 a = 2;
-  int32 b = 4;
+  S first = S(a=1, b=2, c=3);
+  print(s: STR"expecting 1 2 3\n");
 
-  Test t = Test ( 1_ = a, 2_ = b); 
-
-  print(i: a);
-  printLn();
-  print(i: b);
-  printLn();
-
-  print(i: t.1_);
-  printLn();
-  print(i: t.2_);
-  printLn();
+  print(i: first.a);
+  print(s: STR" ");
+  print(i: first.b);
+  print(s: STR" ");
+  print(i: first.c);
+  print(s: STR" \n");
 }
-
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
 
 
 

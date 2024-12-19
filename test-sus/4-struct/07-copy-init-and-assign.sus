@@ -1,24 +1,32 @@
-struct Test(
+struct S (
   int32 a,
-  int32 b
+  int32 b,
+  int32 c
 );
 
 {
-  Test t0 = Test(a = 1, b = 2);
+  S first = S(a=1, b=2, c=3);
+  print(s: STR"expecting 1 2 3\n");
 
-  Test t1 = t0;
+  S second = first;
 
-  print(i: t0.a);
+  S third = S(a=111,b=222,c=333);
+
+  ASM {
+    ; BEFORE ASSIGN =============================================================================
+  }
+  third = second;
+  ASM {
+    ; AFTER ASSIGN =============================================================================
+  }
+
+  print(i: third.a);
   print(s: STR" ");
-  print(i: t1.a);
+  print(i: third.b);
+  print(s: STR" ");
+  print(i: third.c);
+  print(s: STR" \n");
 }
-
-# func print(Test t) {
-#   sus_out_buffer(
-#     buffer:	t.start,
-#     size: 	convert[int32](t.end - t.start)
-#   );
-# }
 
 
 

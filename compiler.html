@@ -492,16 +492,20 @@
             let expr = tryParseNodeExprVal();
             if (!expr) return;
 
-            let op = eat(/^(\.)/);
-            if (!op) return expr;
-            eatEmpty();
+            while (true) {
+              if (eof()) throw err('unexpected eof');
 
-            let memberName = eatSymbol();
-            eatEmpty();
+              let op = eat(/^(\.)/);
+              if (!op) return expr;
+              eatEmpty();
 
-            let memExpr = makeNodeExprMemberName(memberName);
-            memExpr.kids.push(expr);
-            return memExpr;
+              let memberName = eatSymbol();
+              eatEmpty();
+
+              let memExpr = makeNodeExprMemberName(memberName);
+              memExpr.kids.push(expr);
+              expr = memExpr;
+            }
           });
         }
 
@@ -872,6 +876,9 @@
         const makeStructTableRow = (name, type, members, size) => ({ name, type, members, size });
         const makeStructTableRowMember = (name, type, off) => ({ name, type, off });
         let structTable = null;
+        function findStructTableRow(name) {
+          return structTable.rows.find((x) => x.name === name);
+        }
 
         // STRING LITERALS ============================
 
@@ -948,6 +955,7 @@
 
         // EXPRESSIONS ============================
 
+        // gives size in bytes
         function evalSize(type, depth = 1000) {
           if (depth < 0) {
             throw makeErr(type.i ?? 0, 'recursive struct definition ' + JSON.stringify(type));
@@ -1249,29 +1257,25 @@
         function baseCompileStructTable() {
           structTable = makeStructTable([]);
 
-          for (const stuct of state.root.kids) {
-            if (stuct.name !== 'struct') continue;
+          for (const strct of state.root.kids) {
+            if (strct.name !== 'struct') continue;
 
-            let name = stuct.props.name;
+            let name = strct.props.name;
             let type = makeOwnNodeType();
             type.kids.push(makeOwnNodeTypeNamed(name));
 
             if (findStructTableRow(name)) {
-              throw makeErr(stuct.i, 'same struct found twice');
+              throw makeErr(strct.i, 'same struct found twice');
             }
             let members = []; //stuct.kids.map(x => );
             let off = 0;
-            for (const m of stuct.kids) {
+            for (const m of strct.kids) {
               members.push(makeStructTableRowMember(m.props.name, m.kids[0], off));
               off += evalSize(m.kids[0]);
             }
 
             structTable.rows.push(makeStructTableRow(name, type, members, off));
           }
-        }
-
-        function findStructTableRow(name) {
-          return structTable.rows.find((x) => x.name === name);
         }
 
         function baseCompileDataTable() {
@@ -1529,8 +1533,69 @@
             case 'expr-sym':
               r += compileInsAssSym(targetExpr, expr, scope);
               break;
+            case 'expr-member':
+              r += compileInsAssMember(targetExpr, expr, scope);
+              break;
             default:
               throw makeErr(targetExpr.i, 'expression ' + targetExpr.name + ' can not be assigned');
+          }
+
+          return r;
+        }
+
+        // if (structExpr.name === 'expr-drf') {
+        //   throw makeImplErr('get drefed struct');
+        // } else if (structExpr.name === 'expr-sym') {
+        //   let loc = findSymTableLoc(scope, structExpr.props.symbol);
+        //   if (!loc) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+        //   let row = loc.row;
+        //   let symRes = resolveSymbolBase(loc);
+        //   r += symRes.asm;
+        //   let off = row.off + member.off;
+        //   r += line(`mov     eax, [${symRes.register}${getOffStr(off)}] ; member ref: ${structExpr.props.symbol}.${memberName}`);
+        //   r += line(`push    eax`);
+        // } else {
+        //   throw makeImplErr('cannot access struct member of expression ' + structExpr.name);
+        // }
+
+        function compileInsAssMember(exprMem, expr, scope) {
+          let r = '';
+
+          let chain = resolveMemberChain(scope, exprMem);
+          let structExpr = chain.baseExpr;
+          let member = chain.members[0];
+
+          checkType(expr, scope, member.type);
+
+          let memberSizeBytes = evalSize(member.type);
+
+          if (structExpr.name === 'expr-sym') {
+            let symbol = structExpr.props.symbol;
+
+            let symLoc = findSymTableLoc(scope, symbol);
+            if (!symLoc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
+            let symRow = symLoc.row;
+
+            let memberChainString = chain.members.map(x => x.name).join('.');
+            r += line(`; member assign: ${symbol}.${memberChainString}`);
+
+            // push member value
+            r += compileExpr(expr, scope);
+
+            // compile symbol
+            let symRes = resolveSymbolBase(symLoc);
+            r += symRes.asm;
+
+            let off = symRow.off + chain.off;
+            
+            r += compileCopy('esp', 0, 'ebp', off, memberSizeBytes, true);
+            r += line(`add     esp, ${memberSizeBytes}`);
+
+            r += line();
+          } else if (structExpr.name === 'expr-drf') {
+            throw makeImplErr('assign member of expr-drf');
+          } else {
+            throw makeErr(exprMem.i, 'cannot assign struct member of expression ' + structExpr.name);
           }
 
           return r;
@@ -1543,18 +1608,22 @@
 
           let loc = findSymTableLoc(scope, symbol);
           if (!loc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
-          let row = loc.row;
+          let symRow = loc.row;
+          let type = symRow.type;
+          let byteSize = evalSize(type);
 
           r += line(`; symbol assign: ${symbol}`);
-
           r += compileExpr(expr, scope);
 
           let symRes = resolveSymbolBase(loc);
-
           r += symRes.asm;
 
-          r += line('pop     eax');
-          r += line(`mov     [${symRes.register}${getOffStr(row.off)}], eax`);
+          // r += line('pop     eax');
+          // r += line(`mov     [${symRes.register}${getOffStr(row.off)}], eax`);
+
+          r += compileCopy('esp', 0, symRes.register, symRow.off, byteSize, true);
+          r += line(`add     esp, ${byteSize}`);
+
           r += line();
 
           return r;
@@ -1583,21 +1652,38 @@
 
           let symbol = ins.props.name;
           let loc = findSymTableLoc(scope, symbol);
-          let row = loc.row;
+          let symRow = loc.row;
+
+          let byteSize = evalSize(symRow.type);
 
           r += line(`; symbol init: ${symbol}`);
-
           r += compileExpr(expr, scope);
 
           let symRes = resolveSymbolBase(loc);
 
           r += symRes.asm;
 
-          // note: only works for 4-byte values
-          r += line('pop     eax');
-          r += line(`mov     [${symRes.register}${getOffStr(row.off)}], eax`);
-          r += line();
+          r += compileCopy('esp', 0, symRes.register, symRow.off, byteSize, true);
+          r += line(`add     esp, ${byteSize}`);
 
+          r += line(``);
+
+          return r;
+        }
+
+        function compileCopy(fromReg, fromOffBytes, toReg, toOffBytes, sizeBytes, reverse = false) {
+          let r = '';
+          if (sizeBytes % 4 !== 0) throw makeImplErr('can only copy 4-byte aligned');
+          let sizeStack = sizeBytes / 4;
+          for (let i = 0; i < sizeStack; i++) {
+            let elementOffsetBytes = i * 4;
+            if (reverse) {
+              r += line(`mov     eax, [${fromReg}${getOffStr(fromOffBytes + (sizeStack - 1 - i) * 4)}]`);
+            } else {
+              r += line(`mov     eax, [${fromReg}${getOffStr(fromOffBytes + elementOffsetBytes)}]`);
+            }
+            r += line(`mov     [${toReg}${getOffStr(toOffBytes + elementOffsetBytes)}], eax`);
+          }
           return r;
         }
 
@@ -1734,15 +1820,9 @@
         function compileExprMember(expr, scope) {
           let r = '';
 
-          let memberName = expr.props.name;
-          let structExpr = expr.kids[0];
+          let chain = resolveMemberChain(scope, expr);
+          let structExpr = chain.baseExpr;
 
-          let structType = evalType(structExpr, scope);
-          if (structType.name === 'type') structType = structType.kids[0];
-          let structName = structType.props.name;
-          let structRow = findStructTableRow(structName);
-          let member = structRow.members.find((x) => x.name === memberName);
-          if (!member) throw makeErr(expr.i, 'could not find member ' + memberName + ' of ' + structName);
           if (structExpr.name === 'expr-drf') {
             throw makeImplErr('get drefed struct');
           } else if (structExpr.name === 'expr-sym') {
@@ -1751,14 +1831,41 @@
             let row = loc.row;
             let symRes = resolveSymbolBase(loc);
             r += symRes.asm;
-            let off = row.off + member.off;
-            r += line(`mov     eax, [${symRes.register}${getOffStr(off)}] ; member ref: ${structExpr.props.symbol}.${memberName}`);
+
+            let off = row.off + chain.off;
+            
+            let memberChainString = chain.members.map(x => x.name).join('.');
+            
+            r += line(`mov     eax, [${symRes.register}${getOffStr(off)}] ; member ref: ${structExpr.props.symbol}.(${memberChainString})`);
             r += line(`push    eax`);
           } else {
             throw makeImplErr('cannot access struct member of expression ' + structExpr.name);
           }
 
           return r;
+        }
+
+        function makeMemberChain(baseExpr, off, members) {return { baseExpr, off, members }};
+
+        function resolveMemberChain(scope, exprMember, members=[]) {
+          let memberName = exprMember.props.name;
+          let structExpr = exprMember.kids[0];
+
+          let structType = evalType(structExpr, scope);
+          if (structType.name === 'type') structType = structType.kids[0];
+          let structName = structType.props.name;
+          let structRow = findStructTableRow(structName);
+          if (!structRow) throw makeErr(expr.i, 'could not find struct ' + structName);
+          let member = structRow.members.find((x) => x.name === memberName);
+          if (!member) throw makeErr(expr.i, 'could not find member ' + memberName + ' of ' + structName);
+          
+          members.push(member);
+
+          if (structExpr.name === 'expr-member') {
+            return resolveMemberChain(scope, structExpr, members);
+          }
+          
+          return makeMemberChain(structExpr, members.map(x => x.off).reduce((a, b) => a + b), members);
         }
 
         function compileExprRef(expr, scope) {
@@ -1797,7 +1904,7 @@
 
           if (structRow.members < inits.length) throw makeErr(expr.i, 'to many member initializations for ' + structRow.name);
 
-          for (const member of [...structRow.members].reverse()) {
+          for (const member of structRow.members) {
             let init = inits.find((x) => x.props.name == member.name);
             if (!init) throw makeErr(expr.i, 'can not find initialization for member ' + member.name);
 
@@ -1924,12 +2031,14 @@
             if (!structRow) throw new makeErr(exprSym.i, 'struct ' + type.props.name + ' not found');
             if (structRow.size % 4 !== 0) throw makeImplErr('struct needs to be 4-byte aligned');
 
-            asm += line(`; expr struct ${structRow.name} symbol: ${symbol}`);
+            asm += line(`; expr struct ${structRow.name} symbol: ${symbol} {`);
             let size = structRow.size / 4;
             for (let i = 0; i < size; i++) {
-              asm += line(`mov     eax, [${symRes.register}${getOffStr(row.off + i * 4)}]`);
-              asm += line(`push    eax`);
+              // asm += line(`mov     eax, [${symRes.register}${getOffStr(row.off + i * 4)}]`);
+              // asm += line(`push    eax`);
+              asm += line(`push    dword [${symRes.register}${getOffStr(row.off + i * 4)}]`);
             }
+            asm += line('; }');
           } else {
             throw makeImplErr('can not init using symbol of type ' + type.name);
           }
