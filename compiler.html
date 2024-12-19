@@ -1562,6 +1562,7 @@
           let r = '';
 
           let chain = resolveMemberChain(scope, exprMem);
+          let memberChainString = chain.members.map(x => x.name).join('.');
           let structExpr = chain.baseExpr;
           let member = chain.members[0];
 
@@ -1573,16 +1574,13 @@
             let symbol = structExpr.props.symbol;
 
             let symLoc = findSymTableLoc(scope, symbol);
-            if (!symLoc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
+            if (!symLoc) throw makeErr(structExpr.i, 'can not find symbol ' + symbol);
             let symRow = symLoc.row;
 
-            let memberChainString = chain.members.map(x => x.name).join('.');
             r += line(`; member assign: ${symbol}.${memberChainString}`);
 
-            // push member value
             r += compileExpr(expr, scope);
 
-            // compile symbol
             let symRes = resolveSymbolBase(symLoc);
             r += symRes.asm;
 
@@ -1593,7 +1591,19 @@
 
             r += line();
           } else if (structExpr.name === 'expr-drf') {
-            throw makeImplErr('assign member of expr-drf');
+            let addressExpr = structExpr.kids[0];
+
+            r += line(`; member deref assign ${memberChainString}`);
+            r += compileExpr(expr, scope);
+
+            r += compileExpr(addressExpr, scope);
+            r += line(`pop     edx`);
+            
+            let off = chain.off;
+            r += compileCopy('esp', 0, 'edx', off, memberSizeBytes, true);
+            r += line(`add     esp, ${memberSizeBytes}`);
+
+            r += line();
           } else {
             throw makeErr(exprMem.i, 'cannot assign struct member of expression ' + structExpr.name);
           }
@@ -1671,6 +1681,7 @@
           return r;
         }
 
+        // already uses: eax
         function compileCopy(fromReg, fromOffBytes, toReg, toOffBytes, sizeBytes, reverse = false) {
           let r = '';
           if (sizeBytes % 4 !== 0) throw makeImplErr('can only copy 4-byte aligned');
@@ -1822,9 +1833,19 @@
 
           let chain = resolveMemberChain(scope, expr);
           let structExpr = chain.baseExpr;
+          let member = chain.members[0];
+          let memberSizeBytes = evalSize(member.type);
+          let memberChainString = chain.members.map(x => x.name).join('.');
 
           if (structExpr.name === 'expr-drf') {
-            throw makeImplErr('get drefed struct');
+            let addressExpr = structExpr.kids[0];
+
+            r += line(`; expression member ref: ${memberChainString}`);
+            r += compileExpr(addressExpr, scope);
+            r += line('pop     ecx');
+
+            let off = chain.off;
+            r += compilePush('ecx', off, memberSizeBytes);
           } else if (structExpr.name === 'expr-sym') {
             let loc = findSymTableLoc(scope, structExpr.props.symbol);
             if (!loc) throw makeErr(expr.i, 'can not find symbol ' + symbol);
@@ -1834,14 +1855,25 @@
 
             let off = row.off + chain.off;
             
-            let memberChainString = chain.members.map(x => x.name).join('.');
-            
-            r += line(`mov     eax, [${symRes.register}${getOffStr(off)}] ; member ref: ${structExpr.props.symbol}.(${memberChainString})`);
-            r += line(`push    eax`);
+            // r += line(`mov     eax, [${symRes.register}${getOffStr(off)}] ; member sym: ${structExpr.props.symbol}.(${memberChainString})`);
+            // r += line(`push    eax`);
+            r += line(`; expression sym member: ${structExpr.props.symbol}.${memberChainString}`);
+            r += compilePush(symRes.register, off, memberSizeBytes);
           } else {
             throw makeImplErr('cannot access struct member of expression ' + structExpr.name);
           }
 
+          return r;
+        }
+
+        // does not clobber any register
+        function compilePush(register, offset, sizeBytes) {
+          if (sizeBytes % 4 !== 0) throw makeImplErr('cannot push unaligned bytes');
+          let r = '';
+          let sizeStack = sizeBytes / 4;
+          for (let i = 0; i < sizeStack; i++) {
+            r += line(`push dword [${register}${getOffStr(offset + i * 4)}]`);
+          }
           return r;
         }
 
@@ -1873,10 +1905,45 @@
           let asm = '';
           if (kidExpr.name === 'expr-sym') {
             return compileExprRefSym(kidExpr, scope);
+          } else if (kidExpr.name === 'expr-member') {
+            return compileExprRefMem(kidExpr, scope);
           } else {
             throw makeErr(kidExpr.i, 'can not take reference of expression ' + kidExpr.name);
           }
           return asm;
+        }
+
+        function compileExprRefMem(expr, scope) {
+          let r = '';
+
+          let chain = resolveMemberChain(scope, expr);
+          let base = chain.baseExpr;
+          let memberChainString = chain.members.map(x => x.name).join('.');
+
+          if (base.name === 'expr-sym') {
+            let symbol = base.props.symbol;
+            let loc = findSymTableLoc(scope, symbol);
+            if (!loc) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+            let symRow = loc.row;
+            let symRes = resolveSymbolBase(loc);
+            r += symRes.asm;
+
+            let off = symRow.off + chain.off;
+            r += line(`lea     eax, [${symRes.register}${getOffStr(off)}] ; member address: ${symbol}.${memberChainString}`);
+            r += line(`push    eax`);
+          } else if (base.name === 'expr-drf') {
+            let addressExpr = base.kids[0];
+
+            r += line(`; expression member ref: ${memberChainString}`);
+            r += compileExpr(addressExpr, scope);
+
+            let off = chain.off;
+            r += line('add     dword [esp], ' + off);
+          } else {
+            throw makeErr(kidExpr.i, 'can not take member reference of expression ' + base.name);
+          }
+
+          return r;
         }
 
         function compileExprRefSym(exprSym, scope) {

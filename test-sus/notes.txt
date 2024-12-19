@@ -34,10 +34,10 @@ MISSING
   - Structures
     - Copying
       - Init: [x] Symbol
-      - Assign: [s] Symbol, [ ] Deref
+      - Assign: [x] Symbol, [x] Deref base, [x] Member chaining, [x] Struct member
     - Using members
-      - Read member: [x] Symbol, [ ] Deref, [x] Member chaining
-      - Set member: [x] Symbol, [ ] Deref, [x] Member chaining
+      - Read member: [x] Symbol base, [x] Deref base, [x] Member chaining, [x] Struct member
+      - Ref member: [x] Symbol base, [ ] Deref base
     - Heap allocation
   - Packages
   - Multiple Files, Automatic linking and running

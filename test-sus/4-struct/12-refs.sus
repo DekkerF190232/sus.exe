@@ -4,7 +4,7 @@ struct Test (
 );
 
 {
-  print(s:STR"11-refs.sus\n");
+  print(s:STR"12-refs.sus\n");
 
   Test test = Test(a=1, b=2);
 
@@ -12,6 +12,20 @@ struct Test (
   DRF(_test).a = 123;
 
   print(s: STR "expected: 123 2, 123 2\n");
+  print(i: DRF(_test).a);
+  print(s: STR " ");
+  print(i: DRF(_test).b);
+  print(s: STR ", ");
+  print(i: test.a);
+  print(s: STR " ");
+  print(i: test.b);
+  printLn();
+
+  PTR[int32] _a = REF(test.a);
+  PTR[int32] _b = REF(DRF(_test).b);
+  DRF(_a) = 4;
+  DRF(_b) = 6;
+  print(s: STR "expected: 4 6, 4 6\n");
   print(i: DRF(_test).a);
   print(s: STR " ");
   print(i: DRF(_test).b);
