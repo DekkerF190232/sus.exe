@@ -70,9 +70,11 @@
         const makeNodeExprLitBoo = (val) => makeNode('expr-lit', { litType: 'dec-boo', value: val });
         const makeNodeExprLitPtrStr = (str) => makeNode('expr-lit', { litType: 'ptr-str', value: str });
         const makeNodeExprArr = () => makeNode('expr-arr', null, []); // kids: type, expression for size
+        const makeNodeExprBrackets = () => makeNode('expr-brackets', null, []); // expression
         const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get pointer of
         const makeNodeExprDrf = () => makeNode('expr-drf', null, []); // kids: expression to express value of
-        const makeNodeExprCon = () => makeNode('expr-con', null, []); // kids: type, expression
+        const makeNodeExprRtp = () => makeNode('expr-reinterpret', null, []); // kids: type, expression
+        const makeNodeExprSize = () => makeNode('expr-siz', null, []); // kids: type, expression
         const makeNodeType = () => makeNode('type', undefined, []);
         const makeNodeTypePrim = (name) => makeNode('type-prim', { name }, []);
         const makeNodeTypeNamed = (name) => makeNode('type-named', { name }, []);
@@ -465,12 +467,14 @@
 
         function tryParseNodeExprOp(nodeExprA) {
           return tryParse((_) => {
-            let op = eat(/^([+-]|==|!=|>|<|>=|<=|\|\||\&\&)/);
+            let op = eat(/^([+\-*/]|==|!=|>=|<=|>|<|\|\||\&\&)/);
             if (!op) return undefined;
             eatEmpty();
             let n = makeNodeExprOp(op);
             n.kids.push(nodeExprA);
-            n.kids.push(tryParseNodeExprGreedy());
+            let second = tryParseNodeExprGreedy();
+            if (!second) return;
+            n.kids.push(second);
             return n;
           });
         }
@@ -539,6 +543,15 @@
               return arrayNode;
             },
             () => {
+              if (!eat(/^\(/)) return;
+              eatEmpty();
+              let bracketsNode = makeNodeExprBrackets();
+              bracketsNode.kids.push(parseNodeExpr());
+              eatPicky(')');
+              eatEmpty();
+              return bracketsNode;
+            },
+            () => {
               if (!eat(/^REF/)) return;
               eatEmpty();
               if (!eat(/^\(/)) return;
@@ -561,7 +574,7 @@
               return drfNode;
             },
             () => {
-              if (!eat(/^convert/)) return;
+              if (!eat(/^RTP/)) return;
               eatEmpty();
 
               if (!eat(/^\[/)) return;
@@ -575,7 +588,7 @@
               eatPicky('(');
               eatEmpty();
 
-              let drfNode = makeNodeExprCon();
+              let drfNode = makeNodeExprRtp();
               drfNode.kids.push(nodeType);
               drfNode.kids.push(parseNodeExpr());
 
@@ -583,6 +596,26 @@
               eatEmpty();
 
               return drfNode;
+            },
+            () => {
+              if (!eat(/^size/)) return;
+              eatEmpty();
+
+              if (!eat(/^\[/)) return;
+              eatEmpty();
+
+              let nodeType = parseNodeType();
+
+              eatPicky(']');
+              eatEmpty();
+              eatPicky('(');
+              eatEmpty();
+              eatPicky(')');
+              eatEmpty();
+              
+              let n = makeNodeExprSize();
+              n.kids.push(nodeType);
+              return n;
             },
             () => {
               let structName = eatSymbol();
@@ -956,6 +989,12 @@
         // EXPRESSIONS ============================
 
         // gives size in bytes
+        function evalSizeAligned(type) {
+          let r = evalSize(type);
+          if (r % 4 !== 0) throw makeImplErr('unaligned!');
+          return r;
+        }
+
         function evalSize(type, depth = 1000) {
           if (depth < 0) {
             throw makeErr(type.i ?? 0, 'recursive struct definition ' + JSON.stringify(type));
@@ -1117,19 +1156,20 @@
           return typeToString(a) === typeToString(b);
         }
 
-        function evalTypeConvert(expr, scope) {
+        function evalTypeReinterpret(expr, scope) {
           let wantedType = expr.kids[0];
           let kid = expr.kids[1];
           let actualType = evalType(kid, scope);
 
-          switch (typeBaseName(actualType)) {
-            case 'PTR':
-            case 'ptr':
-              if (['int32'].includes(typeToString(wantedType))) return wantedType;
-              throw makeErr(expr.i, 'cannot convert type ' + typeToString(actualType) + ' to ' + typeToString(wantedType));
-            default:
-              throw makeErr(expr.i, 'cannot convert type ' + typeToString(actualType));
-          }
+          return wantedType; // lol
+          //switch (typeBaseName(actualType)) {
+          //  case 'PTR':
+          //  case 'ptr':
+          //    if (['int32'].includes(typeToString(wantedType))) return wantedType;
+          //    throw makeErr(expr.i, 'cannot convert type ' + typeToString(actualType) + ' to ' + typeToString(wantedType));
+          //  default:
+          //    throw makeErr(expr.i, 'cannot convert type ' + typeToString(actualType));
+          //}
         }
 
         function evalType(expr, scope) {
@@ -1138,8 +1178,10 @@
           const makeArtType = (kid) => ({ name: 'type', kids: [kid] });
           const makeArtTypePrim = (typeName, kids = []) => ({ name: 'type-prim', props: { name: typeName }, kids });
 
-          if (expr.name === 'expr-con') {
-            return evalTypeConvert(expr, scope);
+          if (expr.name === 'expr-reinterpret') {
+            return evalTypeReinterpret(expr, scope);
+          } else if (expr.name==='expr-siz') {
+            return makeArtType(makeArtTypePrim('int32'));
           } else if (expr.name === 'expr-lit') {
             switch (expr.props.litType) {
               case 'dec-boo':
@@ -1182,6 +1224,8 @@
                 return evalBinOp(op, expr, scope, allowedComp, (a, b) => true, (a, b) => makeArtType(makeArtTypePrim('boo')) );
               case '+':
               case '-':
+              case '*':
+              case '/':
                 // prettier-ignore
                 return evalBinOp(op, expr, scope, allowedNum, (a, b) => true, (a, b) => a );
               case '||':
@@ -1217,6 +1261,9 @@
             let kidExpr = expr.kids[0];
             let type = evalType(kidExpr, scope);
             return makeArtTypePrim('PTR', [type]);
+          } else if (expr.name === 'expr-brackets') {
+            let kidExpr = expr.kids[0];
+            return evalType(kidExpr, scope);
           } else if (expr.name === 'expr-drf') {
             let kidExpr = expr.kids[0];
             let type = evalType(kidExpr, scope);
@@ -1522,13 +1569,16 @@
 
           switch (targetExpr.name) {
             case 'expr-drf':
+              let byteSize = evalSizeAligned(exprType);
+
               r += line(`; deref assign`);
-              r += compileExpr(targetExpr.kids[0], scope);
               r += compileExpr(expr, scope);
-              r += line(`pop     eax`);
-              r += line(`pop     ecx`);
-              r += line(`mov     [ecx], eax`);
-              r += line();
+              
+              r += compileExpr(targetExpr.kids[0], scope);
+              r += line(`pop     edx`);
+
+              r += compileCopy('esp', 0, 'edx', 0, byteSize, true);
+              r += line(`add     esp, ${byteSize}`);
               break;
             case 'expr-sym':
               r += compileInsAssSym(targetExpr, expr, scope);
@@ -1683,6 +1733,8 @@
 
         // already uses: eax
         function compileCopy(fromReg, fromOffBytes, toReg, toOffBytes, sizeBytes, reverse = false) {
+          if ([fromReg, toReg].includes('eax')) throw makeImplErr('lol');
+
           let r = '';
           if (sizeBytes % 4 !== 0) throw makeImplErr('can only copy 4-byte aligned');
           let sizeStack = sizeBytes / 4;
@@ -1770,8 +1822,12 @@
           if (expr.name === 'expr') return compileExpr(expr.kids[0], scope);
 
           let asm = '';
-          if (expr.name === 'expr-con') {
-            asm += compileExprCon(expr, scope);
+          if (expr.name === 'expr-reinterpret') {
+            asm += compileExprReinterpret(expr, scope);
+          } else if (expr.name === 'expr-siz') {
+            let exprType = expr.kids[0];
+            let size = evalSize(exprType);
+            asm += line(`push    ${size}`);
           } else if (expr.name === 'expr-lit') {
             switch (expr.props.litType) {
               case 'dec-int':
@@ -1797,6 +1853,8 @@
             asm += compileExprCtr(expr, scope);
           } else if (expr.name === 'expr-ref') {
             asm += compileExprRef(expr, scope);
+          } else if (expr.name === 'expr-brackets') {
+            asm += compileExpr(expr.kids[0], scope);
           } else if (expr.name === 'expr-drf') {
             asm += compileExprDrf(expr, scope);
           } else if (expr.name === 'expr-member') {
@@ -1807,7 +1865,7 @@
           return asm;
         }
 
-        function compileExprCon(expr, scope) {
+        function compileExprReinterpret(expr, scope) {
           let wantedType = expr.kids[0];
           let kid = expr.kids[1];
           let actualType = evalType(kid, scope);
@@ -1997,17 +2055,15 @@
           let sizeType = typeToString(evalType(sizeExpr, scope));
           if (sizeType !== 'ptr' && sizeType !== 'int32') throw makeErr(sizeExpr.i, 'expected expression of type ptr or int32');
 
-          // NOTE: EVERY "ARR" EXPRESSION IRREVERSIBLY GROWS THE STACK BY THE ARRAY SIZE FOR THE SCOPE.
-          // ALSO THE POINTER SHALL NOT BE USED AFTER SCOPE ENDS.
+          // NOTE: ARRAY EXPRESSIONS DIE AFTER GOING OUT OF SCOPE.
 
-          // asm to mov aligned array size in bytes into eax:
+          let typeSize = evalSize(type);
+          if (typeSize %4 !== 0) throw makeImplErr();
+
           asm += compileExpr(sizeExpr, scope);
           asm += line(`pop     eax`);
-          asm += line(`mov     ecx, ${evalSize(type)}`);
-          asm += line(`mul     ecx`);
-          asm += line(`add     eax, 3`);
-          asm += line(`shr     eax, 2`);
-          asm += line(`shl     eax, 2`);
+          asm += line(`mov     ebx, ${typeSize}`);
+          asm += line(`mul     ebx`);
 
           // push array, push array pointer
           asm += line(`sub     esp, eax`);
@@ -2035,6 +2091,10 @@
               return compileExprOpSimple(exprOp, scope, op, 'sub');
             case '+':
               return compileExprOpSimple(exprOp, scope, op, 'add');
+            case '*':
+              return compileExprOpMul(exprOp, scope, op, 'imul');
+            case '/':
+              return compileExprOpSimple(exprOp, scope, op, 'idiv');
             case '||':
               return compileExprOpSimple(exprOp, scope, op, 'or');
             case '&&':
@@ -2064,7 +2124,7 @@
 
         // (very inefficient lol)
         function compileExprOpSimple(exprOp, scope, op, asmOp) {
-          if (exprOp.kids.length != 2) throw makeErr('expected 2 params for op +');
+          if (exprOp.kids.length != 2) throw makeErr('expected 2 params for op ' + op);
           let a = exprOp.kids[0];
           let b = exprOp.kids[1];
           let asm = '';
@@ -2072,6 +2132,20 @@
           asm += compileExpr(b, scope);
           asm += line(`pop     eax`);
           asm += line(`${asmOp.padEnd(8, ' ')}[esp], eax`);
+          return asm;
+        }
+
+        function compileExprOpMul(exprOp, scope, op, asmOp) {
+          if (exprOp.kids.length != 2) throw makeErr('expected 2 params for op ' + op);
+          let a = exprOp.kids[0];
+          let b = exprOp.kids[1];
+          let asm = '';
+          asm += compileExpr(a, scope);
+          asm += compileExpr(b, scope);
+          asm += line(`pop     eax`);
+          asm += line(`pop     ebx`);
+          asm += line(`${asmOp.padEnd(8, ' ')} eax, ebx`);
+          asm += line(`push    eax`);
           return asm;
         }
 

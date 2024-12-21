@@ -16,7 +16,7 @@ ACTUALLY IMPLEMENTED
       - Initializing, Assigning
     - Asm instructions
     - Expressions
-      - Operators, String literals, int32 literals
+      - Operators: (arithmetics, refs, convert), String literals, int32 literals
     - Branching
       - Conditions, Boo logic, done, break
       - While Loop
@@ -26,11 +26,6 @@ ACTUALLY IMPLEMENTED
   - Pointers
     - Arithmetic Referencing, Dereferencing, Assigning
   - Stack-Arrays
-
-
-
-MISSING
-  - Function pointers
   - Structures
     - Copying
       - Init: [x] Symbol
@@ -38,7 +33,22 @@ MISSING
     - Using members
       - Read member: [x] Symbol base, [x] Deref base, [x] Member chaining, [x] Struct member
       - Ref member: [x] Symbol base, [ ] Deref base
+
+
+
+MISSING
+  - Function pointers
+  - Operators
+    - size
+  - Multiple Files
+    - convert to run using npm lol
+  - Structures
+    - Assign PTR[struct]
     - Heap allocation
+      - compiler-impl.sus
+        - String expression syntax sugar
+        - Alloc implementation
+        - Free implementation
   - Packages
   - Multiple Files, Automatic linking and running
   - Mogroft
