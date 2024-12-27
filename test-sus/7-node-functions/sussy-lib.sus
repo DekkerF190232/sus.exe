@@ -1,0 +1,28 @@
+func test() {
+  PTR[int8] test = STR"test\n";
+  out(buffer: STR"test", size: 5);
+}
+
+func out(PTR[int8] buffer, int32 size) {
+  out2(buffer: buffer, size: size);
+  out2(buffer: STR"(2)\n\n", size: 5);
+}
+
+func out2(PTR[int8] buffer, int32 size) {
+  ASM {
+      extern  _GetStdHandle@4
+      extern  _WriteFile@20
+
+      push    -11
+      call    _GetStdHandle@4
+      mov     ecx, eax    
+      push    0
+      push    0
+      mov     eax, SUS{size} ; inserts [ebp+SIZE OFFSET]
+      push    eax
+      mov     eax, SUS{buffer}
+      push    eax
+      push    ecx
+      call    _WriteFile@20
+  }
+}

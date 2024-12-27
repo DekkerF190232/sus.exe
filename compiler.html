@@ -960,7 +960,7 @@
           let paramOffset = 8;
           if (listParam) {
             for (const param of listParam.kids) {
-              let type = param.kids.find((x) => x.name === 'type');
+              let type = param.kids.find((x) => x.name === 'type').props.type;
               let name = param.props.name;
               let size = evalSize(type);
               if (findSymTableLoc(scope, name)) throw makeErr('duplicate symbol: ' + name);
@@ -972,7 +972,7 @@
           let symOffset = 0;
           for (const ins of listIns.kids) {
             if (ins.name !== 'ins-sym') continue;
-            let type = ins.kids.find((x) => x.name === 'type');
+            let type = ins.kids.find((x) => x.name === 'type').props.type;
             let name = ins.props.name;
             let size = evalSize(type);
             if (findSymTableLoc(scope, name)) throw makeErr(ins.i, 'duplicate symbol: ' + name);
@@ -1318,7 +1318,7 @@
             let off = 0;
             for (const m of strct.kids) {
               members.push(makeStructTableRowMember(m.props.name, m.kids[0], off));
-              off += evalSize(m.kids[0]);
+              off += evalSize(m.kids[0].props.type);
             }
 
             structTable.rows.push(makeStructTableRow(name, type, members, off));
@@ -1770,7 +1770,7 @@
             if (!arg) throw makeErr(ins.i, 'can not find argument for param ' + param.props.name);
 
             let expr = arg.kids.find((x) => x.name === 'expr');
-            let type = param.kids.find((x) => x.name === 'type');
+            let type = param.kids.find((x) => x.name === 'type').props.type;
 
             checkType(expr, scope, type);
 
@@ -1825,7 +1825,7 @@
           if (expr.name === 'expr-reinterpret') {
             asm += compileExprReinterpret(expr, scope);
           } else if (expr.name === 'expr-siz') {
-            let exprType = expr.kids[0];
+            let exprType = expr.kids[0].props.type;
             let size = evalSize(exprType);
             asm += line(`push    ${size}`);
           } else if (expr.name === 'expr-lit') {
@@ -2049,7 +2049,7 @@
         function compileExprArr(expr, scope) {
           let asm = '';
 
-          let type = expr.kids[0];
+          let type = expr.kids[0].props.type;
           let sizeExpr = expr.kids[1];
 
           let sizeType = typeToString(evalType(sizeExpr, scope));

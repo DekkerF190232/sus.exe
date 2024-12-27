@@ -1,0 +1,7 @@
+#code Test {
+#  
+#  func add(int32 a, int32 b, PTR[int32] r) {
+#    DRF(r) = a + b;
+#  }
+#
+#}
