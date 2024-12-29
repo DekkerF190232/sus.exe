@@ -61,7 +61,7 @@ function buildContext(buildInfo, units) {
   for (const unit of units) {
     let srcPath = path.join(buildInfo.sourceFolder, unit.sourceFile);
     let src = fs.readFileSync(srcPath, { encoding: 'utf-8' }).replaceAll(EOL, '\n');
-    compiler.addToContext(ctx, srcPath, src);
+    compiler.addToContext(ctx, path.resolve(srcPath), src);
 
     console.log('  ' + unit.sourceFile);
   }

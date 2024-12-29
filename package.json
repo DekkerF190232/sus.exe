@@ -5,7 +5,7 @@
   "main": "compiler_node.js",
   "scripts": {
     "start": "node compiler_node.js test-sus/8-node-sections/",
-    "start-exec": "cls && node compiler_node.js test-sus/8-node-sections/ && echo ================ building  ================ && build-path && cd .sus-build && build && echo ================ executing ================ && main.sus.exe"
+    "start-exec": "node compiler_node.js test-sus/8-node-sections/ && echo ================ building  ================ && build-path && cd .sus-build && build && echo ================ executing ================ && main.sus.exe"
   },
   "author": "",
   "license": "ISC",
