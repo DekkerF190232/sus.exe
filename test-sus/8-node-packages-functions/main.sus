@@ -1,0 +1,29 @@
+
+package Main {
+
+  use sus/InOut;
+  use sus/System;
+  use sus/Memory;
+
+  main {
+    InOut/print(s: STR"Hello, World\n");
+
+    ptr buffer = RTP[ptr](0);
+
+    InOut/print(i: RTP[int32](buffer));
+    InOut/printLn();
+
+    Memory/alloc(size: 10, pointer: REF(buffer));
+    
+    InOut/print(i: RTP[int32](buffer));
+    InOut/printLn();
+
+    Memory/free(pointer: buffer);
+
+    InOut/print(s: STR"================================== END REACHED =====================================\n");
+    System/exit(code: 0);
+
+    InOut/print(s: STR"WHAT??");
+  }
+
+}

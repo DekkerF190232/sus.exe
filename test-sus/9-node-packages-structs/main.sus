@@ -1,0 +1,83 @@
+
+package Main {
+
+  use sus/InOut;
+  use sus/System;
+
+  main {
+
+    TestLocal/test();
+    
+    TestLib/test();
+    
+    InOut/printLn();
+    
+    InOut/print(s: STR"DONE.\n");
+
+    System/exit(code: 0);
+    
+  }
+
+}
+
+
+
+package TestLib {
+
+  use sus/InOut;
+  use sus/StringBuffer;
+  use sus/Memory;
+
+	func test() {
+
+    StringBuffer sb = StringBuffer(pointer=RTP[ptr](STR"abc"), length=3, pos=3);
+
+    StringBuffer/init(this: REF(sb), pointer: STR"when the imposter is sus\n");
+
+	}
+
+	func testCopy() {
+
+    InOut/print(s: STR"TestLib  --------------- {\n");
+    
+    StringBuffer sb = StringBuffer(pointer=RTP[ptr](STR"abc"), length=3, pos=3);
+
+    ptr a = RTP[ptr](ARR[int8](2));
+    
+    Memory/copy(dst:a, dstSize:size[int8]() * 2, src:RTP[ptr](STR"123456"), length:4);
+    
+    # HELP!
+    DRF(RTP[PTR[int32]](a+4)) = 0;
+
+    InOut/print(s: RTP[PTR[int8]](a));
+    
+    InOut/print(s: STR"TestLib  --------------- }\n");
+
+	}
+
+}
+
+
+
+package TestLocal {
+
+  use sus/InOut;
+
+  struct Test (
+    int32 a,
+    int32 b
+  );
+
+  func test() {
+  
+    InOut/print(s: STR"TestLocal--------------- {\n");
+
+    Test test = Test(a=111, b=222);
+    InOut/print(i: test.b);
+
+    InOut/printLn();
+  
+    InOut/print(s: STR"TestLocal--------------- }\n");
+  }
+
+}

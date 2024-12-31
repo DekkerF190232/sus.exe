@@ -1,5 +1,69 @@
 
-package sus/sys/Io {
+package sus/System {
+
+  func exit(int32 code) {
+    ASM {
+      push    dword SUS{code}
+      extern  _ExitProcess@4
+      call    _ExitProcess@4
+      hlt
+    }
+  }
+
+}
+
+package sus/Memory {
+
+  func alloc(int32 size, PTR[ptr] pointer) {
+    ASM {
+      push    dword SUS{size}
+      extern  _malloc
+      call    _malloc
+      mov     edx, SUS{pointer}
+      mov     [edx], eax
+    }
+  }
+
+  func free(ptr pointer) {
+    ASM {
+      push     dword SUS{pointer}
+      extern  _free
+      call    _free
+    }
+  }
+
+}
+
+package sus/StringBuffer {
+  
+  struct StringBuffer (
+    ptr pointer,
+    int32 length
+  );
+
+}
+
+package sus/String {
+
+  func intToString(int32 value, PTR[int8] buffer, int32 size, int32 radix) {
+    ASM {
+      extern  __itoa_s
+      mov     eax, SUS{radix}
+      push    eax
+      mov     eax, SUS{size}
+      push    eax
+      mov     eax, SUS{buffer}
+      push    eax
+      mov     eax, SUS{value}
+      push    eax
+      call    __itoa_s
+    }
+  }
+
+}
+
+
+package sus/InOut {
 
   func print(boo b) {
     if (b) sus_out_int32(integer:1);

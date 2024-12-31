@@ -1,12 +1,3 @@
-ISSUES
-  - Expressions:
-    - type checking for addition
-    - REF chaining
-    - arithmetic operators
-  - Local symbols
-    non self-assign
-    non-usable before declaration
-
 ACTUALLY IMPLEMENTED
   - Top Level Statements
   - Functions
@@ -16,16 +7,17 @@ ACTUALLY IMPLEMENTED
       - Initializing, Assigning
     - Asm instructions
     - Expressions
-      - Operators: (arithmetics, refs, convert), String literals, int32 literals
+      - Operators: (arithmetics, refs, convert, size), String literals, int32 literals
     - Branching
       - Conditions, Boo logic, done, break
       - While Loop
     - Blocks/Scopes
-
   - Type checking
   - Pointers
     - Arithmetic Referencing, Dereferencing, Assigning
   - Stack-Arrays
+  - Multiple Files: Automatic build script generator
+  - Packages: use statement
   - Structures
     - Copying
       - Init: [x] Symbol
@@ -34,23 +26,33 @@ ACTUALLY IMPLEMENTED
       - Read member: [x] Symbol base, [x] Deref base, [x] Member chaining, [x] Struct member
       - Ref member: [x] Symbol base, [ ] Deref base
 
-
+ISSUES
+  - unmet requirements
+    - create byte arrays for strings.
+    - assign single bytes in byte arrays.
+    - make "safe" type conversion possible
+    - add unsigned types, unsigned type literals, size types?
+    - function return types?
+    - have "default" function parameters, which don't need a name
+    - have "const" type
+    - have better syntax for pointers etc.
+  - possible bugs
+    - conflict for constructors accessed using full path and divisions between symbols
 
 MISSING
+  - compiler-impl.sus
+    - String expression syntax sugar
+    - Alloc implementation
+    - Free implementation
   - Function pointers
-  - Operators
-    - size
-  - Multiple Files
-    - convert to run using npm lol
-  - Structures
-    - Assign PTR[struct]
-    - Heap allocation
-      - compiler-impl.sus
-        - String expression syntax sugar
-        - Alloc implementation
-        - Free implementation
-  - Packages
-  - Multiple Files, Automatic linking and running
+    - types
+    - calling
+    - lambdas
+  - Interfaces
+  - Type/Template arguments
+  - Variable size before creation structs
+  - Macros
+  - Calling convention declarations
   - Mogroft
     - Window
     - Missing operators
@@ -122,12 +124,18 @@ NOTES FOR FEATURES NOW
 RAMBLING SECTION MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  
 
 
+for |start=0, end=5, |i| {
+}|
 
+macfunc for |start, end, default block|  {
+  int32 i = start||;
+  int32 e = end||;
 
-
-
-
-
+  while(i < e) {
+    block|i|
+    i = e + i;
+  }
+}
 
 
 

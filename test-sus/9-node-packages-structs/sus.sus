@@ -1,0 +1,176 @@
+
+package sus/System {
+
+  func exit(int32 code) {
+    ASM {
+      push    dword SUS{code}
+      extern  _ExitProcess@4
+      call    _ExitProcess@4
+      hlt
+    }
+  }
+
+}
+
+package sus/Memory {
+
+  func alloc(int32 length, PTR[ptr] pointer) {
+    ASM {
+      push    dword SUS{length}
+      extern  _malloc
+      call    _malloc
+      mov     edx, SUS{pointer}
+      mov     [edx], eax
+    }
+  }
+
+  func free(ptr pointer) {
+    ASM {
+      push     dword SUS{pointer}
+      extern  _free
+      call    _free
+    }
+  }
+  
+  func copy(ptr dst, int32 dstSize, ptr src, int32 length) {
+    ASM {
+      push    dword SUS{length}
+      push    dword SUS{src}
+      push    dword SUS{dstSize}
+      push    dword SUS{dst}
+      extern  _memcpy_s
+      call    _memcpy_s
+    }
+  }
+
+}
+
+package sus/StringBuffer {
+  
+  use sus/InOut;
+
+  struct StringBuffer (
+    ptr pointer,
+    int32 length,
+    int32 pos
+  );
+
+  func init(PTR[StringBuffer] this, PTR[int8] pointer) {
+    DRF(this).pointer = RTP[ptr](pointer);
+    InOut/sus_length(buffer: pointer, size: 10000, length: REF(DRF(this).pos));
+  }
+
+  func append(PTR[StringBuffer] this, PTR[int8] pointer) {
+  }
+
+}
+
+package sus/InOut {
+
+  func print(boo b) {
+    if (b) sus_out_int32(integer:1);
+    else sus_out_int32(integer:0);
+  }
+
+  func print(int32 i) {
+    sus_out_int32(integer:i);
+  }
+
+  func print(PTR[int8] s) {
+    int32 length = 0;
+    sus_length(
+      buffer: s,
+      size: 10000,
+      length: REF(length)
+    );
+    sus_out_buffer(buffer: s, size: length);
+  }
+
+  func printLn() {
+    print(s: STR "\n");
+  }
+
+  #
+  #
+  #
+
+  func sus_out_int32(int32 integer) {
+    int32 bufferSize = 128;
+    PTR[int8] intBuffer = ARR[int8](bufferSize);
+    
+    int32 length = 0;
+    sus_iota_s(
+      value:  integer,
+      buffer: intBuffer, 
+      size:   bufferSize, 
+      radix:  10
+    );
+    sus_length(
+      buffer: intBuffer,
+      size: bufferSize,
+      length: REF(length)
+    );
+
+    sus_out_buffer(buffer: intBuffer, size: length);
+  }
+
+  func sus_out_line() {
+    sus_out_buffer(buffer: STR"\n", size:1);
+  }
+
+  func sus_exit(int32 code) {
+    ASM {
+      extern  _ExitProcess@4
+      mov     eax, SUS{code}
+      push    eax
+      call    _ExitProcess@4
+      hlt
+    }
+  }
+
+  func sus_length(PTR[int8] buffer, int32 size, PTR[int32] length) {
+    ASM {
+      extern  _strnlen
+      mov     eax, SUS{size}
+      push    eax
+      mov     eax, SUS{buffer}
+      push    eax
+      call    _strnlen
+      mov     ecx, SUS{length}
+      mov     [ecx], eax
+    }
+  }
+
+  func sus_iota_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) {
+    ASM {
+      extern  __itoa_s
+      mov     eax, SUS{radix}
+      push    eax
+      mov     eax, SUS{size}
+      push    eax
+      mov     eax, SUS{buffer}
+      push    eax
+      mov     eax, SUS{value}
+      push    eax
+      call    __itoa_s
+    }
+  }
+
+  func sus_out_buffer(PTR[int8] buffer, int32 size) {
+    ASM {
+        extern  _GetStdHandle@4
+        extern  _WriteFile@20
+        push    -11
+        call    _GetStdHandle@4
+        mov     ecx, eax    
+        push    0
+        push    0
+        mov     eax, SUS{size}
+        push    eax
+        mov     eax, SUS{buffer}
+        push    eax
+        push    ecx
+        call    _WriteFile@20
+    }
+  }
+}

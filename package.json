@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "main": "compiler_node.js",
   "scripts": {
-    "start": "node compiler_node.js test-sus/8-node-sections/",
-    "start-exec": "node compiler_node.js test-sus/8-node-sections/ && echo ================ building  ================ && build-path && cd .sus-build && build && echo ================ executing ================ && main.sus.exe"
+    "compile": "node compiler_node.js test-sus/9-node-packages-structs/",
+    "start": "npm run compile && echo ================ building  ================ && build-path && cd .sus-build && build && echo ================ executing ================ && main.sus.exe"
   },
   "author": "",
   "license": "ISC",
