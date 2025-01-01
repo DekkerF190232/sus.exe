@@ -18,10 +18,10 @@
 // missing: function calls, pointer types, type templates
 
 function _ass(val) {
-  if (!val) throw new Error("assertion failed.");
+  if (!val) throw new Error('assertion failed.');
 }
 function _nass(val) {
-  if (val) throw new Error("negative assertion failed.");
+  if (val) throw new Error('negative assertion failed.');
 }
 
 function makeParseState(name, text, i, root, n) {
@@ -29,7 +29,7 @@ function makeParseState(name, text, i, root, n) {
 }
 
 function parseFile(name, text) {
-  if (text.includes("\r"))
+  if (text.includes('\r'))
     throw new Error('Can only parse end of line sequence "LF"');
   let state = makeParseState(name, text, 0, undefined, undefined);
   parse(state);
@@ -37,65 +37,66 @@ function parseFile(name, text) {
 }
 
 function parse(state) {
-  "use strict";
+  'use strict';
 
   function makeNode(name, props, kids) {
     return { name, props, kids, i: state.i };
   }
   // node makers so i don't forget
-  const makeNodeRoot = (_) => makeNode("root", undefined, []);
-  const makeNodePackage = (name) => makeNode("package", { name }, []);
-  const makeNodeUsing = (name) => makeNode("using", { name }, []);
-  const makeNodeCtr = (name) => makeNode("expr-ctr", { name }, []);
-  const makeNodeMemberInit = (name) => makeNode("member-init", { name }, []);
-  const makeNodeStruct = (name) => makeNode("struct", { name }, []);
-  const makeNodeMember = (name) => makeNode("member", { name }, []);
-  const makeNodeFunc = (name) => makeNode("func", { name }, []);
-  const makeNodeListParam = (_) => makeNode("list-param", undefined, []);
-  const makeNodeParam = (name) => makeNode("param", { name }, []);
-  const makeNodeListInst = (_) => makeNode("list-inst", undefined, []);
-  const makeNodeInsAsm = (_) => makeNode("ins-asm", undefined, []);
-  const makeNodeAsm = (_) => makeNode("asm", undefined, []);
+  const makeNodeRoot = (_) => makeNode('root', undefined, []);
+  const makeNodePackage = (name) => makeNode('package', { name }, []);
+  const makeNodeUsing = (name) => makeNode('using', { name }, []);
+  const makeNodeCtr = (name) => makeNode('expr-ctr', { name }, []);
+  const makeNodeMemberInit = (name) => makeNode('member-init', { name }, []);
+  const makeNodeStruct = (name) => makeNode('struct', { name }, []);
+  const makeNodeConst = (name) => makeNode('const', { name }, []); // type, expr
+  const makeNodeMember = (name) => makeNode('member', { name }, []);
+  const makeNodeFunc = (name) => makeNode('func', { name }, []);
+  const makeNodeListParam = (_) => makeNode('list-param', undefined, []);
+  const makeNodeParam = (name) => makeNode('param', { name }, []);
+  const makeNodeListInst = (_) => makeNode('list-inst', undefined, []);
+  const makeNodeInsAsm = (_) => makeNode('ins-asm', undefined, []);
+  const makeNodeAsm = (_) => makeNode('asm', undefined, []);
   const makeNodeAsmPart = (partType, value) =>
-    makeNode("asm-part", { partType, value }); // partType: asm/sus
-  const makeNodeInstBlock = () => makeNode("ins-block", undefined, []); // kids: list-inst
-  const makeNodeInsDone = (_) => makeNode("ins-done");
-  const makeNodeInsBreak = (levels) => makeNode("ins-break", { levels });
-  const makeNodeInsSym = (name) => makeNode("ins-sym", { name }, []);
-  const makeNodeInsAssign = (_) => makeNode("ins-ass", {}, []);
-  const makeNodeInsIf = (_) => makeNode("ins-if", undefined, []); // kids: expr, list-inst
-  const makeNodeInsWhile = (_) => makeNode("ins-while", undefined, []); // kids: expr, list-inst
-  const makeNodeElse = (_) => makeNode("else", undefined, []); // kids: expr, list-inst
-  const makeNodeTarget = (expr) => makeNode("target", undefined, [expr]);
-  const makeNodeExpr = (_) => makeNode("expr", {}, []);
-  const makeNodeExprSym = (symbol) => makeNode("expr-sym", { symbol });
-  const makeNodeExprOp = (op) => makeNode("expr-op", { op }, []);
+    makeNode('asm-part', { partType, value }); // partType: asm/sus
+  const makeNodeInstBlock = () => makeNode('ins-block', undefined, []); // kids: list-inst
+  const makeNodeInsDone = (_) => makeNode('ins-done');
+  const makeNodeInsBreak = (levels) => makeNode('ins-break', { levels });
+  const makeNodeInsSym = (name) => makeNode('ins-sym', { name }, []);
+  const makeNodeInsAssign = (_) => makeNode('ins-ass', {}, []);
+  const makeNodeInsIf = (_) => makeNode('ins-if', undefined, []); // kids: expr, list-inst
+  const makeNodeInsWhile = (_) => makeNode('ins-while', undefined, []); // kids: expr, list-inst
+  const makeNodeElse = (_) => makeNode('else', undefined, []); // kids: expr, list-inst
+  const makeNodeTarget = (expr) => makeNode('target', undefined, [expr]);
+  const makeNodeExpr = (_) => makeNode('expr', {}, []);
+  const makeNodeExprSym = (symbol) => makeNode('expr-sym', { symbol });
+  const makeNodeExprOp = (op) => makeNode('expr-op', { op }, []);
   const makeNodeExprMemberName = (name) =>
-    makeNode("expr-member", { name }, []);
+    makeNode('expr-member', { name }, []);
   const makeNodeExprLitDecInt = (decInt) =>
-    makeNode("expr-lit", { litType: "dec-int", value: decInt });
+    makeNode('expr-lit', { litType: 'dec-int', value: decInt });
   const makeNodeExprLitBoo = (val) =>
-    makeNode("expr-lit", { litType: "dec-boo", value: val });
+    makeNode('expr-lit', { litType: 'boo', value: val });
   const makeNodeExprLitPtrStr = (str) =>
-    makeNode("expr-lit", { litType: "ptr-str", value: str });
-  const makeNodeExprArr = () => makeNode("expr-arr", null, []); // kids: type, expression for size
-  const makeNodeExprBrackets = () => makeNode("expr-brackets", null, []); // expression
-  const makeNodeExprRef = () => makeNode("expr-ref", null, []); // kids: expression to get pointer of
-  const makeNodeExprDrf = () => makeNode("expr-drf", null, []); // kids: expression to express value of
-  const makeNodeExprRtp = () => makeNode("expr-reinterpret", null, []); // kids: type, expression
-  const makeNodeExprSize = () => makeNode("expr-siz", null, []); // kids: type, expression
-  const makeNodeType = (type) => makeNode("type", { type }, []);
-  const makeNodeInsCall = (name) => makeNode("ins-call", { name }, []);
-  const makeNodeArgument = (name) => makeNode("arg", { name }, []);
+    makeNode('expr-lit', { litType: 'ptr-str', value: str });
+  const makeNodeExprArr = () => makeNode('expr-arr', null, []); // kids: type, expression for size
+  const makeNodeExprBrackets = () => makeNode('expr-brackets', null, []); // expression
+  const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get pointer of
+  const makeNodeExprDrf = () => makeNode('expr-drf', null, []); // kids: expression to express value of
+  const makeNodeExprRtp = () => makeNode('expr-reinterpret', null, []); // kids: type, expression
+  const makeNodeExprSize = () => makeNode('expr-siz', null, []); // kids: type, expression
+  const makeNodeType = (type) => makeNode('type', { type }, []);
+  const makeNodeInsCall = (name) => makeNode('ins-call', { name }, []);
+  const makeNodeArgument = (name) => makeNode('arg', { name }, []);
 
   // parser helper functions
 
   function err(msg) {
-    return new Error("(parse err) " + msg + " at " + locPrevString());
+    return new Error('(parse err) ' + msg + ' at ' + locPrevString());
   }
 
   function warn(msg) {
-    console.warn(msg + " at " + locPrevString());
+    console.warn(msg + ' at ' + locPrevString());
   }
 
   // note: pattern should start with ^
@@ -120,7 +121,7 @@ function parse(state) {
 
   // https://stackoverflow.com/a/6969486/13356588
   function escapeRegExp(string) {
-    return string.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return string.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   function eatPicky(str) {
@@ -135,7 +136,7 @@ function parse(state) {
   }
 
   function expect(v, name) {
-    if (!v) throw err("expected " + name);
+    if (!v) throw err('expected ' + name);
     return v;
   }
 
@@ -157,7 +158,7 @@ function parse(state) {
     state.n = { name: null, props: {}, kids: [] };
     parserFunc();
     if (state.n.kids.length !== 1) {
-      throw new Error("no single node appended");
+      throw new Error('no single node appended');
     }
     let captured = state.n.kids[0];
     state.n = lastNode;
@@ -169,8 +170,8 @@ function parse(state) {
     let l =
       state.text
         .slice(Math.max(0, state.i), Math.min(state.text.length, state.i + 50))
-        .replaceAll("\n", "<LF>") + "...";
-    return state.name + ":" + line + ":" + col + "\n  ..." + l;
+        .replaceAll('\n', '<LF>') + '...';
+    return state.name + ':' + line + ':' + col + '\n  ...' + l;
   }
 
   //
@@ -185,7 +186,7 @@ function parse(state) {
     let prevI = state.i;
     parseBase();
     if (prevI >= state.i) {
-      throw err("unparsable statement");
+      throw err('unparsable statement');
     }
   }
 
@@ -206,7 +207,7 @@ function parse(state) {
 
   function parseBase() {
     if (tryParsePackage()) return;
-    throw err("unparsable top level statement");
+    throw err('unparsable top level statement');
   }
 
   function tryParsePackage() {
@@ -239,6 +240,7 @@ function parse(state) {
               return true;
             },
             tryParseStruct,
+            tryParseConst,
             tryParseUsing
           ) &&
           !eof()
@@ -246,9 +248,40 @@ function parse(state) {
       });
       eatEmpty();
 
-      eatPicky("}");
+      eatPicky('}');
       eatEmpty();
 
+      return true;
+    });
+  }
+
+  function tryParseConst() {
+    return tryParse(() => {
+      let nodeConst = makeNodeConst(undefined);
+
+      if (!eat(/^const[ \t\n]/)) return;
+      eatEmpty();
+
+      let type = tryParseNodeType();
+      if (!type) return;
+
+      nodeConst.props.name = eatSymbol();
+      if (!nodeConst.props.name) return;
+      eatEmpty();
+
+      if (!eat(/^=/)) return;
+      eatEmpty();
+
+      let expr = tryParseNodeExpr();
+      if (!expr) return;
+
+      if (!eat(/^;/)) return;
+      eatEmpty();
+
+      append(nodeConst, () => {
+        append(type);
+        append(expr);
+      });
       return true;
     });
   }
@@ -262,7 +295,7 @@ function parse(state) {
       if (!name) return;
       eatEmpty();
 
-      eatPicky(";");
+      eatPicky(';');
       eatEmpty();
 
       append(makeNodeUsing(name));
@@ -277,19 +310,19 @@ function parse(state) {
 
       let struct = makeNodeStruct(undefined);
 
-      let name = expect(eatSymbol(), "a struct name");
+      let name = expect(eatSymbol(), 'a struct name');
       struct.props.name = name;
       eatEmpty();
 
-      eatPicky("(");
+      eatPicky('(');
       eatEmpty();
 
       let first = true;
       while (!eat(/^\)/)) {
-        if (eof()) throw err("unexpected eof");
+        if (eof()) throw err('unexpected eof');
 
         if (!first) {
-          eatPicky(",");
+          eatPicky(',');
           eatEmpty();
         }
         first = false;
@@ -297,7 +330,7 @@ function parse(state) {
         let node = makeNodeMember();
         node.kids.push(parseNodeType());
 
-        let name = expect(eatSymbol(), "a member name");
+        let name = expect(eatSymbol(), 'a member name');
         eatEmpty();
         node.props.name = name;
 
@@ -305,7 +338,7 @@ function parse(state) {
       }
       eatEmpty();
 
-      eatPicky(";");
+      eatPicky(';');
       eatEmpty();
 
       append(struct);
@@ -315,10 +348,10 @@ function parse(state) {
   }
 
   function parseTls() {
-    eatPicky("{");
+    eatPicky('{');
     eatEmpty();
     parseListInst();
-    eatPicky("}");
+    eatPicky('}');
     eatEmpty();
   }
 
@@ -337,7 +370,7 @@ function parse(state) {
         parseListInst();
       });
 
-      eatPicky("}");
+      eatPicky('}');
       eatEmpty();
       return true;
     });
@@ -367,13 +400,13 @@ function parse(state) {
       let nodeWhile = makeNodeInsWhile();
       nodeWhile.kids.push(parseNodeExpr());
 
-      eatPicky(")");
+      eatPicky(')');
       eatEmpty();
 
       nodeWhile.kids.push(
         expect(
           kidnap(() => tryParseInst()),
-          "a statement"
+          'a statement'
         )
       );
 
@@ -394,13 +427,13 @@ function parse(state) {
 
       nodeIf.kids.push(parseNodeExpr()); // if: expr
 
-      eatPicky(")");
+      eatPicky(')');
       eatEmpty();
 
       nodeIf.kids.push(
         expect(
           kidnap(() => tryParseInst()),
-          "a statement"
+          'a statement'
         )
       ); // if: any instruction
 
@@ -417,7 +450,7 @@ function parse(state) {
         n.kids.push(
           expect(
             kidnap(() => tryParseInst()),
-            "a statement"
+            'a statement'
           )
         ); // else: any instruction
 
@@ -443,10 +476,10 @@ function parse(state) {
       append(makeNodeInsCall(name), (_) => {
         let first = true;
         while (!eat(/^\)/)) {
-          if (eof()) throw err("unexpected eof");
+          if (eof()) throw err('unexpected eof');
 
           if (!first) {
-            eatPicky(",");
+            eatPicky(',');
             eatEmpty();
           }
           first = false;
@@ -454,7 +487,7 @@ function parse(state) {
           let symbol = eatSymbol();
           eatEmpty();
 
-          eatPicky(":");
+          eatPicky(':');
           eatEmpty();
 
           append(makeNodeArgument(symbol), (_) => {
@@ -463,7 +496,7 @@ function parse(state) {
         }
 
         eatEmpty();
-        eatPicky(";");
+        eatPicky(';');
         eatEmpty();
       });
       eatEmpty();
@@ -488,7 +521,7 @@ function parse(state) {
       append(makeNodeInsSym(name), (_) => {
         append(nodeType);
         append(parseNodeExpr());
-        eatPicky(";");
+        eatPicky(';');
         eatEmpty();
       });
 
@@ -513,7 +546,7 @@ function parse(state) {
       append(makeNodeInsAssign(), (_) => {
         append(nodeTargetExpr);
         append(parseNodeExpr());
-        eatPicky(";");
+        eatPicky(';');
         eatEmpty();
       });
 
@@ -522,7 +555,7 @@ function parse(state) {
   }
 
   function parseNodeExpr() {
-    return expect(tryParseNodeExpr(), "expression");
+    return expect(tryParseNodeExpr(), 'expression');
   }
 
   // parses an expression
@@ -574,7 +607,7 @@ function parse(state) {
       if (!expr) return;
 
       while (true) {
-        if (eof()) throw err("unexpected eof");
+        if (eof()) throw err('unexpected eof');
 
         let op = eat(/^(\.)/);
         if (!op) return expr;
@@ -604,17 +637,17 @@ function parse(state) {
         let type = parseNodeType();
         eatEmpty();
 
-        eatPicky("]");
+        eatPicky(']');
         eatEmpty();
 
-        eatPicky("(");
+        eatPicky('(');
         eatEmpty();
 
         let arrayNode = makeNodeExprArr();
         arrayNode.kids.push(type);
         arrayNode.kids.push(parseNodeExpr());
 
-        eatPicky(")");
+        eatPicky(')');
         eatEmpty();
 
         return arrayNode;
@@ -624,7 +657,7 @@ function parse(state) {
         eatEmpty();
         let bracketsNode = makeNodeExprBrackets();
         bracketsNode.kids.push(parseNodeExpr());
-        eatPicky(")");
+        eatPicky(')');
         eatEmpty();
         return bracketsNode;
       },
@@ -635,7 +668,7 @@ function parse(state) {
         eatEmpty();
         let refNode = makeNodeExprRef();
         refNode.kids.push(parseNodeExpr());
-        eatPicky(")");
+        eatPicky(')');
         eatEmpty();
         return refNode;
       },
@@ -646,7 +679,7 @@ function parse(state) {
         eatEmpty();
         let drfNode = makeNodeExprDrf();
         drfNode.kids.push(parseNodeExpr());
-        eatPicky(")");
+        eatPicky(')');
         eatEmpty();
         return drfNode;
       },
@@ -659,17 +692,17 @@ function parse(state) {
 
         let nodeType = parseNodeType();
 
-        eatPicky("]");
+        eatPicky(']');
         eatEmpty();
 
-        eatPicky("(");
+        eatPicky('(');
         eatEmpty();
 
         let drfNode = makeNodeExprRtp();
         drfNode.kids.push(nodeType);
         drfNode.kids.push(parseNodeExpr());
 
-        eatPicky(")");
+        eatPicky(')');
         eatEmpty();
 
         return drfNode;
@@ -683,11 +716,11 @@ function parse(state) {
 
         let nodeType = parseNodeType();
 
-        eatPicky("]");
+        eatPicky(']');
         eatEmpty();
-        eatPicky("(");
+        eatPicky('(');
         eatEmpty();
-        eatPicky(")");
+        eatPicky(')');
         eatEmpty();
 
         let n = makeNodeExprSize();
@@ -706,10 +739,10 @@ function parse(state) {
 
         let first = true;
         while (!eat(/^\)/)) {
-          if (eof()) throw err("unexpected eof");
+          if (eof()) throw err('unexpected eof');
 
           if (!first) {
-            eatPicky(",");
+            eatPicky(',');
             eatEmpty();
           }
           first = false;
@@ -737,7 +770,7 @@ function parse(state) {
         return makeNodeExprLitBoo(val);
       },
       (_) => {
-        let symbol = eatSymbol();
+        let symbol = eatAddressName();
         if (!symbol) return undefined;
         eatEmpty();
         return makeNodeExprSym(symbol);
@@ -809,32 +842,32 @@ function parse(state) {
         // eatEmpty();
 
         while (!eat(/^}/)) {
-          if (eof()) throw err("unexpected eof");
+          if (eof()) throw err('unexpected eof');
 
           append(makeNodeAsm(), (_) => {
             while (!eat(/^\n/)) {
-              if (eof()) throw err("unexpected eof");
+              if (eof()) throw err('unexpected eof');
 
               if (eat(/^SUS[\t ]*\{/)) {
                 eatSpace();
-                let symbol = expect(eatSymbol(), "symbol in asm statement");
+                let symbol = expect(eatSymbol(), 'symbol in asm statement');
                 eatSpace();
-                eatPicky("}");
+                eatPicky('}');
                 eatSpace();
 
-                append(makeNodeAsmPart("sus", symbol));
+                append(makeNodeAsmPart('sus', symbol));
                 continue;
               }
 
               // note: matches till end of line or till last character before next sus {
               let asmPart = eat(/^.*?(?=(SUS[\t ]*\{|\n))/);
               if (asmPart) {
-                append(makeNodeAsmPart("asm", asmPart));
+                append(makeNodeAsmPart('asm', asmPart));
                 eatSpace();
                 continue;
               }
 
-              throw err("could not parse asm line");
+              throw err('could not parse asm line');
             }
             eatEmpty();
           });
@@ -847,23 +880,23 @@ function parse(state) {
   }
 
   function parseFunc() {
-    eatPicky("func ");
+    eatPicky('func ');
     eatEmpty();
 
     let name = eatFuncName();
     eatEmpty();
 
     append(makeNodeFunc(name), (_) => {
-      eatPicky("(");
+      eatPicky('(');
       eatEmpty();
 
       append(makeNodeListParam(), (_) => {
         let first = true;
         while (!test(/^\)/)) {
-          if (eof()) throw err("unexpected eof");
+          if (eof()) throw err('unexpected eof');
 
           if (!first) {
-            eatPicky(",");
+            eatPicky(',');
             eatEmpty();
           }
           first = false;
@@ -871,22 +904,22 @@ function parse(state) {
           append(makeNodeParam(name), (_) => {
             append(parseNodeType());
 
-            let paramName = expect(eatSymbol(), "a symbol");
+            let paramName = expect(eatSymbol(), 'a symbol');
             eatEmpty();
             state.n.props.name = paramName;
           });
         }
       });
 
-      eatPicky(")");
+      eatPicky(')');
       eatEmpty();
 
-      eatPicky("{");
+      eatPicky('{');
       eatEmpty();
 
       parseListInst();
 
-      eatPicky("}");
+      eatPicky('}');
       eatEmpty();
     });
   }
@@ -931,7 +964,7 @@ function parse(state) {
   }
 
   function parseNodeType() {
-    return expect(tryParseNodeType(), "a type");
+    return expect(tryParseNodeType(), 'a type');
   }
 }
 
@@ -947,17 +980,17 @@ function makeCompileState(ctx, name, text, isMain, root, n) {
 }
 
 function compile(state) {
-  "use strict";
+  'use strict';
 
   // HELPERS ============================
 
   function makeImplErr(msg) {
-    return new Error("COMPILER IMPLEMENTATION ERROR: " + msg);
+    return new Error('COMPILER IMPLEMENTATION ERROR: ' + msg);
   }
 
   function makeErr(i, msg) {
-    let locMsg = i ? " at " + getLocErr(i) : "";
-    return new Error("(compile err) " + msg + locMsg);
+    let locMsg = i ? ' at ' + getLocErr(i) : '';
+    return new Error('(compile err) ' + msg + locMsg);
   }
 
   function getLocErr(i) {
@@ -965,13 +998,13 @@ function compile(state) {
     let l =
       state.text
         .slice(Math.max(0, i), Math.min(state.text.length, i + 50))
-        .replaceAll("\n", "<LF>") + "...";
-    return state.name + ":" + line + ":" + col + "\n  ..." + l;
+        .replaceAll('\n', '<LF>') + '...';
+    return state.name + ':' + line + ':' + col + '\n  ...' + l;
   }
 
   function getLoc(i) {
     let { line, col } = lineNumber(state.text, i);
-    return state.name + ":" + line + ":" + col;
+    return state.name + ':' + line + ':' + col;
   }
 
   let currentIndent = 0;
@@ -982,9 +1015,9 @@ function compile(state) {
     currentIndent--;
   }
 
-  function line(str = "", indentLevelCount = 1) {
-    if (str == "") return "\n";
-    return "  ".repeat(currentIndent + indentLevelCount) + str + "\n";
+  function line(str = '', indentLevelCount = 1) {
+    if (str == '') return '\n';
+    return '  '.repeat(currentIndent + indentLevelCount) + str + '\n';
   }
 
   // EXTERNAL FUNCTIONS ========================
@@ -994,7 +1027,7 @@ function compile(state) {
   const makeDataTable = (strings) => ({ strings });
   const makeDataTableRowStr = (asmName) => ({ asmName });
   const newAsmNameLitPtrStr = () =>
-    "ss_" + (1 + Object.keys(dataTable.strings).length);
+    'ss_' + (1 + Object.keys(dataTable.strings).length);
   const findAsmNameLitPtrStr = (value) => dataTable.strings[value]?.asmName;
   let dataTable = null;
 
@@ -1029,12 +1062,9 @@ function compile(state) {
 
   function findSymTableLoc(scope, sym, scopes = []) {
     if (scope === undefined) return undefined;
-
     scopes.push(scope);
-
     let row = scope.symTable.rows.find((x) => x.symbol === sym);
     if (row) return makeSymTableLoc(scopes, row);
-
     return findSymTableLoc(scope.parent, sym, scopes);
   }
 
@@ -1055,13 +1085,13 @@ function compile(state) {
     if (listParam) {
       for (const param of listParam.kids) {
         let type = getActualType(
-          param.kids.find((x) => x.name === "type"),
+          param.kids.find((x) => x.name === 'type'),
           addressScope
         );
         let name = param.props.name;
         let size = evalSize(type);
         if (findSymTableLoc(scope, name))
-          throw makeErr(param.i, "duplicate symbol: " + name);
+          throw makeErr(param.i, 'duplicate symbol: ' + name);
         paramOffset += size;
         table.rows.push(makeSymTableRow(name, type, paramOffset, size));
       }
@@ -1069,15 +1099,15 @@ function compile(state) {
 
     let symOffset = 0;
     for (const ins of listIns.kids) {
-      if (ins.name !== "ins-sym") continue;
+      if (ins.name !== 'ins-sym') continue;
       let type = getActualType(
-        ins.kids.find((x) => x.name === "type"),
+        ins.kids.find((x) => x.name === 'type'),
         addressScope
       );
       let name = ins.props.name;
       let size = evalSize(type);
       if (findSymTableLoc(scope, name))
-        throw makeErr(ins.i, "duplicate symbol: " + name);
+        throw makeErr(ins.i, 'duplicate symbol: ' + name);
       table.rows.push(makeSymTableRow(name, type, symOffset, size));
       table.size += size;
       symOffset -= size;
@@ -1091,7 +1121,7 @@ function compile(state) {
   // FUNCTIONS ============================
 
   function getFuncAsmName(addressName, paramNames, addressScope) {
-    const funcNameSep = "/";
+    const funcNameSep = '/';
 
     let nameParts = addressName.split(funcNameSep);
     if (nameParts.length === 1) {
@@ -1119,37 +1149,37 @@ function compile(state) {
   function strLitToAsm(strLit) {
     let value = strLit.props.value;
     let v = value.slice(1, value.length - 1);
-    v = v.replaceAll('\\"', '"').replaceAll("\\n", "\n");
+    v = v.replaceAll('\\"', '"').replaceAll('\\n', '\n');
     let val = v.match(/\\[^\\]/);
-    if (val) throw makeErr(strLit.i, "unknown escape sequence " + val);
-    v = v.replaceAll("\\\\", "\\");
-    let r = "";
+    if (val) throw makeErr(strLit.i, 'unknown escape sequence ' + val);
+    v = v.replaceAll('\\\\', '\\');
+    let r = '';
     let inStr = false;
     for (let i = 0; i < v.length; i++) {
       let c = v[i];
       let newInstr = c.match(/^[a-zA-Z0-9,-_ \.\/]/);
       if (newInstr) {
         if (!inStr) {
-          if (r.length > 0) r += ", ";
+          if (r.length > 0) r += ', ';
           r += "'";
         }
         r += c;
       } else {
         if (inStr) r += "'";
-        if (r.length > 0) r += ", ";
+        if (r.length > 0) r += ', ';
         r += c.codePointAt(0);
       }
       inStr = newInstr;
     }
     if (inStr) r += "'";
-    if (r.length > 0) r += ", ";
-    r += "0";
+    if (r.length > 0) r += ', ';
+    r += '0';
     return r;
   }
 
   function getOffStr(off) {
     let mag = Math.abs(off);
-    let offStr = off < 0 ? " - " + mag : off > 0 ? " + " + mag : "";
+    let offStr = off < 0 ? ' - ' + mag : off > 0 ? ' + ' + mag : '';
     return offStr;
   }
 
@@ -1159,7 +1189,7 @@ function compile(state) {
 
   function isTypePrimitive(type) {
     _ass(type.kind);
-    return type.kind === "prim";
+    return type.kind === 'prim';
   }
 
   function checkType(expr, scope, addressScope, expectedType) {
@@ -1168,9 +1198,9 @@ function compile(state) {
     if (typeToString(exprType) !== typeToString(expectedType)) {
       throw makeErr(
         expr.i,
-        "expected type " +
+        'expected type ' +
           typeToString(expectedType) +
-          " but got " +
+          ' but got ' +
           typeToString(exprType)
       );
     }
@@ -1182,9 +1212,9 @@ function compile(state) {
     if (typeToString(exprType) !== expectedTypeName) {
       throw makeErr(
         expr.i,
-        "expected type " +
+        'expected type ' +
           expectedTypeName +
-          " but got " +
+          ' but got ' +
           typeToString(exprType)
       );
     }
@@ -1215,121 +1245,132 @@ function compile(state) {
   // }
 
   function evalType(exprParam, scope, addressScope) {
-    let expr = exprParam.name === "expr" ? exprParam.kids[0] : exprParam;
+    let expr = exprParam.name === 'expr' ? exprParam.kids[0] : exprParam;
 
-    if (expr.name === "expr-reinterpret") {
+    if (expr.name === 'expr-reinterpret') {
       return evalTypeReinterpret(expr, scope, addressScope);
-    } else if (expr.name === "expr-siz") {
-      return makeTypePrim("int32");
-    } else if (expr.name === "expr-lit") {
+    } else if (expr.name === 'expr-siz') {
+      return makeTypePrim('int32');
+    } else if (expr.name === 'expr-lit') {
       switch (expr.props.litType) {
-        case "dec-boo":
-          return makeTypePrim("boo");
-        case "dec-int":
-          return makeTypePrim("int32");
-        case "ptr-str":
-          return makeTypePrim("PTR", [makeTypePrim("int8")]);
+        case 'boo':
+          return makeTypePrim('boo');
+        case 'dec-int':
+          return makeTypePrim('int32');
+        case 'ptr-str':
+          return makeTypePrim('PTR', [makeTypePrim('int8')]);
         default:
-          throw makeImplErr("unknown literal type: " + expr.props.litType);
+          throw makeImplErr('unknown literal type: ' + expr.props.litType);
       }
-    } else if (expr.name === "expr-op") {
+    } else if (expr.name === 'expr-op') {
       function allowedNum(type) {
         if (!isTypePrimitive(type)) return false;
-        if (!["int32", "ptr", "PTR"].includes(typeBaseName(type))) return false;
+        if (!['int32', 'ptr', 'PTR'].includes(typeBaseName(type))) return false;
         return true;
       }
       function allowedEq(type) {
         if (!isTypePrimitive(type)) return false;
-        if (!["boo", "int32", "ptr", "PTR"].includes(typeBaseName(type)))
+        if (!['boo', 'int32', 'ptr', 'PTR'].includes(typeBaseName(type)))
           return false;
         return true;
       }
       const allowedComp = allowedEq;
       function allowedBoo(type) {
         if (!isTypePrimitive(type)) return false;
-        if (typeBaseName(type) !== "boo") return false;
+        if (typeBaseName(type) !== 'boo') return false;
         return true;
       }
       let op = expr.props.op;
       switch (op) {
-        case "!=":
-        case "==":
+        case '!=':
+        case '==':
           // prettier-ignore
           return evalBinOp(op, expr, scope, addressScope, allowedEq, (a, b) => true, (a, b) => makeTypePrim('boo') );
-        case "<":
-        case ">":
-        case "<=":
-        case ">=":
+        case '<':
+        case '>':
+        case '<=':
+        case '>=':
           // prettier-ignore
           return evalBinOp(op, expr, scope, addressScope, allowedComp, (a, b) => true, (a, b) => makeTypePrim('boo') );
-        case "+":
-        case "-":
-        case "*":
-        case "/":
+        case '+':
+        case '-':
+        case '*':
+        case '/':
           // prettier-ignore
           return evalBinOp(op, expr, scope, addressScope, allowedNum, (a, b) => true, (a, b) => a );
-        case "||":
-        case "&&":
+        case '||':
+        case '&&':
           // prettier-ignore
           return evalBinOp(op, expr, scope, addressScope, allowedBoo, (a, b) => true, (a, b) => a );
         default:
-          throw makeImplErr("unknown op " + expr.props.op);
+          throw makeImplErr('unknown op ' + expr.props.op);
       }
-    } else if (expr.name === "expr-member") {
+    } else if (expr.name === 'expr-member') {
       let tyeExpr = expr.kids[0];
       let memberName = expr.props.name;
       let structType = evalType(tyeExpr, scope, addressScope);
       let structName = structType.name;
       let structRow = findStructByAddress(state.ctx, structName);
-      if (!structRow) throw makeErr(expr.i, "unknown struct: " + structName);
+      if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + structName);
       let member = structRow.members.find((x) => x.name === memberName);
       if (!member)
         throw makeErr(
           expr.i,
-          "not a member of " + structName + ": " + memberName
+          'not a member of ' + structName + ': ' + memberName
         );
       return member.type;
-    } else if (expr.name === "expr-sym") {
-      let loc = findSymTableLoc(scope, expr.props.symbol);
-      if (!loc)
-        throw makeErr(expr.i, "can not find symbol " + expr.props.symbol);
-      return loc.row.type;
-    } else if (expr.name === "expr-ctr") {
+    } else if (expr.name === 'expr-sym') {
+      let type;
+
+      let symbol = expr.props.symbol;
+
+      let loc = findSymTableLoc(scope, symbol);
+      if (loc) type = loc.row.type;
+
+      if (!type) {
+        let const_ = findConst(state.ctx, addressScope, symbol);
+        if (const_) type = const_.type;
+      }
+
+      if (!type) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+
+      return type;
+    } else if (expr.name === 'expr-ctr') {
       let row = findStruct(state.ctx, addressScope, expr.props.name);
       return row.type;
-    } else if (expr.name === "expr-arr") {
+    } else if (expr.name === 'expr-arr') {
       let type = getActualType(
-        expr.kids.find((x) => x.name === "type"),
+        expr.kids.find((x) => x.name === 'type'),
         addressScope
       );
       _ass(type);
-      return makeTypePrim("PTR", [type]);
-    } else if (expr.name === "expr-ref") {
+      return makeTypePrim('PTR', [type]);
+    } else if (expr.name === 'expr-ref') {
       let kidExpr = expr.kids[0];
       let type = evalType(kidExpr, scope, addressScope);
-      return makeTypePrim("PTR", [type]);
-    } else if (expr.name === "expr-brackets") {
+      return makeTypePrim('PTR', [type]);
+    } else if (expr.name === 'expr-brackets') {
       let kidExpr = expr.kids[0];
       return evalType(kidExpr, scope, addressScope);
-    } else if (expr.name === "expr-drf") {
+    } else if (expr.name === 'expr-drf') {
       let paramExpr = expr.kids[0];
       let type = evalType(paramExpr, scope, addressScope);
       if (!isTypePrimitive(type))
         throw makeErr(
           expr.i,
-          "dereferencing non-pointer type " + typeToString(type)
+          'dereferencing non-pointer type ' + typeToString(type)
         );
-      if (type.name != "PTR")
+      if (type.name != 'PTR')
         throw makeErr(
           expr.i,
-          "dereferencing non-pointer type " + typeToString(type)
+          'dereferencing non-pointer type ' + typeToString(type)
         );
       let pointedType = type.args[0];
       return pointedType;
     } else {
-      throw makeImplErr("unknown expression " + expr.name);
+      throw makeImplErr('unknown expression ' + expr.name);
     }
-    throw makeImplErr("?");
+    throw makeImplErr('?');
   }
 
   function evalBinOp(
@@ -1348,21 +1389,21 @@ function compile(state) {
     if (!allowedFunc(typeA))
       throw makeErr(
         expr.i,
-        "op " + op + " not supported for type " + typeToString(typeA)
+        'op ' + op + ' not supported for type ' + typeToString(typeA)
       );
     if (!allowedFunc(typeB))
       throw makeErr(
         expr.i,
-        "op " + op + " not supported for type " + typeToString(typeB)
+        'op ' + op + ' not supported for type ' + typeToString(typeB)
       );
     if (!compatibleFunc(typeA, typeB))
       throw makeErr(
         expr.i,
-        "op " +
+        'op ' +
           op +
-          " not compatible for types " +
+          ' not compatible for types ' +
           typeToString(typeA) +
-          " and " +
+          ' and ' +
           typeToString(typeB)
       );
     return typeFunc(typeA, typeB);
@@ -1372,20 +1413,118 @@ function compile(state) {
 
   // COMPILATION METHODS ============================================
 
+  function baseCompileConst() {
+    let r = '';
+    for (const pkg of state.root.kids.filter((x) => x.name === 'package')) {
+      let addressScope = buildAddressScope(pkg);
+      for (const nodeConst of pkg.kids.filter((x) => x.name === 'const')) {
+        r += compileConst(nodeConst, addressScope);
+      }
+    }
+    return r;
+  }
+
+  function compileConst(nodeConst, addressScope) {
+    let r = '';
+
+    let name = nodeConst.props.name;
+    let expectedType = getActualType(nodeConst.kids[0], addressScope);
+    let expr = nodeConst.kids[1];
+
+    // TODO: make-over scopes.
+    checkType(expr, null, addressScope, expectedType);
+
+    let asmName = getConstAsmName(
+      name,
+      addressScope.usings[addressScope.usings.length - 1]
+    );
+    r += line('global ' + asmName, 0);
+    r += line(asmName + ':', 0);
+    r += compileDefinitionExpr(expr, addressScope);
+
+    return r;
+  }
+
+  function compileDefinitionExpr(expr, addressScope) {
+    if (expr.name === 'expr') expr = expr.kids[0];
+
+    let r = '';
+
+    if (expr.name === 'expr-lit') {
+      switch (expr.props.litType) {
+        case 'dec-int':
+          r += line('dd    ' + expr.props.value);
+          break;
+        case 'boo':
+          r += line('dd    ' + (expr.props.value === 'yes' ? 1 : 0));
+          break;
+        case 'ptr-str':
+          let asmName = findAsmNameLitPtrStr(expr.props.value);
+          _ass(asmName);
+          r += line('dd ' + asmName);
+          break;
+        default:
+          throw makeImplErr('unknown literal type: ' + expr.props.litType);
+      }
+    } else if (expr.name === 'expr-ctr') {
+      r += compileDefinitionExprCtr(expr, addressScope);
+    } else {
+      throw makeImplErr('can not make constant of expression ' + expr.name);
+    }
+
+    return r;
+  }
+
+  function compileDefinitionExprCtr(expr, addressScope) {
+    let r = '';
+    r += line('; ctr ' + expr.props.name);
+
+    let structRow = findStruct(state.ctx, addressScope, expr.props.name);
+    if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + expr.props.name);
+
+    let inits = expr.kids.filter((x) => x.name === 'member-init');
+
+    if (structRow.members < inits.length)
+      throw makeErr(
+        expr.i,
+        'to many member initializations for ' + structRow.name
+      );
+
+    for (const member of structRow.members) {
+      let init = inits.find((x) => x.props.name == member.name);
+      if (!init)
+        throw makeErr(
+          expr.i,
+          'can not find initialization for member ' + member.name
+        );
+
+      let expr = init.kids.find((x) => x.name === 'expr');
+      let type = member.type;
+
+      checkType(expr, undefined, addressScope, type);
+
+      r += compileDefinitionExpr(expr, addressScope);
+    }
+
+    r += line();
+
+    return r;
+  }
+
   function baseCompileDataTable() {
-    let r = "";
+    let r = '';
 
     dataTable = makeDataTable({});
 
     function traverse(node) {
       // const makeNodeExprLitPtrStr = (str) => makeNode('expr-lit', { litType: 'ptr-str', value: str });
-      if (node.name === "expr-lit" && node.props.litType === "ptr-str") {
+      if (node.name === 'expr-lit' && node.props.litType === 'ptr-str') {
         let value = node.props.value;
         if (!findAsmNameLitPtrStr(value)) {
           r += line(`;   str at ${getLoc(node.i)}`, 0);
           let asmName = newAsmNameLitPtrStr();
-          r += line(asmName + ":", 0);
-          r += line("db " + strLitToAsm(node));
+          r += line(asmName + ':', 0);
+          r += line('db ' + strLitToAsm(node));
           dataTable.strings[value] = makeDataTableRowStr(asmName);
         }
       }
@@ -1398,50 +1537,64 @@ function compile(state) {
 
   function getAsmNameTls(ins) {
     let { line, col } = lineNumber(state.text, ins.i);
-    return "st__tls_" + line + "_" + col;
+    return 'st__tls_' + line + '_' + col;
   }
 
   function baseCompileMain() {
-    let asm = "";
+    let asm = '';
 
     let mainFound = false;
     for (const pkg of state.root.kids) {
-      if (pkg.name !== "package") continue;
+      if (pkg.name !== 'package') continue;
 
       let addressScope = buildAddressScope(pkg);
 
       for (const listIns of pkg.kids) {
-        if (listIns.name !== "list-inst") continue;
+        if (listIns.name !== 'list-inst') continue;
         if (listIns.kids.length === 0) continue;
         if (!state.isMain)
-          throw makeErr(listIns.i, "can only use main block in main.sus");
+          throw makeErr(listIns.i, 'can only use main block in main.sus');
 
-        if (mainFound) throw makeErr(listIns.i, "can only have one main block");
+        if (mainFound) throw makeErr(listIns.i, 'can only have one main block');
 
-        let endAsmName = getAsmNameTls(listIns) + "_end";
+        let endAsmName = getAsmNameTls(listIns) + '_end';
 
         asm += line(
-          `;   main block at ${(getLoc(listIns.i) + "   ").padEnd(35, "=")} {`
+          `;   main block at ${(getLoc(listIns.i) + '   ').padEnd(35, '=')} {`
         );
         asm += compileScope(
           listIns,
           createScope(addressScope, endAsmName, undefined, listIns),
           addressScope
         );
-        asm += line(`; } main block at ${getLoc(listIns.i).padEnd(35, " ")} `);
+        asm += line(`; } main block at ${getLoc(listIns.i).padEnd(35, ' ')} `);
         asm += line();
         mainFound = true;
       }
     }
 
     if (!mainFound && state.isMain)
-      throw new makeErr("no main block found in any code of main.sus");
+      throw makeErr('no main block found in any code of main.sus');
 
     return asm;
   }
 
+  function baseCompileFunctions() {
+    let r = '';
+    for (const pkg of state.root.kids) {
+      if (pkg.name !== 'package') continue;
+
+      let addressScope = buildAddressScope(pkg);
+
+      for (const func of pkg.kids.filter((x) => x.name === 'func')) {
+        r += compileFunc(func, addressScope);
+      }
+    }
+    return r;
+  }
+
   function compileFunc(func, addressScope) {
-    let asm = "";
+    let asm = '';
     let currentAddress = addressScope.usings[addressScope.usings.length - 1];
     let paramNames = func.kids[0].kids.map((x) => x.props.name);
     let asmName = getFuncSigAsmName(
@@ -1449,71 +1602,71 @@ function compile(state) {
       func.props.name,
       paramNames
     );
-    let asmNameEnd = asmName + "@end";
-    asm += line(`;   func at ${(getLoc(func.i) + "   ").padEnd(35, "=")} {`, 0);
-    asm += line("global  " + asmName, 0);
-    asm += line(asmName + ":", 0);
-    let listIns = func.kids.find((x) => x.name === "list-inst");
-    let listParam = func.kids.find((x) => x.name === "list-param");
+    let asmNameEnd = asmName + '@end';
+    asm += line(`;   func at ${(getLoc(func.i) + '   ').padEnd(35, '=')} {`, 0);
+    asm += line('global  ' + asmName, 0);
+    asm += line(asmName + ':', 0);
+    let listIns = func.kids.find((x) => x.name === 'list-inst');
+    let listParam = func.kids.find((x) => x.name === 'list-param');
     asm += compileScope(
       listIns,
       createScope(addressScope, asmNameEnd, listParam, listIns),
       addressScope
     );
     asm += line(`ret`);
-    asm += line(`; } func at ${getLoc(func.i).padEnd(35, " ")} `, 0);
+    asm += line(`; } func at ${getLoc(func.i).padEnd(35, ' ')} `, 0);
     asm += line();
     return asm;
   }
 
   function compileScope(listIns, scope, addressScope) {
-    let r = "";
+    let r = '';
 
-    r += line("push    ebp");
-    r += line("lea     ebp, [esp - 4]"); // ebp points to first variable
+    r += line('push    ebp');
+    r += line('lea     ebp, [esp - 4]'); // ebp points to first variable
     if (scope.symTable.size > 0)
-      r += line("sub     esp, " + scope.symTable.size);
-    r += line("");
+      r += line('sub     esp, ' + scope.symTable.size);
+    r += line('');
 
     for (const ins of listIns.kids) {
       r += compileIns(ins, scope, addressScope);
     }
 
-    r += line(scope.endAsmName + ":", 0);
+    r += line(scope.endAsmName + ':', 0);
 
-    r += line("lea     esp, [ebp + 8]");
-    r += line("mov     ebp, [ebp + 4]");
+    r += line('lea     esp, [ebp + 8]');
+    r += line('mov     ebp, [ebp + 4]');
 
     return r;
   }
 
   function compileIns(ins, scope, addressScope) {
     switch (ins.name) {
-      case "ins-sym":
+      case 'ins-sym':
         return compileInsSym(ins, scope, addressScope);
-      case "ins-ass":
+      case 'ins-ass':
         return compileInsAss(ins, scope, addressScope);
-      case "ins-call":
+      case 'ins-call':
         return compileInsCall(ins, scope, addressScope);
-      case "ins-asm":
+      case 'ins-asm':
         return compileInsAsm(ins, scope, addressScope);
-      case "ins-block":
+      case 'ins-block':
         return compileInsBlock(ins, scope, addressScope);
-      case "ins-if":
+      case 'ins-if':
         return compileInsIf(ins, scope, addressScope);
-      case "ins-while":
+      case 'ins-while':
         return compileInsWhile(ins, scope, addressScope);
-      case "ins-done":
+      case 'ins-done':
         return compileInsDone(ins, scope, addressScope);
-      case "ins-break":
+      case 'ins-break':
         return compileInsBreak(ins, scope, addressScope);
       default:
-        throw makeImplErr("unsupported statement: " + ins.name);
+        throw makeImplErr('unsupported statement: ' + ins.name);
     }
   }
 
   function compileExit(ins, scope, levels) {
-    let r = "";
+    let r = '';
 
     let scopes = (function findRoot(s, scopes = []) {
       scopes.push(s);
@@ -1522,14 +1675,14 @@ function compile(state) {
 
     let lv = scopes.length - 1;
     if (levels) {
-      if (levels < 1) throw makeErr(ins.i, "break level too small");
-      if (levels >= scopes.length) throw makeErr(ins.i, "use done instead");
+      if (levels < 1) throw makeErr(ins.i, 'break level too small');
+      if (levels >= scopes.length) throw makeErr(ins.i, 'use done instead');
       lv = levels - 1;
     }
 
     for (let i = 0; i < lv; i++) {
-      r += line("lea     esp, [ebp + 8]");
-      r += line("mov     ebp, [ebp + 4]");
+      r += line('lea     esp, [ebp + 8]');
+      r += line('mov     ebp, [ebp + 4]');
     }
     r += line(`jmp     ${scopes[lv].endAsmName}`);
 
@@ -1546,34 +1699,34 @@ function compile(state) {
 
   function getAsmNameIf(insIf) {
     let { line, col } = lineNumber(state.text, insIf.i);
-    return "ss__if_" + line + "_" + col;
+    return 'ss__if_' + line + '_' + col;
   }
 
   function getAsmNameWhile(insIf) {
     let { line, col } = lineNumber(state.text, insIf.i);
-    return "ss__while_" + line + "_" + col;
+    return 'ss__while_' + line + '_' + col;
   }
 
   function compileInsIf(insIf, scope, addressScope) {
-    let r = "";
+    let r = '';
 
     let asmName = getAsmNameIf(insIf);
-    let asmNameYes = asmName + "_yes";
-    let asmNameElse = asmName + "_else";
-    let asmNameEnd = asmName + "_end";
+    let asmNameYes = asmName + '_yes';
+    let asmNameElse = asmName + '_else';
+    let asmNameEnd = asmName + '_end';
 
     let expr = insIf.kids[0];
     let ins = insIf.kids[1];
     let nodeElse = insIf.kids.length >= 3 ? insIf.kids[2] : undefined;
 
-    checkTypeName(expr, scope, addressScope, "boo");
+    checkTypeName(expr, scope, addressScope, 'boo');
 
     r += compileExpr(expr, scope, addressScope);
     r += line(`pop     eax`);
     r += line(`cmp     eax, 1`);
     r += line(`jne     ${nodeElse ? asmNameElse : asmNameEnd}`);
 
-    r += line(asmNameYes + ":");
+    r += line(asmNameYes + ':');
     indented(() => {
       r += compileIns(ins, scope, addressScope);
       r += line(`jmp     ${asmNameEnd}`);
@@ -1581,29 +1734,29 @@ function compile(state) {
 
     if (nodeElse) {
       let elseIns = nodeElse.kids[0];
-      r += line(asmNameElse + ":");
+      r += line(asmNameElse + ':');
       indented(() => {
         r += compileIns(elseIns, scope, addressScope);
       });
     }
 
-    r += line(asmNameEnd + ":");
+    r += line(asmNameEnd + ':');
     r += line();
 
     return r;
   }
 
   function compileInsWhile(insIf, scope, addressScope) {
-    let r = "";
+    let r = '';
 
     let asmName = getAsmNameWhile(insIf);
-    let asmNameTop = asmName + "_top";
-    let asmNameEnd = asmName + "_end";
+    let asmNameTop = asmName + '_top';
+    let asmNameEnd = asmName + '_end';
 
     let expr = insIf.kids[0];
     let ins = insIf.kids[1];
 
-    checkTypeName(expr, scope, addressScope, "boo");
+    checkTypeName(expr, scope, addressScope, 'boo');
 
     r += line(`${asmNameTop}:`);
     r += compileExpr(expr, scope, addressScope);
@@ -1616,7 +1769,7 @@ function compile(state) {
       r += line(`jmp     ${asmNameTop}`);
     });
 
-    r += line(asmNameEnd + ":");
+    r += line(asmNameEnd + ':');
     r += line();
 
     return r;
@@ -1624,16 +1777,16 @@ function compile(state) {
 
   function getAsmNameBlock(ins) {
     let { line, col } = lineNumber(state.text, ins.i);
-    return "ss__bloc_" + line + "_" + col;
+    return 'ss__bloc_' + line + '_' + col;
   }
 
   function compileInsBlock(block, scope, addressScope) {
-    let r = "";
+    let r = '';
     let listIns = block.kids[0];
 
-    let asmNameBlockEnd = getAsmNameBlock(block) + "_end";
+    let asmNameBlockEnd = getAsmNameBlock(block) + '_end';
 
-    r += line(`;   bloc at ${(getLoc(block.i) + "   ").padEnd(35, "=")} {`);
+    r += line(`;   bloc at ${(getLoc(block.i) + '   ').padEnd(35, '=')} {`);
     indented(
       () =>
         (r += compileScope(
@@ -1641,13 +1794,13 @@ function compile(state) {
           createScope(addressScope, asmNameBlockEnd, undefined, listIns, scope)
         ))
     );
-    r += line(`; } bloc at ${getLoc(block.i).padEnd(35, " ")} `, 0);
+    r += line(`; } bloc at ${getLoc(block.i).padEnd(35, ' ')} `, 0);
 
     return r;
   }
 
   function compileInsAss(ins, scope, addressScope) {
-    let r = "";
+    let r = '';
 
     let targetExpr = ins.kids[0].kids[0].kids[0]; // ins.target.expr.kids[0]
     let expr = ins.kids[1].kids[0]; // ins.expr.kids[0]
@@ -1657,14 +1810,14 @@ function compile(state) {
     if (!typeEquals(targetType, exprType))
       throw makeErr(
         ins.i,
-        "target of type " +
+        'target of type ' +
           typeToString(targetType) +
-          " can not be assigned to type " +
+          ' can not be assigned to type ' +
           typeToString(exprType)
       );
 
     switch (targetExpr.name) {
-      case "expr-drf":
+      case 'expr-drf':
         let byteSize = evalSizeAligned(exprType);
 
         r += line(`; deref assign`);
@@ -1673,45 +1826,30 @@ function compile(state) {
         r += compileExpr(targetExpr.kids[0], scope, addressScope);
         r += line(`pop     edx`);
 
-        r += compileCopy("esp", 0, "edx", 0, byteSize, true);
+        r += compileCopy('esp', 0, 'edx', 0, byteSize, true);
         r += line(`add     esp, ${byteSize}`);
         break;
-      case "expr-sym":
+      case 'expr-sym':
         r += compileInsAssSym(targetExpr, expr, scope, addressScope);
         break;
-      case "expr-member":
+      case 'expr-member':
         r += compileInsAssMember(targetExpr, expr, scope, addressScope);
         break;
       default:
         throw makeErr(
           targetExpr.i,
-          "expression " + targetExpr.name + " can not be assigned"
+          'expression ' + targetExpr.name + ' can not be assigned'
         );
     }
 
     return r;
   }
 
-  // if (structExpr.name === 'expr-drf') {
-  //   throw makeImplErr('get dereferenced struct');
-  // } else if (structExpr.name === 'expr-sym') {
-  //   let loc = findSymTableLoc(scope, structExpr.props.symbol);
-  //   if (!loc) throw makeErr(expr.i, 'can not find symbol ' + symbol);
-  //   let row = loc.row;
-  //   let symRes = resolveSymbolBase(loc);
-  //   r += symRes.asm;
-  //   let off = row.off + member.off;
-  //   r += line(`mov     eax, [${symRes.register}${getOffStr(off)}] ; member ref: ${structExpr.props.symbol}.${memberName}`);
-  //   r += line(`push    eax`);
-  // } else {
-  //   throw makeImplErr('cannot access struct member of expression ' + structExpr.name);
-  // }
-
   function compileInsAssMember(exprMem, expr, scope, addressScope) {
-    let r = "";
+    let r = '';
 
     let chain = resolveMemberChain(scope, addressScope, exprMem);
-    let memberChainString = chain.members.map((x) => x.name).join(".");
+    let memberChainString = chain.members.map((x) => x.name).join('.');
     let structExpr = chain.baseExpr;
     let member = chain.members[0];
 
@@ -1719,11 +1857,11 @@ function compile(state) {
 
     let memberSizeBytes = evalSize(member.type);
 
-    if (structExpr.name === "expr-sym") {
+    if (structExpr.name === 'expr-sym') {
       let symbol = structExpr.props.symbol;
 
       let symLoc = findSymTableLoc(scope, symbol);
-      if (!symLoc) throw makeErr(structExpr.i, "can not find symbol " + symbol);
+      if (!symLoc) throw makeErr(structExpr.i, 'can not find symbol ' + symbol);
       let symRow = symLoc.row;
 
       r += line(`; member assign: ${symbol}.${memberChainString}`);
@@ -1735,11 +1873,11 @@ function compile(state) {
 
       let off = symRow.off + chain.off;
 
-      r += compileCopy("esp", 0, "ebp", off, memberSizeBytes, true);
+      r += compileCopy('esp', 0, 'ebp', off, memberSizeBytes, true);
       r += line(`add     esp, ${memberSizeBytes}`);
 
       r += line();
-    } else if (structExpr.name === "expr-drf") {
+    } else if (structExpr.name === 'expr-drf') {
       let addressExpr = structExpr.kids[0];
 
       r += line(`; member deref assign ${memberChainString}`);
@@ -1749,14 +1887,14 @@ function compile(state) {
       r += line(`pop     edx`);
 
       let off = chain.off;
-      r += compileCopy("esp", 0, "edx", off, memberSizeBytes, true);
+      r += compileCopy('esp', 0, 'edx', off, memberSizeBytes, true);
       r += line(`add     esp, ${memberSizeBytes}`);
 
       r += line();
     } else {
       throw makeErr(
         exprMem.i,
-        "cannot assign struct member of expression " + structExpr.name
+        'cannot assign struct member of expression ' + structExpr.name
       );
     }
 
@@ -1764,12 +1902,12 @@ function compile(state) {
   }
 
   function compileInsAssSym(exprSym, expr, scope, addressScope) {
-    let r = "";
+    let r = '';
 
     let symbol = exprSym.props.symbol;
 
     let loc = findSymTableLoc(scope, symbol);
-    if (!loc) throw makeErr(targetExpr.i, "can not find symbol " + symbol);
+    if (!loc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
     let symRow = loc.row;
     let type = symRow.type;
     let byteSize = evalSize(type);
@@ -1783,7 +1921,7 @@ function compile(state) {
     // r += line('pop     eax');
     // r += line(`mov     [${symRes.register}${getOffStr(row.off)}], eax`);
 
-    r += compileCopy("esp", 0, symRes.register, symRow.off, byteSize, true);
+    r += compileCopy('esp', 0, symRes.register, symRow.off, byteSize, true);
     r += line(`add     esp, ${byteSize}`);
 
     r += line();
@@ -1793,23 +1931,23 @@ function compile(state) {
 
   // note: generated assembly does not preserve edx
   function resolveSymbolBase(loc) {
-    let r = "";
+    let r = '';
     let amount = loc.scopes.length - 1;
-    if (amount === 0) return { asm: r, register: "ebp" };
+    if (amount === 0) return { asm: r, register: 'ebp' };
     r += line(`mov     edx, [ebp + 4]`);
     for (let i = 1; i < amount; i++) {
       r += line(`mov     edx, [edx + 4]`);
     }
-    return { asm: r, register: "edx" };
+    return { asm: r, register: 'edx' };
   }
 
   function compileInsSym(ins, scope, addressScope) {
-    let r = "";
+    let r = '';
 
     // todo: only allow usage of sym after this.
-    let expr = ins.kids.find((x) => x.name === "expr");
+    let expr = ins.kids.find((x) => x.name === 'expr');
     let type = getActualType(
-      ins.kids.find((x) => x.name === "type"),
+      ins.kids.find((x) => x.name === 'type'),
       addressScope
     );
 
@@ -1828,7 +1966,7 @@ function compile(state) {
 
     r += symRes.asm;
 
-    r += compileCopy("esp", 0, symRes.register, symRow.off, byteSize, true);
+    r += compileCopy('esp', 0, symRes.register, symRow.off, byteSize, true);
     r += line(`add     esp, ${byteSize}`);
 
     r += line(``);
@@ -1845,10 +1983,10 @@ function compile(state) {
     sizeBytes,
     reverse = false
   ) {
-    if ([fromReg, toReg].includes("eax")) throw makeImplErr("lol");
+    if ([fromReg, toReg].includes('eax')) throw makeImplErr('lol');
 
-    let r = "";
-    if (sizeBytes % 4 !== 0) throw makeImplErr("can only copy 4-byte aligned");
+    let r = '';
+    if (sizeBytes % 4 !== 0) throw makeImplErr('can only copy 4-byte aligned');
     let sizeStack = sizeBytes / 4;
     for (let i = 0; i < sizeStack; i++) {
       let elementOffsetBytes = i * 4;
@@ -1873,37 +2011,37 @@ function compile(state) {
   }
 
   function compileInsCall(ins, scope, addressScope) {
-    let r = "";
+    let r = '';
 
-    r += line("; call");
+    r += line('; call');
 
-    let args = ins.kids.filter((x) => x.name === "arg");
+    let args = ins.kids.filter((x) => x.name === 'arg');
 
     let paramNames = args.map((x) => x.props.name).sort();
 
     let callName = ins.props.name;
     let asmName = getFuncAsmName(callName, paramNames, addressScope);
-    if (!asmName) throw makeErr(ins.i, "unknown function: " + callName);
+    if (!asmName) throw makeErr(ins.i, 'unknown function: ' + callName);
 
     let sig = findFuncSig(state.ctx, asmName);
     if (!sig)
       throw makeErr(
         ins.i,
-        "could find asm name but not function name? for " + callName
+        'could find asm name but not function name? for ' + callName
       );
 
     let params = sig.params;
 
     if (params.length < args.length)
-      throw makeErr(ins.i, "to many arguments for " + func.props.name);
+      throw makeErr(ins.i, 'to many arguments for ' + func.props.name);
 
     let size = 0;
     for (const param of [...params].reverse()) {
       let arg = args.find((x) => x.props.name == param.name);
       if (!arg)
-        throw makeErr(ins.i, "can not find argument for param " + param.name);
+        throw makeErr(ins.i, 'can not find argument for param ' + param.name);
 
-      let expr = arg.kids.find((x) => x.name === "expr");
+      let expr = arg.kids.find((x) => x.name === 'expr');
       let type = param.type;
       _ass(type); // TODO: REMOVE
 
@@ -1918,7 +2056,7 @@ function compile(state) {
       tableExternals.push(asmName);
     }
 
-    r += line("call    " + asmName);
+    r += line('call    ' + asmName);
 
     if (size > 0) {
       r += line(`add     esp, ${size}`);
@@ -1930,23 +2068,23 @@ function compile(state) {
   }
 
   function compileInsAsm(ins, scope) {
-    let r = "";
-    r += line("; asm");
+    let r = '';
+    r += line('; asm');
     for (const nodeAsm of ins.kids) {
-      let lineRes = "";
+      let lineRes = '';
       for (const part of nodeAsm.kids) {
-        if (part.props.partType === "asm") {
+        if (part.props.partType === 'asm') {
           lineRes += part.props.value;
-        } else if (part.props.partType === "sus") {
+        } else if (part.props.partType === 'sus') {
           let symbol = part.props.value;
           let loc = findSymTableLoc(scope, symbol);
-          if (!loc) throw makeErr(part.i, "can not find symbol " + symbol);
+          if (!loc) throw makeErr(part.i, 'can not find symbol ' + symbol);
           if (loc.scopes.length > 1)
-            throw makeErr(part.i, "can only use symbols in same scope");
+            throw makeErr(part.i, 'can only use symbols in same scope');
           let row = loc.row;
 
           if (loc.scopes.length !== 1)
-            throw makeErr("can only use local variables in asm instructions");
+            throw makeErr('can only use local variables in asm instructions');
           lineRes += `[ebp${getOffStr(row.off)}]`; // ; ${symbol}
         } else throw Error();
       }
@@ -1959,50 +2097,50 @@ function compile(state) {
   // always generates asm to push (very inefficient lol)
   // const makeNodeExpr = (_) => makeNode('expr', 'expr-sym', 'expr-op',  'expr-lit' ('dec-int' 13254, 'ptr-str' "asdf"});
   function compileExpr(expr, scope, addressScope) {
-    if (scope === undefined) throw makeImplErr("undefined scope");
-    if (expr.name === "expr")
+    if (scope === undefined) throw makeImplErr('undefined scope');
+    if (expr.name === 'expr')
       return compileExpr(expr.kids[0], scope, addressScope);
 
-    let asm = "";
-    if (expr.name === "expr-reinterpret") {
+    let asm = '';
+    if (expr.name === 'expr-reinterpret') {
       asm += compileExprReinterpret(expr, scope, addressScope);
-    } else if (expr.name === "expr-siz") {
+    } else if (expr.name === 'expr-siz') {
       let exprType = getActualType(expr.kids[0], addressScope);
       let size = evalSize(exprType);
       asm += line(`push    ${size}`);
-    } else if (expr.name === "expr-lit") {
+    } else if (expr.name === 'expr-lit') {
       switch (expr.props.litType) {
-        case "dec-int":
-          asm += line("push    " + expr.props.value);
+        case 'dec-int':
+          asm += line('push    ' + expr.props.value);
           break;
-        case "dec-boo":
-          asm += line("push    " + (expr.props.value === "yes" ? 1 : 0));
+        case 'boo':
+          asm += line('push    ' + (expr.props.value === 'yes' ? 1 : 0));
           break;
-        case "ptr-str":
+        case 'ptr-str':
           let asmName = findAsmNameLitPtrStr(expr.props.value);
-          asm += line("push    " + asmName);
+          asm += line('push    ' + asmName);
           break;
         default:
-          throw makeImplErr("unknown literal type: " + expr.props.litType);
+          throw makeImplErr('unknown literal type: ' + expr.props.litType);
       }
-    } else if (expr.name === "expr-op") {
+    } else if (expr.name === 'expr-op') {
       asm += compileExprOp(expr, scope, addressScope);
-    } else if (expr.name === "expr-sym") {
+    } else if (expr.name === 'expr-sym') {
       asm += compileExprSym(expr, scope, addressScope);
-    } else if (expr.name === "expr-arr") {
+    } else if (expr.name === 'expr-arr') {
       asm += compileExprArr(expr, scope, addressScope);
-    } else if (expr.name === "expr-ctr") {
+    } else if (expr.name === 'expr-ctr') {
       asm += compileExprCtr(expr, scope, addressScope);
-    } else if (expr.name === "expr-ref") {
+    } else if (expr.name === 'expr-ref') {
       asm += compileExprRef(expr, scope, addressScope);
-    } else if (expr.name === "expr-brackets") {
+    } else if (expr.name === 'expr-brackets') {
       asm += compileExpr(expr.kids[0], scope, addressScope);
-    } else if (expr.name === "expr-drf") {
+    } else if (expr.name === 'expr-drf') {
       asm += compileExprDrf(expr, scope, addressScope);
-    } else if (expr.name === "expr-member") {
+    } else if (expr.name === 'expr-member') {
       asm += compileExprMember(expr, scope, addressScope);
     } else {
-      throw makeImplErr("unknown expression " + expr.name);
+      throw makeImplErr('unknown expression ' + expr.name);
     }
     return asm;
   }
@@ -2010,7 +2148,7 @@ function compile(state) {
   function compileExprReinterpret(expr, scope, addressScope) {
     let kid = expr.kids[1];
 
-    let r = "";
+    let r = '';
     r += compileExpr(kid, scope, addressScope);
     return r;
   }
@@ -2018,7 +2156,7 @@ function compile(state) {
   function compileExprDrf(expr, scope, addressScope) {
     // note: this is already checked to be a pointer
     let kidExpr = expr.kids[0].kids[0]; // exprDrf.expr.kids[0]
-    let r = "";
+    let r = '';
     r += compileExpr(kidExpr, scope, addressScope);
     r += line(`pop     eax`);
     r += line(`mov     eax, [eax]`);
@@ -2027,41 +2165,56 @@ function compile(state) {
   }
 
   function compileExprMember(expr, scope, addressScope) {
-    let r = "";
+    let r = '';
 
     let chain = resolveMemberChain(scope, addressScope, expr);
     let structExpr = chain.baseExpr;
     let member = chain.members[0];
     let memberSizeBytes = evalSize(member.type);
-    let memberChainString = chain.members.map((x) => x.name).join(".");
+    let memberChainString = chain.members.map((x) => x.name).join('.');
 
-    if (structExpr.name === "expr-drf") {
+    if (structExpr.name === 'expr-drf') {
       let addressExpr = structExpr.kids[0];
 
       r += line(`; expression member ref: ${memberChainString}`);
       r += compileExpr(addressExpr, scope, addressScope);
-      r += line("pop     ecx");
+      r += line('pop     ecx');
 
       let off = chain.off;
-      r += compilePush("ecx", off, memberSizeBytes);
-    } else if (structExpr.name === "expr-sym") {
-      let loc = findSymTableLoc(scope, structExpr.props.symbol);
-      if (!loc) throw makeErr(expr.i, "can not find symbol " + symbol);
-      let row = loc.row;
-      let symRes = resolveSymbolBase(loc);
-      r += symRes.asm;
+      r += compilePush('ecx', off, memberSizeBytes);
+    } else if (structExpr.name === 'expr-sym') {
+      let symbol = structExpr.props.symbol;
+      r += line(`; expression sym member: ${symbol}.${memberChainString}`);
 
-      let off = row.off + chain.off;
+      let loc = findSymTableLoc(scope, symbol);
 
-      // r += line(`mov     eax, [${symRes.register}${getOffStr(off)}] ; member sym: ${structExpr.props.symbol}.(${memberChainString})`);
-      // r += line(`push    eax`);
-      r += line(
-        `; expression sym member: ${structExpr.props.symbol}.${memberChainString}`
-      );
-      r += compilePush(symRes.register, off, memberSizeBytes);
+      if (loc) {
+        let row = loc.row;
+        let symRes = resolveSymbolBase(loc);
+        r += symRes.asm;
+        let off = row.off + chain.off;
+        r += compilePush(symRes.register, off, memberSizeBytes);
+      } else {
+        let const_ = findConst(state.ctx, addressScope, symbol);
+        if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+
+        let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
+        _ass(asmName);
+
+        if (
+          state.name !== const_.unitPath &&
+          !tableExternals.includes(asmName)
+        ) {
+          tableExternals.push(asmName);
+        }
+
+        r += line('mov     ecx, ' + asmName);
+        let off = chain.off;
+        r += compilePush('ecx', off, memberSizeBytes);
+      }
     } else {
       throw makeImplErr(
-        "cannot access struct member of expression " + structExpr.name
+        'cannot access struct member of expression ' + structExpr.name
       );
     }
 
@@ -2070,8 +2223,8 @@ function compile(state) {
 
   // does not clobber any register
   function compilePush(register, offset, sizeBytes) {
-    if (sizeBytes % 4 !== 0) throw makeImplErr("cannot push unaligned bytes");
-    let r = "";
+    if (sizeBytes % 4 !== 0) throw makeImplErr('cannot push unaligned bytes');
+    let r = '';
     let sizeStack = sizeBytes / 4;
     for (let i = 0; i < sizeStack; i++) {
       r += line(`push dword [${register}${getOffStr(offset + i * 4)}]`);
@@ -2091,17 +2244,17 @@ function compile(state) {
     let structName = structType.name;
     let structRow = findStructByAddress(state.ctx, structName);
     if (!structRow)
-      throw makeErr(expr.i, "could not find struct " + structName);
+      throw makeErr(expr.i, 'could not find struct ' + structName);
     let member = structRow.members.find((x) => x.name === memberName);
     if (!member)
       throw makeErr(
         expr.i,
-        "could not find member " + memberName + " of " + structName
+        'could not find member ' + memberName + ' of ' + structName
       );
 
     members.push(member);
 
-    if (structExpr.name === "expr-member") {
+    if (structExpr.name === 'expr-member') {
       return resolveMemberChain(scope, addressScope, structExpr, members);
     }
 
@@ -2112,93 +2265,121 @@ function compile(state) {
     );
   }
 
-  function compileExprRef(expr, scope) {
+  function compileExprRef(expr, scope, addressScope) {
     let kidExpr = expr.kids[0].kids[0];
-    let asm = "";
-    if (kidExpr.name === "expr-sym") {
-      return compileExprRefSym(kidExpr, scope);
-    } else if (kidExpr.name === "expr-member") {
-      return compileExprRefMem(kidExpr, scope);
+    let asm = '';
+    if (kidExpr.name === 'expr-sym') {
+      return compileExprRefSym(kidExpr, scope, addressScope);
+    } else if (kidExpr.name === 'expr-member') {
+      return compileExprRefMem(kidExpr, scope, addressScope);
     } else {
       throw makeErr(
         kidExpr.i,
-        "can not take reference of expression " + kidExpr.name
+        'can not take reference of expression ' + kidExpr.name
       );
     }
     return asm;
   }
 
   function compileExprRefMem(expr, scope, addressScope) {
-    let r = "";
+    let r = '';
 
     let chain = resolveMemberChain(scope, addressScope, expr);
     let base = chain.baseExpr;
-    let memberChainString = chain.members.map((x) => x.name).join(".");
+    let memberChainString = chain.members.map((x) => x.name).join('.');
 
-    if (base.name === "expr-sym") {
+    if (base.name === 'expr-sym') {
       let symbol = base.props.symbol;
       let loc = findSymTableLoc(scope, symbol);
-      if (!loc) throw makeErr(expr.i, "can not find symbol " + symbol);
-      let symRow = loc.row;
-      let symRes = resolveSymbolBase(loc);
-      r += symRes.asm;
 
-      let off = symRow.off + chain.off;
-      r += line(
-        `lea     eax, [${symRes.register}${getOffStr(
-          off
-        )}] ; member address: ${symbol}.${memberChainString}`
-      );
-      r += line(`push    eax`);
-    } else if (base.name === "expr-drf") {
+      let c = `; member address: ${symbol}.${memberChainString}`;
+
+      if (loc) {
+        let symRow = loc.row;
+        let symRes = resolveSymbolBase(loc);
+        r += symRes.asm;
+        let off = symRow.off + chain.off;
+        r += line(`lea     eax, [${symRes.register}${getOffStr(off)}] ${c}`);
+        r += line(`push    eax`);
+      } else {
+        let const_ = findConst(state.ctx, addressScope, symbol);
+        if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+        let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
+        _ass(asmName);
+        if (
+          state.name !== const_.unitPath &&
+          !tableExternals.includes(asmName)
+        ) {
+          tableExternals.push(asmName);
+        }
+        let off = chain.off;
+        r += line(`lea     eax, [${asmName}${getOffStr(off)}]`);
+        r += line(`push    eax`);
+      }
+    } else if (base.name === 'expr-drf') {
       let addressExpr = base.kids[0];
 
       r += line(`; expression member ref: ${memberChainString}`);
       r += compileExpr(addressExpr, scope, addressScope);
 
       let off = chain.off;
-      r += line("add     dword [esp], " + off);
+      r += line('add     dword [esp], ' + off);
     } else {
       throw makeErr(
         kidExpr.i,
-        "can not take member reference of expression " + base.name
+        'can not take member reference of expression ' + base.name
       );
     }
 
     return r;
   }
 
-  function compileExprRefSym(exprSym, scope) {
-    let asm = "";
+  function compileExprRefSym(exprSym, scope, addressScope) {
+    let r = '';
     let symbol = exprSym.props.symbol;
+
     let loc = findSymTableLoc(scope, symbol);
-    if (!loc) throw makeErr(exprSym.i, "can not find symbol " + symbol);
-    let row = loc.row;
-    let symRes = resolveSymbolBase(loc);
-    asm += symRes.asm;
-    asm += line(
-      `lea     eax, [${symRes.register}${getOffStr(
-        row.off
-      )}] ; symbol ref: ${symbol}`
-    );
-    asm += line(`push    eax`);
-    return asm;
+    if (loc) {
+      let row = loc.row;
+      let symRes = resolveSymbolBase(loc);
+      r += symRes.asm;
+      r += line(
+        `lea     eax, [${symRes.register}${getOffStr(
+          row.off
+        )}] ; symbol ref: ${symbol}`
+      );
+      r += line(`push    eax`);
+    } else {
+      let const_ = findConst(state.ctx, addressScope, symbol);
+      if (!const_) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
+
+      let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
+      _ass(asmName);
+
+      if (state.name !== const_.unitPath && !tableExternals.includes(asmName)) {
+        tableExternals.push(asmName);
+      }
+
+      r += line(`push    ${asmName}; const ref: ${const_.fullName}`);
+    }
+
+    return r;
   }
 
   function compileExprCtr(expr, scope, addressScope) {
-    let r = "";
+    let r = '';
 
-    r += line("; ctr " + expr.props.name);
+    r += line('; ctr ' + expr.props.name);
 
     let structRow = findStruct(state.ctx, addressScope, expr.props.name);
-    if (!structRow) throw makeErr(expr.i, "unknown struct: " + expr.props.name);
+    if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + expr.props.name);
 
-    let inits = expr.kids.filter((x) => x.name === "member-init");
+    let inits = expr.kids.filter((x) => x.name === 'member-init');
 
     if (structRow.members < inits.length)
       throw makeErr(
         expr.i,
-        "to many member initializations for " + structRow.name
+        'to many member initializations for ' + structRow.name
       );
 
     for (const member of structRow.members) {
@@ -2206,10 +2387,10 @@ function compile(state) {
       if (!init)
         throw makeErr(
           expr.i,
-          "can not find initialization for member " + member.name
+          'can not find initialization for member ' + member.name
         );
 
-      let expr = init.kids.find((x) => x.name === "expr");
+      let expr = init.kids.find((x) => x.name === 'expr');
       let type = member.type;
 
       checkType(expr, scope, addressScope, type);
@@ -2232,14 +2413,14 @@ function compile(state) {
   }
 
   function compileExprArr(expr, scope, addressScope) {
-    let asm = "";
+    let asm = '';
 
     let type = getActualType(expr.kids[0], addressScope);
     let sizeExpr = expr.kids[1];
 
     let sizeType = typeToString(evalType(sizeExpr, scope));
-    if (sizeType !== "ptr" && sizeType !== "int32")
-      throw makeErr(sizeExpr.i, "expected expression of type ptr or int32");
+    if (sizeType !== 'ptr' && sizeType !== 'int32')
+      throw makeErr(sizeExpr.i, 'expected expression of type ptr or int32');
 
     // NOTE: ARRAY EXPRESSIONS DIE AFTER GOING OUT OF SCOPE.
 
@@ -2261,39 +2442,39 @@ function compile(state) {
   function compileExprOp(exprOp, scope, addressScope) {
     let op = exprOp.props.op;
     switch (op) {
-      case "==":
-        return compileExprOpComp(exprOp, scope, addressScope, "sete");
-      case "!=":
-        return compileExprOpComp(exprOp, scope, addressScope, "setne");
-      case ">":
-        return compileExprOpComp(exprOp, scope, addressScope, "setg");
-      case "<":
-        return compileExprOpComp(exprOp, scope, addressScope, "setl");
-      case ">=":
-        return compileExprOpComp(exprOp, scope, addressScope, "setge");
-      case "<=":
-        return compileExprOpComp(exprOp, scope, addressScope, "setle");
-      case "-":
-        return compileExprOpSimple(exprOp, scope, addressScope, op, "sub");
-      case "+":
-        return compileExprOpSimple(exprOp, scope, addressScope, op, "add");
-      case "*":
-        return compileExprOpMul(exprOp, scope, addressScope, op, "imul");
-      case "/":
-        return compileExprOpSimple(exprOp, scope, addressScope, op, "idiv");
-      case "||":
-        return compileExprOpSimple(exprOp, scope, addressScope, op, "or");
-      case "&&":
-        return compileExprOpSimple(exprOp, scope, addressScope, op, "and");
+      case '==':
+        return compileExprOpComp(exprOp, scope, addressScope, 'sete');
+      case '!=':
+        return compileExprOpComp(exprOp, scope, addressScope, 'setne');
+      case '>':
+        return compileExprOpComp(exprOp, scope, addressScope, 'setg');
+      case '<':
+        return compileExprOpComp(exprOp, scope, addressScope, 'setl');
+      case '>=':
+        return compileExprOpComp(exprOp, scope, addressScope, 'setge');
+      case '<=':
+        return compileExprOpComp(exprOp, scope, addressScope, 'setle');
+      case '-':
+        return compileExprOpSimple(exprOp, scope, addressScope, op, 'sub');
+      case '+':
+        return compileExprOpSimple(exprOp, scope, addressScope, op, 'add');
+      case '*':
+        return compileExprOpMul(exprOp, scope, addressScope, op, 'imul');
+      case '/':
+        return compileExprOpSimple(exprOp, scope, addressScope, op, 'idiv');
+      case '||':
+        return compileExprOpSimple(exprOp, scope, addressScope, op, 'or');
+      case '&&':
+        return compileExprOpSimple(exprOp, scope, addressScope, op, 'and');
       default:
-        throw makeImplErr("unknown operand " + op);
+        throw makeImplErr('unknown operand ' + op);
     }
   }
 
   function compileExprOpComp(exprOp, scope, addressScope, inst) {
     let a = exprOp.kids[0];
     let b = exprOp.kids[1];
-    let asm = "";
+    let asm = '';
     asm += compileExpr(a, scope, addressScope);
     asm += compileExpr(b, scope, addressScope);
     // comparing: https://stackoverflow.com/questions/77062912/how-to-move-the-zero-flag-into-a-register-in-x86-64
@@ -2302,7 +2483,7 @@ function compile(state) {
     asm += line(`pop     edx`);
     asm += line(`pop     ecx`);
     asm += line(`cmp     ecx, edx`);
-    asm += line(`${inst.padEnd(8, " ")}al`);
+    asm += line(`${inst.padEnd(8, ' ')}al`);
     asm += line(`push    eax`);
 
     return asm;
@@ -2311,72 +2492,96 @@ function compile(state) {
   // (very inefficient lol)
   function compileExprOpSimple(exprOp, scope, addressScope, op, asmOp) {
     if (exprOp.kids.length != 2)
-      throw makeErr("expected 2 params for op " + op);
+      throw makeErr('expected 2 params for op ' + op);
     let a = exprOp.kids[0];
     let b = exprOp.kids[1];
-    let asm = "";
+    let asm = '';
     asm += compileExpr(a, scope, addressScope);
     asm += compileExpr(b, scope, addressScope);
     asm += line(`pop     eax`);
-    asm += line(`${asmOp.padEnd(8, " ")}[esp], eax`);
+    asm += line(`${asmOp.padEnd(8, ' ')}[esp], eax`);
     return asm;
   }
 
   function compileExprOpMul(exprOp, scope, addressScope, op, asmOp) {
     if (exprOp.kids.length != 2)
-      throw makeErr("expected 2 params for op " + op);
+      throw makeErr('expected 2 params for op ' + op);
     let a = exprOp.kids[0];
     let b = exprOp.kids[1];
-    let asm = "";
+    let asm = '';
     asm += compileExpr(a, scope, addressScope);
     asm += compileExpr(b, scope, addressScope);
     asm += line(`pop     eax`);
     asm += line(`pop     ebx`);
-    asm += line(`${asmOp.padEnd(8, " ")} eax, ebx`);
+    asm += line(`${asmOp.padEnd(8, ' ')} eax, ebx`);
     asm += line(`push    eax`);
     return asm;
   }
 
   function compileExprSym(exprSym, scope, addressScope) {
-    let asm = "";
+    let asm = '';
 
     let symbol = exprSym.props.symbol;
 
     let loc = findSymTableLoc(scope, symbol);
-    if (!loc) throw makeErr(exprSym.i, "can not find symbol " + symbol);
-    let row = loc.row;
-    let type = row.type;
 
-    let symRes = resolveSymbolBase(loc);
+    if (loc) {
+      if (!loc) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
+      let row = loc.row;
+      let type = row.type;
 
-    asm += symRes.asm;
+      let symRes = resolveSymbolBase(loc);
 
-    if (type.kind === "prim") {
-      asm += line(
-        `mov     eax, [${symRes.register}${getOffStr(
-          row.off
-        )}] ; expr symbol: ${symbol}`
-      );
-      asm += line(`push    eax`);
-    } else if (type.name === "struct") {
-      let structRow = findStructByAddress(state.ctx, type.name);
-      if (!structRow)
-        throw new makeErr(exprSym.i, "struct " + type.name + " not found");
-      if (structRow.size % 4 !== 0)
-        throw makeImplErr("struct needs to be 4-byte aligned");
+      asm += symRes.asm;
 
-      asm += line(`; expr struct ${structRow.name} symbol: ${symbol} {`);
-      let size = structRow.size / 4;
-      for (let i = 0; i < size; i++) {
-        // asm += line(`mov     eax, [${symRes.register}${getOffStr(row.off + i * 4)}]`);
-        // asm += line(`push    eax`);
+      if (type.kind === 'prim') {
         asm += line(
-          `push    dword [${symRes.register}${getOffStr(row.off + i * 4)}]`
+          `mov     eax, [${symRes.register}${getOffStr(
+            row.off
+          )}] ; expr symbol: ${symbol}`
         );
+        asm += line(`push    eax`);
+      } else if (type.name === 'struct') {
+        let structRow = findStructByAddress(state.ctx, type.name);
+        if (!structRow)
+          throw makeErr(exprSym.i, 'struct ' + type.name + ' not found');
+        if (structRow.size % 4 !== 0)
+          throw makeImplErr('struct needs to be 4-byte aligned');
+
+        asm += line(`; expr struct ${structRow.name} symbol: ${symbol} {`);
+        let size = structRow.size / 4;
+        for (let i = 0; i < size; i++) {
+          asm += line(
+            `push    dword [${symRes.register}${getOffStr(row.off + i * 4)}]`
+          );
+        }
+        asm += line('; }');
+      } else {
+        _ass(false);
       }
-      asm += line("; }");
     } else {
-      _ass(false);
+      let const_ = findConst(state.ctx, addressScope, symbol);
+      if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+
+      let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
+      _ass(asmName);
+
+      if (state.name !== const_.unitPath && !tableExternals.includes(asmName)) {
+        tableExternals.push(asmName);
+      }
+
+      asm += line('mov     ecx, ' + asmName);
+
+      let type = const_.type;
+      let size = evalSizeAligned(type) / 4;
+
+      asm += line(
+        `; expr struct ${typeToString(type)} const: ${const_.fullName} {`
+      );
+      for (let i = 0; i < size; i++) {
+        asm += line(`push    dword [ecx${getOffStr(i * 4)}]`);
+      }
+      asm += line('; }');
     }
 
     return asm;
@@ -2385,52 +2590,39 @@ function compile(state) {
   // /
 
   // compilation start ========================================
-  let dataDefinitions = baseCompileDataTable();
+  let stringDefinitions = baseCompileDataTable();
+  let constDefinitions = baseCompileConst();
   let resultTopLevel = baseCompileMain();
   let resultFunctions = baseCompileFunctions();
 
-  //
-
-  function baseCompileFunctions() {
-    let r = "";
-    for (const pkg of state.root.kids) {
-      if (pkg.name !== "package") continue;
-
-      let addressScope = buildAddressScope(pkg);
-
-      for (const func of pkg.kids.filter((x) => x.name === "func")) {
-        r += compileFunc(func, addressScope);
-      }
-    }
-    return r;
-  }
-
   if (
-    dataDefinitions.length === 0 &&
+    constDefinitions.length === 0 &&
     resultTopLevel.length === 0 &&
     resultFunctions.length === 0
   )
-    return "";
+    return '';
 
-  let program = "";
+  let program = '';
 
-  let eol = "\n";
+  let eol = '\n';
 
-  program += "; external functions" + eol;
+  program += '; external functions' + eol;
   for (const asmName of tableExternals) {
-    program += "  extern  " + asmName + eol;
+    program += '  extern  ' + asmName + eol;
   }
-  program += "" + eol;
+  program += '' + eol;
 
-  program += "; data definitions" + eol;
-  program += "section .text" + eol;
-  program += dataDefinitions + eol;
+  program += '; data definitions' + eol;
+  program += 'section .text' + eol;
+  program += stringDefinitions + eol;
+  program += '; const definitions' + eol;
+  program += constDefinitions + eol;
 
-  program += "; code" + eol;
-  program += "section .text" + eol;
+  program += '; code' + eol;
+  program += 'section .text' + eol;
   if (state.isMain) {
-    program += "global _main" + eol;
-    program += "_main:" + eol;
+    program += 'global _main' + eol;
+    program += '_main:' + eol;
     program += resultTopLevel;
   }
 
@@ -2448,7 +2640,7 @@ function lineNumber(str, idx) {
   let col = 1;
   for (let i = 0; i < str.length && i <= idx; i++) {
     const c = str[i];
-    if (c == "\n") {
+    if (c == '\n') {
       line++;
       col = 1;
       continue;
@@ -2468,14 +2660,14 @@ function buildAddressScope(pkg) {
   let usings = [];
   usings.push(pkg.props.name);
   for (const use of pkg.kids) {
-    if (use.name !== "using") continue;
+    if (use.name !== 'using') continue;
     usings.push(use.props.name);
   }
   return makeAddressScope(usings.reverse());
 }
 
 function addrSimpleName(address) {
-  let parts = address.split("/");
+  let parts = address.split('/');
   return parts[parts.length - 1];
 }
 
@@ -2489,15 +2681,15 @@ function resolveAddress(addressScope, simpleName) {
 // type start ================================================================= {
 
 function makeTypePrim(name, args = []) {
-  return { kind: "prim", name, args };
+  return { kind: 'prim', name, args };
 }
 
 function makeTypeStruct(name, args = []) {
-  return { kind: "struct", name, args };
+  return { kind: 'struct', name, args };
 }
 
 function makeTypeNamed(anyName, args = []) {
-  return { kind: "named", anyName, args };
+  return { kind: 'named', anyName, args };
 }
 
 function typeEquals(a, b) {
@@ -2514,9 +2706,9 @@ function typeBaseName(type) {
 function typeToString(type) {
   if (!type.kind) throw 0;
   switch (type.kind) {
-    case "prim":
-      return type.name + (type.args > 0 ? "[" + args.join(", ") + "]" : "");
-    case "struct":
+    case 'prim':
+      return type.name + (type.args > 0 ? '[' + args.join(', ') + ']' : '');
+    case 'struct':
       return type.name;
     default:
       throw 0;
@@ -2526,31 +2718,31 @@ function typeToString(type) {
 // gives size in bytes
 function getSizeAligned(ctx, type) {
   let r = getSize(ctx, type);
-  if (r % 4 !== 0) throw makeImplErr("unaligned!");
+  if (r % 4 !== 0) throw makeImplErr('unaligned!');
   return r;
 }
 
 function getSize(ctx, type) {
   _ass(type.kind);
 
-  if (type.kind === "struct") {
+  if (type.kind === 'struct') {
     let name = type.name;
     let struct = findStructByAddress(ctx, name);
-    if (!struct) throw new Error("could not find struct " + name);
+    if (!struct) throw new Error('could not find struct ' + name);
     return struct.size;
-  } else if (type.kind === "prim") {
+  } else if (type.kind === 'prim') {
     switch (type.name) {
-      case "boo":
-      case "int8":
-      case "int32":
-      case "ptr":
-      case "PTR":
+      case 'boo':
+      case 'int8':
+      case 'int32':
+      case 'ptr':
+      case 'PTR':
         return 4;
       default:
-        throw new Error("unknown primitive type: " + type.kind);
+        throw new Error('unknown primitive type: ' + type.kind);
     }
   } else {
-    throw new Error("unknown type: " + type.kind);
+    throw new Error('unknown type: ' + type.kind);
   }
 }
 
@@ -2558,9 +2750,10 @@ function getSize(ctx, type) {
 
 // ctx start  ================================================================= {
 
-const makeContext = (structs, funcSigs, funcAsmNames, unitPaths) => ({
+const makeContext = (structs, funcSigs, consts, funcAsmNames, unitPaths) => ({
   structs,
   funcSigs,
+  consts,
   funcAsmNames,
   unitPaths,
 });
@@ -2570,6 +2763,14 @@ const makeFuncSig = (unitPath, packageAddress, name, params) => ({
   packageAddress,
   name,
   params,
+});
+
+const makeConst = (unitPath, packageAddress, simpleName, fullName, type) => ({
+  unitPath,
+  packageAddress,
+  simpleName,
+  fullName,
+  type
 });
 
 const makeFuncSigParam = (type, name) => ({ type, name });
@@ -2593,9 +2794,20 @@ function findStruct(ctx, addressScope, name) {
   if (struct) return struct;
 
   for (const using of addressScope.usings) {
-    let fullName = using + "/" + name;
+    let fullName = using + '/' + name;
     let struct = ctx.structs.find((x) => x.name === fullName);
     if (struct) return struct;
+  }
+  return undefined;
+}
+
+function findConst(ctx, addressScope, symbol) {
+  let r = ctx.consts.find((x) => x.fullName === symbol);
+  if (r) return r;
+  for (const using of addressScope.usings) {
+    let fullName = using + '/' + symbol;
+    let r = ctx.consts.find((x) => x.fullName === fullName);
+    if (r) return r;
   }
   return undefined;
 }
@@ -2612,10 +2824,10 @@ function getType(ctx, addressScope, typeNode) {
 
     type.args = type.args.map(resolveType);
 
-    if (type.kind === "named") {
+    if (type.kind === 'named') {
       let struct = findStruct(ctx, addressScope, type.anyName);
       if (!struct)
-        throw new Error("could not find struct of name " + type.anyName); // TODO: fix this error message
+        throw new Error('could not find struct of name ' + type.anyName); // TODO: fix this error message
       return struct.type;
     }
 
@@ -2626,28 +2838,45 @@ function getType(ctx, addressScope, typeNode) {
 }
 
 export function doMakeContext() {
-  return makeContext([], [], [], []);
+  return makeContext([], [], [], [], []);
 }
 
 export function addToContext(ctx, path, src) {
   ctx.unitPaths.push(path);
 
   let tree = parseFile(path, src);
+
   loadStructTypes(ctx, path, src, tree);
   loadStructMemberTypes(ctx, path, src, tree);
   loadStructSizes(ctx, path, src, tree);
 
   loadFuncSigs(ctx, path, src, tree);
+
+  loadConsts(ctx, path, src, tree);
+}
+
+function loadConsts(ctx, path, src, tree) {
+  for (const pkg of tree.kids.filter((x) => x.name === 'package')) {
+    let addressScope = buildAddressScope(pkg);
+    for (const nodeConst of pkg.kids.filter((x) => x.name === 'const')) {
+      let type = getType(ctx, addressScope, nodeConst.kids[0]);
+      _ass(type);
+      let fullName = pkg.props.name + '/' + nodeConst.props.name;
+      ctx.consts.push(
+        makeConst(path, pkg.props.name, nodeConst.props.name, fullName, type)
+      );
+    }
+  }
 }
 
 function loadStructTypes(ctx, path, src, tree) {
   for (const pkg of tree.kids) {
-    if (pkg.name !== "package") continue;
+    if (pkg.name !== 'package') continue;
 
     for (const strct of pkg.kids) {
-      if (strct.name !== "struct") continue;
+      if (strct.name !== 'struct') continue;
 
-      let fullName = pkg.props.name + "/" + strct.props.name;
+      let fullName = pkg.props.name + '/' + strct.props.name;
 
       let type = makeTypeStruct(fullName);
       ctx.structs.push(makeStruct(path, fullName, type, null, null));
@@ -2657,14 +2886,14 @@ function loadStructTypes(ctx, path, src, tree) {
 
 function loadStructMemberTypes(ctx, path, src, tree) {
   for (const pkg of tree.kids) {
-    if (pkg.name !== "package") continue;
+    if (pkg.name !== 'package') continue;
 
     let addressScope = buildAddressScope(pkg);
 
     for (const nodeStruct of pkg.kids) {
-      if (nodeStruct.name !== "struct") continue;
+      if (nodeStruct.name !== 'struct') continue;
 
-      let fullName = pkg.props.name + "/" + nodeStruct.props.name;
+      let fullName = pkg.props.name + '/' + nodeStruct.props.name;
       let struct = findStructByAddress(ctx, fullName);
       _ass(struct);
 
@@ -2672,10 +2901,10 @@ function loadStructMemberTypes(ctx, path, src, tree) {
       for (const member of nodeStruct.kids) {
         let type = member.kids[0].props.type;
         _ass(type);
-        if (type.kind === "named") {
+        if (type.kind === 'named') {
           let memberStruct = findStruct(ctx, addressScope, type.anyName);
           if (!memberStruct)
-            throw new Error("could not find struct " + type.anyName);
+            throw new Error('could not find struct ' + type.anyName);
           type = memberStruct.type;
         }
 
@@ -2688,7 +2917,7 @@ function loadStructMemberTypes(ctx, path, src, tree) {
 
 function loadStructSizes(ctx, path, src, tree) {
   function calcSize(struct, depth = 1000) {
-    if (depth <= 0) throw new Error("probably recursive struct definition");
+    if (depth <= 0) throw new Error('probably recursive struct definition');
 
     _ass(struct);
     if (struct.size !== null) return struct.size;
@@ -2696,12 +2925,12 @@ function loadStructSizes(ctx, path, src, tree) {
     let off = 0;
     for (const member of struct.members) {
       member.off = off;
-      if (member.type.kind === "struct") {
+      if (member.type.kind === 'struct') {
         off += calcSize(findStructByAddress(ctx, member.type.name), depth - 1);
-      } else if (member.type.kind === "prim") {
+      } else if (member.type.kind === 'prim') {
         off += getSize(ctx, member.type);
       } else {
-        throw new Error("unknown type kind " + member.type.kind);
+        throw new Error('unknown type kind ' + member.type.kind);
       }
     }
     struct.size = off;
@@ -2714,12 +2943,12 @@ function loadStructSizes(ctx, path, src, tree) {
 
 function loadFuncSigs(ctx, path, src, tree) {
   for (const pkg of tree.kids) {
-    if (pkg.name !== "package") continue;
+    if (pkg.name !== 'package') continue;
 
     let addressScope = buildAddressScope(pkg);
 
     for (const func of pkg.kids) {
-      if (func.name !== "func") continue;
+      if (func.name !== 'func') continue;
 
       let sigPar = [];
 
@@ -2743,10 +2972,18 @@ function loadFuncSigs(ctx, path, src, tree) {
   }
 }
 
+// asm names ===================
+
 // note on valid nasm names: letters, numbers, _, $, #, @, ~, ., and ?. The only characters which may be used as the first character of an identifier are letters, .
+
+function getConstAsmName(simpleName, address) {
+  let addressString = address.split('/').join('$');
+  return `sc_~${addressString}~${simpleName}`;
+}
+
 function getFuncSigAsmName(address, name, params) {
-  let addressString = address.split("/").join("$");
-  let paramString = [...params].sort().join(".");
+  let addressString = address.split('/').join('$');
+  let paramString = [...params].sort().join('.');
   return `sf_~${addressString}~${name}~${paramString}`;
 }
 
@@ -2756,15 +2993,17 @@ export function validateContext(ctx) {
   validateContextFuncts(ctx, errors);
 
   if (errors.length > 0)
-    throw Error("context validtion error. \n" + errors.join("\n"));
+    throw Error('context validtion error. \n' + errors.join('\n'));
 }
+
+// ================================
 
 function validateContextFuncts(ctx, errors) {
   for (let i = 0; i < ctx.funcAsmNames.length; i++) {
     const a = ctx.funcAsmNames[i];
     for (let j = 0; j < ctx.funcAsmNames.length; j++) {
       const b = ctx.funcAsmNames[j];
-      if (a === b && i !== j) errors.push("duplicate function " + a);
+      if (a === b && i !== j) errors.push('duplicate function ' + a);
     }
   }
 }

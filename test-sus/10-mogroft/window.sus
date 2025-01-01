@@ -1,0 +1,17 @@
+package mogroft/Window {
+
+  const int32 ERR_NONE = 0;
+  const int32 ERR_REGCLS = 1;
+  const int32 ERR_CRWIN_AWR = 2;
+  const int32 ERR_CRWIN = 3;
+  const int32 ERR_DC = 4;
+  const int32 ERR_CPF = 5;
+  const int32 ERR_SPF = 6;
+  const int32 ERR_RC = 7;
+  
+  struct Error (
+    int32 code,
+    PTR[int8] message
+  );
+
+}

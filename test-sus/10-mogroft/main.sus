@@ -1,0 +1,27 @@
+
+package Main {
+
+  use sus/InOut;
+  use sus/System;
+
+  const int32 TEST = 123;
+
+  struct Test (int32 a, int32 b);
+
+  const Test asdf = Test(a=1, b=2);
+
+  main {
+
+    InOut/print(i: DRF(REF(TEST)));
+    InOut/printLn();
+
+    InOut/print(i: asdf.b);
+    InOut/printLn();
+
+    InOut/print(s: STR"DONE.\n");
+
+    System/exit(code: 0);
+    
+  }
+
+}
