@@ -1121,9 +1121,7 @@ function compile(state) {
   // FUNCTIONS ============================
 
   function getFuncAsmName(addressName, paramNames, addressScope) {
-    const funcNameSep = '/';
-
-    let nameParts = addressName.split(funcNameSep);
+    let nameParts = addressName.split(/\/(?=[^\/]*$)/);
     if (nameParts.length === 1) {
       let basePackageAddress =
         addressScope.usings[addressScope.usings.length - 1];
@@ -1131,14 +1129,10 @@ function compile(state) {
     }
     let addressSimpleName = nameParts[0];
     let simpleFuncName = nameParts[1];
-
     let addressString = resolveAddress(addressScope, addressSimpleName);
     if (!addressString) addressString = addressSimpleName;
-
     let asmName = getFuncSigAsmName(addressString, simpleFuncName, paramNames);
-
     if (!state.ctx.funcAsmNames.includes(asmName)) return undefined; // throw makeImplErr("unable to find function " + addressName);
-
     return asmName;
   }
 
@@ -1416,7 +1410,7 @@ function compile(state) {
   function baseCompileConst() {
     let r = '';
     for (const pkg of state.root.kids.filter((x) => x.name === 'package')) {
-      let addressScope = buildAddressScope(pkg);
+      let addressScope = buildAddressScope(state.ctx, pkg);
       for (const nodeConst of pkg.kids.filter((x) => x.name === 'const')) {
         r += compileConst(nodeConst, addressScope);
       }
@@ -1547,7 +1541,7 @@ function compile(state) {
     for (const pkg of state.root.kids) {
       if (pkg.name !== 'package') continue;
 
-      let addressScope = buildAddressScope(pkg);
+      let addressScope = buildAddressScope(state.ctx, pkg);
 
       for (const listIns of pkg.kids) {
         if (listIns.name !== 'list-inst') continue;
@@ -1584,7 +1578,7 @@ function compile(state) {
     for (const pkg of state.root.kids) {
       if (pkg.name !== 'package') continue;
 
-      let addressScope = buildAddressScope(pkg);
+      let addressScope = buildAddressScope(state.ctx, pkg);
 
       for (const func of pkg.kids.filter((x) => x.name === 'func')) {
         r += compileFunc(func, addressScope);
@@ -2656,11 +2650,15 @@ function makeAddressScope(usings) {
   return { usings };
 }
 
-function buildAddressScope(pkg) {
+function buildAddressScope(ctx, pkg) {
   let usings = [];
   usings.push(pkg.props.name);
-  for (const use of pkg.kids) {
-    if (use.name !== 'using') continue;
+  for (const use of pkg.kids.filter((x) => x.name === 'using')) {
+    // TODO: implement use statement checks
+    // if (findPackageDefinitions(ctx, use.props.name).length === 0) {
+    //   throw new Error('could not find package: ' + use.props.name); // TODO: fix this error message
+    // }
+
     usings.push(use.props.name);
   }
   return makeAddressScope(usings.reverse());
@@ -2750,13 +2748,23 @@ function getSize(ctx, type) {
 
 // ctx start  ================================================================= {
 
-const makeContext = (structs, funcSigs, consts, funcAsmNames, unitPaths) => ({
+const makeContext = (
+  packages,
+  structs,
+  funcSigs,
+  consts,
+  funcAsmNames,
+  unitPaths
+) => ({
+  packages,
   structs,
   funcSigs,
   consts,
   funcAsmNames,
   unitPaths,
 });
+
+const makePackage = (path, name) => ({ path, name });
 
 const makeFuncSig = (unitPath, packageAddress, name, params) => ({
   unitPath,
@@ -2770,7 +2778,7 @@ const makeConst = (unitPath, packageAddress, simpleName, fullName, type) => ({
   packageAddress,
   simpleName,
   fullName,
-  type
+  type,
 });
 
 const makeFuncSigParam = (type, name) => ({ type, name });
@@ -2802,14 +2810,21 @@ function findStruct(ctx, addressScope, name) {
 }
 
 function findConst(ctx, addressScope, symbol) {
-  let r = ctx.consts.find((x) => x.fullName === symbol);
-  if (r) return r;
-  for (const using of addressScope.usings) {
-    let fullName = using + '/' + symbol;
-    let r = ctx.consts.find((x) => x.fullName === fullName);
-    if (r) return r;
+  let parts = symbol.split(/\/(?=[^\/]*$)/);
+  if (parts.length === 1) {
+    let currPkgAddr = addressScope.usings[addressScope.usings.length - 1];
+    parts = [addrSimpleName(currPkgAddr), parts[0]];
   }
-  return undefined;
+  let addrSimp = parts[0];
+  let symbolSimp = parts[1];
+  let addressString = resolveAddress(addressScope, addrSimp);
+  if (!addressString) addressString = addrSimp;
+  let fullName = addressString + '/' + symbolSimp;
+  return ctx.consts.find((x) => x.fullName === fullName);
+}
+
+function findPackageDefinitions(ctx, name) {
+  return ctx.packages.filter((x) => x.name === name);
 }
 
 function findFuncSig(ctx, asmName) {
@@ -2838,13 +2853,15 @@ function getType(ctx, addressScope, typeNode) {
 }
 
 export function doMakeContext() {
-  return makeContext([], [], [], [], []);
+  return makeContext([], [], [], [], [], []);
 }
 
 export function addToContext(ctx, path, src) {
   ctx.unitPaths.push(path);
 
   let tree = parseFile(path, src);
+
+  loadPackages(ctx, path, src, tree);
 
   loadStructTypes(ctx, path, src, tree);
   loadStructMemberTypes(ctx, path, src, tree);
@@ -2855,9 +2872,15 @@ export function addToContext(ctx, path, src) {
   loadConsts(ctx, path, src, tree);
 }
 
+function loadPackages(ctx, path, src, tree) {
+  for (const pkg of tree.kids.filter((x) => x.name === 'package')) {
+    ctx.packages.push(makePackage(path, pkg.props.name));
+  }
+}
+
 function loadConsts(ctx, path, src, tree) {
   for (const pkg of tree.kids.filter((x) => x.name === 'package')) {
-    let addressScope = buildAddressScope(pkg);
+    let addressScope = buildAddressScope(ctx, pkg);
     for (const nodeConst of pkg.kids.filter((x) => x.name === 'const')) {
       let type = getType(ctx, addressScope, nodeConst.kids[0]);
       _ass(type);
@@ -2888,7 +2911,7 @@ function loadStructMemberTypes(ctx, path, src, tree) {
   for (const pkg of tree.kids) {
     if (pkg.name !== 'package') continue;
 
-    let addressScope = buildAddressScope(pkg);
+    let addressScope = buildAddressScope(ctx, pkg);
 
     for (const nodeStruct of pkg.kids) {
       if (nodeStruct.name !== 'struct') continue;
@@ -2945,7 +2968,7 @@ function loadFuncSigs(ctx, path, src, tree) {
   for (const pkg of tree.kids) {
     if (pkg.name !== 'package') continue;
 
-    let addressScope = buildAddressScope(pkg);
+    let addressScope = buildAddressScope(ctx, pkg);
 
     for (const func of pkg.kids) {
       if (func.name !== 'func') continue;
