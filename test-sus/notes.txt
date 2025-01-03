@@ -31,6 +31,10 @@ ISSUES
     - parser: inconsistant parsing naming and use of tryParse etc, always using eatSpace ...
     - compiler: compiler state should be used more, not addressScope, scope etc.
   - unmet requirements
+    - only allow usage of sym after init
+    - error messages for util functions
+    - use statement checks
+    - naming checks: functions, consts etc.
     - create byte arrays for strings.
     - assign single bytes in byte arrays.
     - make "safe" type conversion possible
@@ -43,7 +47,8 @@ ISSUES
     - conflict for constructors accessed using full path and divisions between symbols
 
 MISSING
-  - compiletime-sized arrays
+  - calling conventions
+  - compile-time-sized arrays
   - compiler-impl.sus
     - String expression syntax sugar
     - Alloc implementation
@@ -71,39 +76,51 @@ NOTES FOR NEVER
 
 NOTES FOR FEATURES NOW
 
-struct Test (
-  func[] run;
-  func[(PTR[PTR[int8]] name)] getName;
-);
+  Return
+    func add(int32 a, int32 b) {
+      done;
+    }
 
-func runFunc() {
+    func int32 add(int32 a, int32 b) {
+      done a + b;
+    }
 
-}
+  Calling conventions
+    func CON(stdcall) int32 add(int32 a, int32 b) {
+      done a + b;
+    }
 
-main {
-  PTR[int8] theString = STR"fuck you.";
-  Test t = Test(run = runFunc, getName = func(PTR[PTR[int8]] name) cap (theString) {
-    DRF(name) = theString;
-  });
-}
+  Declarations for external code
+    func CON(stdcall) int32 add(int32 a, int32 b) EXT;
 
--> if params need to be able to be captured
-  -> func type info at compile time
-    - signature
-    - asm name
-  -> func type info at runtime
-    - function pointer
-    - captured size
-    - captured parameter values
-  -> how to compile lambda expression definition?
-    - compile anonymus function
-    - takes captured parameters
-    - takes function parameters
-  -> how to compile func type call
-    - push actual arguments
-    - push captured arguments
-    - call function
-    - pop arguments
+  Function pointers and lambdas
+
+    struct Test (
+      func[] run;
+      func[(PTR[PTR[int8]] name)] getName;
+    );
+
+    func runFunc() {
+
+    }
+
+    -> if params need to be able to be captured
+      -> func type info at compile time
+        - signature
+        - asm name
+      -> func type info at runtime
+        - function pointer
+        - captured size
+        - captured parameter values
+      -> how to compile lambda expression definition?
+        - compile anonymus function
+        - takes captured parameters
+        - takes function parameters
+      -> how to compile func type call
+        - push actual arguments
+        - push captured arguments
+        - call function
+        - pop arguments
 
 
 

@@ -51,8 +51,9 @@ function parse(state) {
   const makeNodeStruct = (name) => makeNode('struct', { name }, []);
   const makeNodeConst = (name) => makeNode('const', { name }, []); // type, expr
   const makeNodeMember = (name) => makeNode('member', { name }, []);
-  const makeNodeFunc = (name) => makeNode('func', { name }, []);
-  const makeNodeListParam = (_) => makeNode('list-param', undefined, []);
+  const makeNodeFunc = (name, convention, external) =>
+    makeNode('func', { name, convention, external }, []); // list-param, list-ins
+  const makeNodeListParam = (_) => makeNode('list-param', undefined, []); // param...
   const makeNodeParam = (name) => makeNode('param', { name }, []);
   const makeNodeListInst = (_) => makeNode('list-inst', undefined, []);
   const makeNodeInsAsm = (_) => makeNode('ins-asm', undefined, []);
@@ -60,7 +61,7 @@ function parse(state) {
   const makeNodeAsmPart = (partType, value) =>
     makeNode('asm-part', { partType, value }); // partType: asm/sus
   const makeNodeInstBlock = () => makeNode('ins-block', undefined, []); // kids: list-inst
-  const makeNodeInsDone = (_) => makeNode('ins-done');
+  const makeNodeInsDone = (_) => makeNode('ins-done', undefined, []); // expr
   const makeNodeInsBreak = (levels) => makeNode('ins-break', { levels });
   const makeNodeInsSym = (name) => makeNode('ins-sym', { name }, []);
   const makeNodeInsAssign = (_) => makeNode('ins-ass', {}, []);
@@ -86,8 +87,9 @@ function parse(state) {
   const makeNodeExprRtp = () => makeNode('expr-reinterpret', null, []); // kids: type, expression
   const makeNodeExprSize = () => makeNode('expr-siz', null, []); // kids: type, expression
   const makeNodeType = (type) => makeNode('type', { type }, []);
-  const makeNodeInsCall = (name) => makeNode('ins-call', { name }, []);
+  const makeNodeInsCall = () => makeNode('ins-call', undefined, []); // expr-call
   const makeNodeArgument = (name) => makeNode('arg', { name }, []);
+  const makeNodeExprCall = (name) => makeNode('expr-call', { name }, []);
 
   // parser helper functions
 
@@ -142,6 +144,7 @@ function parse(state) {
 
   // adds node to current node and calls sup-parser if defined with current node as added node
   function append(node, subParser) {
+    _ass(node);
     state.n.kids.push(node);
 
     // call sup-parse if given
@@ -466,41 +469,17 @@ function parse(state) {
 
   function tryParseInstCall() {
     return tryParse((_) => {
-      let name = eatAddressName();
-      if (!name) return;
+      let node = makeNodeInsCall();
+
+      let callExpr = doParseNodeExprCall();
+      if (!callExpr) return;
+
+      node.kids.push(callExpr);
+      if (!eat(/^;/)) return;
+
       eatEmpty();
 
-      if (!eat(/^\(/)) return;
-      eatEmpty();
-
-      append(makeNodeInsCall(name), (_) => {
-        let first = true;
-        while (!eat(/^\)/)) {
-          if (eof()) throw err('unexpected eof');
-
-          if (!first) {
-            eatPicky(',');
-            eatEmpty();
-          }
-          first = false;
-
-          let symbol = eatSymbol();
-          eatEmpty();
-
-          eatPicky(':');
-          eatEmpty();
-
-          append(makeNodeArgument(symbol), (_) => {
-            append(parseNodeExpr());
-          });
-        }
-
-        eatEmpty();
-        eatPicky(';');
-        eatEmpty();
-      });
-      eatEmpty();
-
+      append(node);
       return true;
     });
   }
@@ -763,6 +742,7 @@ function parse(state) {
 
         return ctr;
       },
+      doParseNodeExprCall,
       (_) => {
         let val = eatLitBoo();
         if (!val) return undefined;
@@ -784,6 +764,43 @@ function parse(state) {
     );
   }
 
+  function doParseNodeExprCall() {
+    let funcName = eatAddressName();
+    if (!funcName) return;
+    eatEmpty();
+
+    if (!eat(/^\(/)) return;
+    eatEmpty();
+
+    let nodeCall = makeNodeExprCall(funcName);
+
+    let first = true;
+    while (!eat(/^\)/)) {
+      if (eof()) throw err('unexpected eof');
+
+      if (!first) {
+        eatPicky(',');
+        eatEmpty();
+      }
+      first = false;
+
+      let symbol = eatSymbol();
+      eatEmpty();
+
+      if (!eat(/^:/)) return;
+      eatEmpty();
+
+      let arg = makeNodeArgument(symbol);
+      let expr = tryParseNodeExpr();
+      if (!expr) return;
+      arg.kids.push(expr);
+      nodeCall.kids.push(arg);
+    }
+    eatEmpty();
+
+    return nodeCall;
+  }
+
   // note: takes var-arg list of functions. first function to succeed in parsing
   // returns its value, on failure to parse undefined is returned.
   function tryParse() {
@@ -800,9 +817,14 @@ function parse(state) {
     return tryParse(() => {
       if (!eat(/^done/)) return;
       eatEmpty();
+
+      append(makeNodeInsDone(), () => {
+        let expr = tryParseNodeExpr();
+        if (expr) append(expr);
+      });
+
       if (!eat(/^;/)) return;
       eatEmpty();
-      append(makeNodeInsDone());
       return true;
     });
   }
@@ -883,10 +905,45 @@ function parse(state) {
     eatPicky('func ');
     eatEmpty();
 
-    let name = eatFuncName();
-    eatEmpty();
+    let convention;
+    if (eat(/^CON/)) {
+      eatEmpty();
+      eatPicky('(');
+      eatEmpty();
 
-    append(makeNodeFunc(name), (_) => {
+      convention = eatSymbol();
+      eatEmpty();
+
+      eatPicky(')');
+      eatEmpty();
+    }
+
+    let type;
+    let name;
+
+    tryParse(
+      () => {
+        type = tryParseNodeType();
+        if (!type) return;
+
+        name = eatFuncName();
+        eatEmpty();
+        if (!name) {
+          type = undefined;
+          return;
+        }
+
+        return true;
+      },
+      () => {
+        name = eatFuncName();
+        eatEmpty();
+        return true;
+      }
+    );
+
+    let n = makeNodeFunc(expect(name, 'function name'), convention, false);
+    append(n, (_) => {
       eatPicky('(');
       eatEmpty();
 
@@ -914,13 +971,29 @@ function parse(state) {
       eatPicky(')');
       eatEmpty();
 
-      eatPicky('{');
-      eatEmpty();
+      // body / ext
+      tryParse(
+        () => {
+          if (!eat(/^\{/)) return;
+          eatEmpty();
+          parseListInst();
+          eatPicky('}');
+          eatEmpty();
 
-      parseListInst();
+          return true;
+        },
+        () => {
+          eatPicky('EXT');
+          eatEmpty();
+          eatPicky(';');
+          eatEmpty();
+          state.n.props.external = true;
+          _ass(state.n.props.external);
+          return true;
+        }
+      );
 
-      eatPicky('}');
-      eatEmpty();
+      if (type) append(type);
     });
   }
 
@@ -1009,9 +1082,9 @@ function compile(state) {
 
   let currentIndent = 0;
 
-  function indented(compileFunc) {
+  function indented(f) {
     currentIndent++;
-    compileFunc();
+    f();
     currentIndent--;
   }
 
@@ -1042,6 +1115,7 @@ function compile(state) {
   // ebp +4   = base pointer of last scope
   // ebp +8   = return address
   // ebp +8+n = first param of scope where n is size of param (params are rtl)
+  // ebp +8+n = return value of scope where n is size of all params
   // ...
   //
   // also: in functions the caller does the stack cleanup.
@@ -1053,10 +1127,11 @@ function compile(state) {
     off,
     size,
   }); // symbol: name, type: node, off: ebp off bytes.  size: bytes
-  const makeScope = (endAsmName, parent, symTable) => ({
+  const makeScope = (endAsmName, parent, symTable, returnType) => ({
     endAsmName,
     parent,
     symTable,
+    returnType,
   });
   const makeSymTableLoc = (scopes, row) => ({ scopes, row });
 
@@ -1076,8 +1151,15 @@ function compile(state) {
     return getSize(state.ctx, type);
   }
 
-  function createScope(addressScope, endAsmName, listParam, listIns, parent) {
-    let scope = makeScope(endAsmName, parent, makeSymTable([], 0));
+  function createScope(
+    addressScope,
+    endAsmName,
+    listParam,
+    listIns,
+    parent,
+    returnType
+  ) {
+    let scope = makeScope(endAsmName, parent, makeSymTable([], 0), returnType);
 
     let table = scope.symTable;
 
@@ -1120,20 +1202,9 @@ function compile(state) {
 
   // FUNCTIONS ============================
 
-  function getFuncAsmName(addressName, paramNames, addressScope) {
-    let nameParts = addressName.split(/\/(?=[^\/]*$)/);
-    if (nameParts.length === 1) {
-      let basePackageAddress =
-        addressScope.usings[addressScope.usings.length - 1];
-      nameParts = [addrSimpleName(basePackageAddress), nameParts[0]];
-    }
-    let addressSimpleName = nameParts[0];
-    let simpleFuncName = nameParts[1];
-    let addressString = resolveAddress(addressScope, addressSimpleName);
-    if (!addressString) addressString = addressSimpleName;
-    let asmName = getFuncSigAsmName(addressString, simpleFuncName, paramNames);
-    if (!state.ctx.funcAsmNames.includes(asmName)) return undefined; // throw makeImplErr("unable to find function " + addressName);
-    return asmName;
+  function resolveFuncSig(symbol, paramNames, addressScope) {
+    let pkgSym = resolvePkgSym(state.ctx, addressScope, symbol);
+    return findFunc(state.ctx, pkgSym.packageAddress, pkgSym.name, paramNames);
   }
 
   // /
@@ -1232,12 +1303,6 @@ function compile(state) {
     //}
   }
 
-  // function evalType(expr, scope, addressScope) {
-  //   let type = evalTypeTesting(expr, scope, addressScope);
-  //   _ass(type.kind);
-  //   return type;
-  // }
-
   function evalType(exprParam, scope, addressScope) {
     let expr = exprParam.name === 'expr' ? exprParam.kids[0] : exprParam;
 
@@ -1322,7 +1387,7 @@ function compile(state) {
       if (loc) type = loc.row.type;
 
       if (!type) {
-        let const_ = findConst(state.ctx, addressScope, symbol);
+        let const_ = resolveConst(state.ctx, addressScope, symbol);
         if (const_) type = const_.type;
       }
 
@@ -1330,8 +1395,19 @@ function compile(state) {
 
       return type;
     } else if (expr.name === 'expr-ctr') {
-      let row = findStruct(state.ctx, addressScope, expr.props.name);
+      let row = resolveStruct(state.ctx, addressScope, expr.props.name);
+      if (!row)
+        throw makeErr(expr.i, 'could not resolve struct ' + expr.props.name);
       return row.type;
+    } else if (expr.name === 'expr-call') {
+      let args = expr.kids.filter((x) => x.name === 'arg');
+      let paramNames = args.map((x) => x.props.name).sort();
+      let sig = resolveFuncSig(expr.props.name, paramNames, addressScope);
+      if (!sig)
+        throw makeErr(expr.i, 'could not find function ' + expr.props.name);
+      if (sig.returnType === undefined)
+        throw makeErr(expr.i, 'function does not have return type');
+      return sig.returnType;
     } else if (expr.name === 'expr-arr') {
       let type = getActualType(
         expr.kids.find((x) => x.name === 'type'),
@@ -1425,7 +1501,6 @@ function compile(state) {
     let expectedType = getActualType(nodeConst.kids[0], addressScope);
     let expr = nodeConst.kids[1];
 
-    // TODO: make-over scopes.
     checkType(expr, null, addressScope, expectedType);
 
     let asmName = getConstAsmName(
@@ -1473,7 +1548,7 @@ function compile(state) {
     let r = '';
     r += line('; ctr ' + expr.props.name);
 
-    let structRow = findStruct(state.ctx, addressScope, expr.props.name);
+    let structRow = resolveStruct(state.ctx, addressScope, expr.props.name);
     if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + expr.props.name);
 
     let inits = expr.kids.filter((x) => x.name === 'member-init');
@@ -1558,7 +1633,14 @@ function compile(state) {
         );
         asm += compileScope(
           listIns,
-          createScope(addressScope, endAsmName, undefined, listIns),
+          createScope(
+            addressScope,
+            endAsmName,
+            undefined,
+            listIns,
+            undefined,
+            undefined
+          ),
           addressScope
         );
         asm += line(`; } main block at ${getLoc(listIns.i).padEnd(35, ' ')} `);
@@ -1581,36 +1663,85 @@ function compile(state) {
       let addressScope = buildAddressScope(state.ctx, pkg);
 
       for (const func of pkg.kids.filter((x) => x.name === 'func')) {
-        r += compileFunc(func, addressScope);
+        if (func.props.external) {
+          r += compileExtFunc(func, addressScope);
+        } else {
+          r += compileFunc(func, addressScope);
+        }
       }
     }
     return r;
   }
 
-  function compileFunc(func, addressScope) {
-    let asm = '';
-    let currentAddress = addressScope.usings[addressScope.usings.length - 1];
+  function compileExtFunc(func, addressScope) {
+    let r = '';
+
+    let simpleName = func.props.name;
+    let packageAddress = getCurrentPkg(addressScope);
     let paramNames = func.kids[0].kids.map((x) => x.props.name);
-    let asmName = getFuncSigAsmName(
-      currentAddress,
-      func.props.name,
-      paramNames
+    let sig = findFunc(state.ctx, packageAddress, simpleName, paramNames);
+    let asmName = sig.asmName;
+
+    r += line(
+      `;   external func at ${(getLoc(func.i) + '   ').padEnd(35, '=')}`,
+      0
     );
+    r += line('extern  ' + asmName, 0);
+
+    return r;
+  }
+
+  function compileFunc(nodeFunc, addressScope) {
+    let simpleName = nodeFunc.props.name;
+    let packageAddress = getCurrentPkg(addressScope);
+    let paramNames = nodeFunc.kids[0].kids.map((x) => x.props.name);
+    let sig = findFunc(state.ctx, packageAddress, simpleName, paramNames);
+
+    if (sig.convention === 'stdcall') {
+      return '; TODO';
+    } else if (sig.convention === undefined || sig.convention === 'sus') {
+      return compileFuncSus(nodeFunc, sig, addressScope);
+    } else {
+      throw makeErr(
+        nodeFunc.i,
+        'unknown calling convention: ' + sig.convention
+      );
+    }
+  }
+
+  function compileFuncSus(nodeFunc, sig, addressScope) {
+    let listIns = nodeFunc.kids.find((x) => x.name === 'list-inst');
+    let listParam = nodeFunc.kids.find((x) => x.name === 'list-param');
+
+    let asmName = sig.asmName;
     let asmNameEnd = asmName + '@end';
-    asm += line(`;   func at ${(getLoc(func.i) + '   ').padEnd(35, '=')} {`, 0);
-    asm += line('global  ' + asmName, 0);
-    asm += line(asmName + ':', 0);
-    let listIns = func.kids.find((x) => x.name === 'list-inst');
-    let listParam = func.kids.find((x) => x.name === 'list-param');
-    asm += compileScope(
+
+    let r = '';
+    r += line(
+      `;   func at ${(getLoc(nodeFunc.i) + '   ').padEnd(35, '=')} {`,
+      0
+    );
+    r += line('global  ' + asmName, 0);
+    r += line(asmName + ':', 0);
+
+    r += compileScope(
       listIns,
-      createScope(addressScope, asmNameEnd, listParam, listIns),
+      createScope(
+        addressScope,
+        asmNameEnd,
+        listParam,
+        listIns,
+        undefined,
+        sig.returnType
+      ),
       addressScope
     );
-    asm += line(`ret`);
-    asm += line(`; } func at ${getLoc(func.i).padEnd(35, ' ')} `, 0);
-    asm += line();
-    return asm;
+
+    r += line(`ret`);
+    r += line(`; } func at ${getLoc(nodeFunc.i).padEnd(35, ' ')} `, 0);
+    r += line();
+
+    return r;
   }
 
   function compileScope(listIns, scope, addressScope) {
@@ -1624,6 +1755,11 @@ function compile(state) {
 
     for (const ins of listIns.kids) {
       r += compileIns(ins, scope, addressScope);
+    }
+    if (scope.returnType) {
+      if (listIns.kids.length === 0) throw makeErr(listIns.i, 'no done statement');
+      let last = listIns.kids[listIns.kids.length - 1];
+      if (last.name !== 'ins-done') throw makeErr(last.i, 'no done statement');
     }
 
     r += line(scope.endAsmName + ':', 0);
@@ -1785,7 +1921,14 @@ function compile(state) {
       () =>
         (r += compileScope(
           listIns,
-          createScope(addressScope, asmNameBlockEnd, undefined, listIns, scope)
+          createScope(
+            addressScope,
+            asmNameBlockEnd,
+            undefined,
+            listIns,
+            scope,
+            undefined
+          )
         ))
     );
     r += line(`; } bloc at ${getLoc(block.i).padEnd(35, ' ')} `, 0);
@@ -1938,7 +2081,6 @@ function compile(state) {
   function compileInsSym(ins, scope, addressScope) {
     let r = '';
 
-    // todo: only allow usage of sym after this.
     let expr = ins.kids.find((x) => x.name === 'expr');
     let type = getActualType(
       ins.kids.find((x) => x.name === 'type'),
@@ -2005,58 +2147,21 @@ function compile(state) {
   }
 
   function compileInsCall(ins, scope, addressScope) {
+    let expr = ins.kids[0];
+
     let r = '';
 
-    r += line('; call');
-
-    let args = ins.kids.filter((x) => x.name === 'arg');
-
+    let args = expr.kids.filter((x) => x.name === 'arg');
     let paramNames = args.map((x) => x.props.name).sort();
+    let symbol = expr.props.name;
 
-    let callName = ins.props.name;
-    let asmName = getFuncAsmName(callName, paramNames, addressScope);
-    if (!asmName) throw makeErr(ins.i, 'unknown function: ' + callName);
+    let sig = resolveFuncSig(symbol, paramNames, addressScope);
+    if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol);
 
-    let sig = findFuncSig(state.ctx, asmName);
-    if (!sig)
-      throw makeErr(
-        ins.i,
-        'could find asm name but not function name? for ' + callName
-      );
+    if (sig.returnType !== undefined)
+      throw makeErr(expr.i, 'function has return type: ' + symbol);
 
-    let params = sig.params;
-
-    if (params.length < args.length)
-      throw makeErr(ins.i, 'to many arguments for ' + func.props.name);
-
-    let size = 0;
-    for (const param of [...params].reverse()) {
-      let arg = args.find((x) => x.props.name == param.name);
-      if (!arg)
-        throw makeErr(ins.i, 'can not find argument for param ' + param.name);
-
-      let expr = arg.kids.find((x) => x.name === 'expr');
-      let type = param.type;
-      _ass(type); // TODO: REMOVE
-
-      checkType(expr, scope, addressScope, type);
-
-      size += evalSize(type);
-
-      r += compileExpr(expr, scope, addressScope);
-    }
-
-    if (state.name !== sig.unitPath && !tableExternals.includes(asmName)) {
-      tableExternals.push(asmName);
-    }
-
-    r += line('call    ' + asmName);
-
-    if (size > 0) {
-      r += line(`add     esp, ${size}`);
-    }
-
-    r += line();
+    r += compileExprCall(expr, scope, addressScope);
 
     return r;
   }
@@ -2125,6 +2230,8 @@ function compile(state) {
       asm += compileExprArr(expr, scope, addressScope);
     } else if (expr.name === 'expr-ctr') {
       asm += compileExprCtr(expr, scope, addressScope);
+    } else if (expr.name === 'expr-call') {
+      asm += compileExprCall(expr, scope, addressScope);
     } else if (expr.name === 'expr-ref') {
       asm += compileExprRef(expr, scope, addressScope);
     } else if (expr.name === 'expr-brackets') {
@@ -2137,6 +2244,69 @@ function compile(state) {
       throw makeImplErr('unknown expression ' + expr.name);
     }
     return asm;
+  }
+
+  function compileExprCall(expr, scope, addressScope) {
+    let nodeArgs = expr.kids.filter((x) => x.name === 'arg');
+    let paramNames = nodeArgs.map((x) => x.props.name).sort();
+    let symbol = expr.props.name;
+
+    let sig = resolveFuncSig(symbol, paramNames, addressScope);
+    if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol);
+    let asmName = sig.asmName;
+
+    if (state.name !== sig.unitPath && !tableExternals.includes(asmName)) {
+      tableExternals.push(asmName);
+    }
+
+    let r = '';
+
+    if (sig.convention === undefined || sig.convention === 'sus') {
+      r += compileExprCallSus(expr, scope, addressScope, sig, nodeArgs);
+    } else if (sig.convention === 'stdcall') {
+      // r += line('; TODO: stdcall');
+      throw makeImplErr('call stdcall function');
+    }
+
+    return r;
+  }
+
+  function compileExprCallSus(expr, scope, addressScope, sig, nodeArgs) {
+    let params = sig.params;
+
+    let r = '';
+
+    r += line('; call expression');
+
+    if (params.length < nodeArgs.length)
+      throw makeErr(expr.i, 'to many arguments for ' + func.props.name);
+
+    // reserve return value
+    // let returnType = sig.returnType;
+    // if (returnType) {
+    //   let returnTypeSize = evalSizeAligned(returnType);
+    //   r += line(`sub     esp, ${returnTypeSize}`);
+    // }
+
+    // push arguments
+    let sizeArgs = 0;
+    for (const param of [...params].reverse()) {
+      let arg = nodeArgs.find((x) => x.props.name == param.name);
+      if (!arg)
+        throw makeErr(expr.i, 'can not find argument for param ' + param.name);
+      let expr = arg.kids.find((x) => x.name === 'expr');
+      checkType(expr, scope, addressScope, param.type);
+      sizeArgs += evalSize(param.type);
+      r += compileExpr(expr, scope, addressScope);
+    }
+
+    r += line('call    ' + sig.asmName);
+
+    if (sizeArgs > 0) r += line(`add     esp, ${sizeArgs}`);
+
+    r += line();
+
+    return r;
   }
 
   function compileExprReinterpret(expr, scope, addressScope) {
@@ -2189,7 +2359,7 @@ function compile(state) {
         let off = row.off + chain.off;
         r += compilePush(symRes.register, off, memberSizeBytes);
       } else {
-        let const_ = findConst(state.ctx, addressScope, symbol);
+        let const_ = resolveConst(state.ctx, addressScope, symbol);
         if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
 
         let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
@@ -2296,7 +2466,7 @@ function compile(state) {
         r += line(`lea     eax, [${symRes.register}${getOffStr(off)}] ${c}`);
         r += line(`push    eax`);
       } else {
-        let const_ = findConst(state.ctx, addressScope, symbol);
+        let const_ = resolveConst(state.ctx, addressScope, symbol);
         if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
         let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
         _ass(asmName);
@@ -2344,7 +2514,7 @@ function compile(state) {
       );
       r += line(`push    eax`);
     } else {
-      let const_ = findConst(state.ctx, addressScope, symbol);
+      let const_ = resolveConst(state.ctx, addressScope, symbol);
       if (!const_) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
 
       let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
@@ -2365,7 +2535,7 @@ function compile(state) {
 
     r += line('; ctr ' + expr.props.name);
 
-    let structRow = findStruct(state.ctx, addressScope, expr.props.name);
+    let structRow = resolveStruct(state.ctx, addressScope, expr.props.name);
     if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + expr.props.name);
 
     let inits = expr.kids.filter((x) => x.name === 'member-init');
@@ -2554,7 +2724,7 @@ function compile(state) {
         _ass(false);
       }
     } else {
-      let const_ = findConst(state.ctx, addressScope, symbol);
+      let const_ = resolveConst(state.ctx, addressScope, symbol);
       if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
 
       let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
@@ -2650,15 +2820,14 @@ function makeAddressScope(usings) {
   return { usings };
 }
 
+function getCurrentPkg(addressScope) {
+  return addressScope.usings[addressScope.usings.length - 1];
+}
+
 function buildAddressScope(ctx, pkg) {
   let usings = [];
   usings.push(pkg.props.name);
   for (const use of pkg.kids.filter((x) => x.name === 'using')) {
-    // TODO: implement use statement checks
-    // if (findPackageDefinitions(ctx, use.props.name).length === 0) {
-    //   throw new Error('could not find package: ' + use.props.name); // TODO: fix this error message
-    // }
-
     usings.push(use.props.name);
   }
   return makeAddressScope(usings.reverse());
@@ -2748,29 +2917,32 @@ function getSize(ctx, type) {
 
 // ctx start  ================================================================= {
 
-const makeContext = (
+const makeContext = (packages, structs, funcSigs, consts, unitPaths) => ({
   packages,
   structs,
   funcSigs,
   consts,
-  funcAsmNames,
-  unitPaths
-) => ({
-  packages,
-  structs,
-  funcSigs,
-  consts,
-  funcAsmNames,
   unitPaths,
 });
 
 const makePackage = (path, name) => ({ path, name });
 
-const makeFuncSig = (unitPath, packageAddress, name, params) => ({
+const makeFuncSig = (
   unitPath,
   packageAddress,
   name,
   params,
+  asmName,
+  convention,
+  returnType
+) => ({
+  unitPath,
+  packageAddress,
+  name,
+  params,
+  asmName,
+  convention,
+  returnType,
 });
 
 const makeConst = (unitPath, packageAddress, simpleName, fullName, type) => ({
@@ -2797,7 +2969,7 @@ function findStructByAddress(ctx, fullName) {
   return ctx.structs.find((x) => x.name === fullName);
 }
 
-function findStruct(ctx, addressScope, name) {
+function resolveStruct(ctx, addressScope, name) {
   let struct = ctx.structs.find((x) => x.name === name);
   if (struct) return struct;
 
@@ -2809,8 +2981,23 @@ function findStruct(ctx, addressScope, name) {
   return undefined;
 }
 
-function findConst(ctx, addressScope, symbol) {
-  let parts = symbol.split(/\/(?=[^\/]*$)/);
+// example resolves:
+//   package test/Test {}
+//
+//   package Main {
+//     use test/Test; # Using statements need full package name
+//       ...
+//       Test/someFunction();     # -> fullName = test/Test/someFunction
+//       int32 c = SOME_CONST;    # -> fullName = Main/SOME_CONST
+//       ...
+//   }
+
+function makePkgSym(packageAddress, name, fullName) {
+  return { packageAddress, name, fullName };
+}
+
+function resolvePkgSym(ctx, addressScope, address) {
+  let parts = address.split(/\/(?=[^\/]*$)/);
   if (parts.length === 1) {
     let currPkgAddr = addressScope.usings[addressScope.usings.length - 1];
     parts = [addrSimpleName(currPkgAddr), parts[0]];
@@ -2820,17 +3007,26 @@ function findConst(ctx, addressScope, symbol) {
   let addressString = resolveAddress(addressScope, addrSimp);
   if (!addressString) addressString = addrSimp;
   let fullName = addressString + '/' + symbolSimp;
-  return ctx.consts.find((x) => x.fullName === fullName);
+  return makePkgSym(addressString, symbolSimp, fullName);
+}
+
+function resolveConst(ctx, addressScope, symbol) {
+  let pkgSym = resolvePkgSym(ctx, addressScope, symbol);
+  return ctx.consts.find((x) => x.fullName === pkgSym.fullName);
 }
 
 function findPackageDefinitions(ctx, name) {
   return ctx.packages.filter((x) => x.name === name);
 }
 
-function findFuncSig(ctx, asmName) {
-  let nameIdx = ctx.funcAsmNames.indexOf(asmName);
-  if (nameIdx === -1) return undefined;
-  return ctx.funcSigs[nameIdx];
+function findFunc(ctx, packageAddress, simpleName, paramNames) {
+  return ctx.funcSigs.find(
+    (x) =>
+      x.packageAddress === packageAddress &&
+      x.name === simpleName &&
+      x.params.length === paramNames.length &&
+      x.params.map((x) => x.name).every((n) => paramNames.includes(n))
+  );
 }
 
 function getType(ctx, addressScope, typeNode) {
@@ -2840,9 +3036,9 @@ function getType(ctx, addressScope, typeNode) {
     type.args = type.args.map(resolveType);
 
     if (type.kind === 'named') {
-      let struct = findStruct(ctx, addressScope, type.anyName);
+      let struct = resolveStruct(ctx, addressScope, type.anyName);
       if (!struct)
-        throw new Error('could not find struct of name ' + type.anyName); // TODO: fix this error message
+        throw new Error('could not find struct of name ' + type.anyName);
       return struct.type;
     }
 
@@ -2853,7 +3049,7 @@ function getType(ctx, addressScope, typeNode) {
 }
 
 export function doMakeContext() {
-  return makeContext([], [], [], [], [], []);
+  return makeContext([], [], [], [], []);
 }
 
 export function addToContext(ctx, path, src) {
@@ -2925,7 +3121,7 @@ function loadStructMemberTypes(ctx, path, src, tree) {
         let type = member.kids[0].props.type;
         _ass(type);
         if (type.kind === 'named') {
-          let memberStruct = findStruct(ctx, addressScope, type.anyName);
+          let memberStruct = resolveStruct(ctx, addressScope, type.anyName);
           if (!memberStruct)
             throw new Error('could not find struct ' + type.anyName);
           type = memberStruct.type;
@@ -2970,32 +3166,41 @@ function loadFuncSigs(ctx, path, src, tree) {
 
     let addressScope = buildAddressScope(ctx, pkg);
 
-    for (const func of pkg.kids) {
-      if (func.name !== 'func') continue;
+    for (const nodeFunc of pkg.kids) {
+      if (nodeFunc.name !== 'func') continue;
 
       let sigPar = [];
 
-      let params = func.kids[0];
+      let params = nodeFunc.kids[0];
       for (const param of params.kids) {
         let pType = getType(ctx, addressScope, param.kids[0]);
         let pName = param.props.name;
         sigPar.push(makeFuncSigParam(pType, pName));
       }
 
-      let sig = makeFuncSig(path, pkg.props.name, func.props.name, sigPar);
-      ctx.funcSigs.push(sig);
-      ctx.funcAsmNames.push(
-        getFuncSigAsmName(
-          sig.packageAddress,
-          sig.name,
-          sig.params.map((x) => x.name)
-        )
+      let nodeReturnType = nodeFunc.kids.find((x) => x.name === 'type');
+
+      let returnType =
+        nodeReturnType !== undefined
+          ? getType(ctx, addressScope, nodeReturnType)
+          : undefined;
+
+      let sig = makeFuncSig(
+        path,
+        pkg.props.name,
+        nodeFunc.props.name,
+        sigPar,
+        undefined,
+        nodeFunc.props.convention ?? 'sus',
+        returnType
       );
+      sig.asmName = getFuncAsmName(ctx, sig);
+      ctx.funcSigs.push(sig);
     }
   }
 }
 
-// asm names ===================
+// asm names =================== {
 
 // note on valid nasm names: letters, numbers, _, $, #, @, ~, ., and ?. The only characters which may be used as the first character of an identifier are letters, .
 
@@ -3004,31 +3209,41 @@ function getConstAsmName(simpleName, address) {
   return `sc_~${addressString}~${simpleName}`;
 }
 
-function getFuncSigAsmName(address, name, params) {
+function getFuncAsmName(ctx, func) {
+  if (func.convention === undefined || func.convention === 'sus') {
+    return getFuncAsmNameSussy(
+      func.packageAddress,
+      func.name,
+      func.params.map((x) => x.name)
+    );
+  } else if (func.convention === 'stdcall') {
+    return getFuncAsmNameStdcall(ctx, func);
+  } else {
+    throw new Error('unknown convention: ' + func.convention);
+  }
+}
+
+function getFuncAsmNameSussy(address, name, params) {
   let addressString = address.split('/').join('$');
   let paramString = [...params].sort().join('.');
   return `sf_~${addressString}~${name}~${paramString}`;
 }
 
+function getFuncAsmNameStdcall(ctx, func) {
+  let name = func.name;
+  let size = func.params
+    .map((p) => getSizeAligned(ctx, p.type))
+    .reduce((a, b) => a + b);
+  return `_${name}@${size}`;
+}
+
+// asm names }
+
 export function validateContext(ctx) {
   let errors = [];
 
-  validateContextFuncts(ctx, errors);
-
   if (errors.length > 0)
     throw Error('context validtion error. \n' + errors.join('\n'));
-}
-
-// ================================
-
-function validateContextFuncts(ctx, errors) {
-  for (let i = 0; i < ctx.funcAsmNames.length; i++) {
-    const a = ctx.funcAsmNames[i];
-    for (let j = 0; j < ctx.funcAsmNames.length; j++) {
-      const b = ctx.funcAsmNames[j];
-      if (a === b && i !== j) errors.push('duplicate function ' + a);
-    }
-  }
 }
 
 // ctx end    }

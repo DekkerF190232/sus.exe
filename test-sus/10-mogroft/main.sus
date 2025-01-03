@@ -7,6 +7,13 @@ package Main {
 
   main {
 
+    int32 r = add(a: 5, b: 10);
+
+    InOut/print(s: STR"added: ");
+    InOut/print(i: r);
+    InOut/printLn();
+
+    InOut/print(s: STR"const: ");
     InOut/print(i: Window/ERR_DC);
     InOut/printLn();
 
@@ -14,6 +21,10 @@ package Main {
 
     System/exit(code: 0);
     
+  }
+
+  func int32 add(int32 a, int32 b) {
+    done a + b;
   }
 
 }

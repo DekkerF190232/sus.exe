@@ -14,4 +14,17 @@ package mogroft/Window {
     PTR[int8] message
   );
 
+  struct Rect (
+    int32 left,
+    int32 top,
+    int32 right,
+    int32 bottom
+  );
+
+  struct WindowHandle (
+    int32 value
+  );
+
+  func CON(stdcall) boo GetWindowRect(WindowHandle windowHandle, Rect rect) EXT;
+
 }
