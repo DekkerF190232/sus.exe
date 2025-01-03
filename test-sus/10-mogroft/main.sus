@@ -7,7 +7,7 @@ package Main {
 
   main {
 
-    int32 r = add(a: 5, b: 10);
+    int32 r = add(a: 5, b: 10 + add(a: 2, b: 3));
 
     InOut/print(s: STR"added: ");
     InOut/print(i: r);

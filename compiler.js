@@ -1110,28 +1110,29 @@ function compile(state) {
 
   // note on offset layout:
   // ...
-  // ebp -n   = second local variable, where n is size of first local variable
-  // ebp      = first local variable
-  // ebp +4   = base pointer of last scope
-  // ebp +8   = return address
-  // ebp +8+n = first param of scope where n is size of param (params are rtl)
-  // ebp +8+n = return value of scope where n is size of all params
+  // ebp -n     = second local variable, where n is size of first local variable
+  // ebp        = first local variable
+  // ebp +4     = base pointer of last scope
+  // ebp +8     = return address
+  // ebp +8+n   = first param of scope where n is size of param (params are rtl)
+  // ebp +8+n+m = return value of scope where n is size of all params and m is the size of the return type
   // ...
   //
   // also: in functions the caller does the stack cleanup.
 
   const makeSymTable = (rows, size) => ({ rows, size }); // includes params and locals, note that params are not included in size
+  const makeReturnInfo = (type, size, off) => ({ type, size, off });
   const makeSymTableRow = (symbol, type, off, size) => ({
     symbol,
     type,
     off,
     size,
   }); // symbol: name, type: node, off: ebp off bytes.  size: bytes
-  const makeScope = (endAsmName, parent, symTable, returnType) => ({
+  const makeScope = (endAsmName, parent, symTable, returnInfo) => ({
     endAsmName,
     parent,
     symTable,
-    returnType,
+    returnInfo,
   });
   const makeSymTableLoc = (scopes, row) => ({ scopes, row });
 
@@ -1159,7 +1160,7 @@ function compile(state) {
     parent,
     returnType
   ) {
-    let scope = makeScope(endAsmName, parent, makeSymTable([], 0), returnType);
+    let scope = makeScope(endAsmName, parent, makeSymTable([], 0), undefined);
 
     let table = scope.symTable;
 
@@ -1193,6 +1194,15 @@ function compile(state) {
       table.rows.push(makeSymTableRow(name, type, symOffset, size));
       table.size += size;
       symOffset -= size;
+    }
+
+    if (returnType) {
+      let returnSize = evalSizeAligned(returnType);
+      scope.returnInfo = makeReturnInfo(
+        returnType,
+        returnSize,
+        paramOffset + returnSize
+      );
     }
 
     return scope;
@@ -1756,8 +1766,9 @@ function compile(state) {
     for (const ins of listIns.kids) {
       r += compileIns(ins, scope, addressScope);
     }
-    if (scope.returnType) {
-      if (listIns.kids.length === 0) throw makeErr(listIns.i, 'no done statement');
+    if (scope.returnInfo) {
+      if (listIns.kids.length === 0)
+        throw makeErr(listIns.i, 'no done statement');
       let last = listIns.kids[listIns.kids.length - 1];
       if (last.name !== 'ins-done') throw makeErr(last.i, 'no done statement');
     }
@@ -1795,7 +1806,7 @@ function compile(state) {
     }
   }
 
-  function compileExit(ins, scope, levels) {
+  function compileExit(ins, scope, addressScope, levels) {
     let r = '';
 
     let scopes = (function findRoot(s, scopes = []) {
@@ -1805,26 +1816,57 @@ function compile(state) {
 
     let lv = scopes.length - 1;
     if (levels) {
+      // must be exit statement
       if (levels < 1) throw makeErr(ins.i, 'break level too small');
       if (levels >= scopes.length) throw makeErr(ins.i, 'use done instead');
       lv = levels - 1;
+    }
+
+    let isFullReturn = lv === scopes.length - 1;
+    let targetScope = scopes[lv];
+
+    if (isFullReturn && targetScope.returnInfo !== undefined) {
+      let returnExpr = ins.kids.find((x) => x.name === 'expr');
+      if (!returnExpr) throw makeErr(ins.i, 'expected return expression');
+      checkType(returnExpr, scope, addressScope, targetScope.returnInfo.type);
+
+      r += line('; return expression ========= (');
+      r += compileExpr(returnExpr, scope, addressScope);
+
+      let scopeRes = resolveScopeBase(scopes);
+      r += scopeRes.asm;
+
+      r += compileCopy(
+        'esp',
+        0,
+        scopeRes.register,
+        targetScope.returnInfo.off,
+        targetScope.returnInfo.size,
+        true
+      );
+      r += line('; return expression )');
+      // r += line(`add     esp, ${rootScope.returnInfo.size}`); // left out because esp is overwritten next line
+    } else {
+      let returnExpr = ins.kids.filter((x) => x.name === 'expr');
+      if (returnExpr) throw makeErr(ins.i, 'unnecessary return expression!');
     }
 
     for (let i = 0; i < lv; i++) {
       r += line('lea     esp, [ebp + 8]');
       r += line('mov     ebp, [ebp + 4]');
     }
-    r += line(`jmp     ${scopes[lv].endAsmName}`);
+
+    r += line(`jmp     ${targetScope.endAsmName}`);
 
     return r;
   }
 
-  function compileInsBreak(ins, scope) {
-    return compileExit(ins, scope, ins.props.levels);
+  function compileInsBreak(ins, scope, addressScope) {
+    return compileExit(ins, scope, addressScope, ins.props.levels);
   }
 
-  function compileInsDone(ins, scope) {
-    return compileExit(ins, scope);
+  function compileInsDone(ins, scope, addressScope) {
+    return compileExit(ins, scope, addressScope);
   }
 
   function getAsmNameIf(insIf) {
@@ -2078,6 +2120,17 @@ function compile(state) {
     return { asm: r, register: 'edx' };
   }
 
+  function resolveScopeBase(scopes) {
+    let r = '';
+    let amount = scopes.length - 1;
+    if (amount === 0) return { asm: r, register: 'ebp' };
+    r += line(`mov     edx, [ebp + 4]`);
+    for (let i = 1; i < amount; i++) {
+      r += line(`mov     edx, [edx + 4]`);
+    }
+    return { asm: r, register: 'edx' };
+  }
+
   function compileInsSym(ins, scope, addressScope) {
     let r = '';
 
@@ -2276,17 +2329,17 @@ function compile(state) {
 
     let r = '';
 
-    r += line('; call expression');
+    r += line('; call expression ==================== (');
 
     if (params.length < nodeArgs.length)
       throw makeErr(expr.i, 'to many arguments for ' + func.props.name);
 
     // reserve return value
-    // let returnType = sig.returnType;
-    // if (returnType) {
-    //   let returnTypeSize = evalSizeAligned(returnType);
-    //   r += line(`sub     esp, ${returnTypeSize}`);
-    // }
+    let returnType = sig.returnType;
+    if (returnType) {
+      let returnTypeSize = evalSizeAligned(returnType);
+      r += line(`sub     esp, ${returnTypeSize}`);
+    }
 
     // push arguments
     let sizeArgs = 0;
@@ -2304,6 +2357,8 @@ function compile(state) {
 
     if (sizeArgs > 0) r += line(`add     esp, ${sizeArgs}`);
 
+    r += line('; call expression )');
+    
     r += line();
 
     return r;
