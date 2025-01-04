@@ -1,0 +1,21 @@
+
+package Main {
+
+  use sus/InOut;
+  use sus/System;
+  use mogroft/Window;
+
+  main {
+    test();
+    InOut/print(s: STR"DONE.\n");
+    System/exit(code: 0);
+  }
+
+  func test() {
+    int32 a = 4;
+    int32 b = 6;
+    InOut/print(i:a);
+    InOut/print(i:b);
+  }
+
+}

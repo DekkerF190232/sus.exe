@@ -1,0 +1,92 @@
+
+package Main {
+
+  use sus/InOut;
+  use sus/System;
+  use mogroft/Window;
+
+  main {
+    mainTest();
+
+    InOut/print(s: STR"DONE.\n");
+
+    System/exit(code: 0);
+  }
+
+  func mainTest() {
+    TestStruct t = new_TestStruct(a:2,b:3);
+    
+    {
+      int32 a = 255;
+      {
+        int32 b = 255;
+
+        t = new_TestStruct(a:4,b:6);
+      }
+    }
+
+    InOut/print(i:t.a);
+    InOut/print(i:t.b);
+  }
+  
+  struct TestStruct (int32 a, int32 b);
+  
+  func TestStruct new_TestStruct(int32 a, int32 b) {
+    done TestStruct(a = a, b = b);
+  }
+
+# func testRet() {
+#    InOut/print(s: STR"expecting 10 20 30, 11 22 33\n");
+#
+#    TestStruct t = new_TestStruct(a: 10, b: 20, c: 30);
+#
+#    InOut/print(i: t.a);
+#    InOut/print(s: STR" ");
+#    InOut/print(i: t.b);
+#    InOut/print(s: STR" ");
+#    InOut/print(i: t.c);
+#    InOut/printLn();
+#  }
+#
+#  struct TestStruct (int32 a, int32 b, int32 c);
+#
+#  func TestStruct new_TestStruct(int32 a, int32 b, int32 c) {
+#    InOut/print(i: a);
+#    InOut/print(s: STR" ");
+#    InOut/print(i: b);
+#    InOut/print(s: STR" ");
+#    InOut/print(i: c);
+#    InOut/print(s: STR", ");
+#
+#    done TestStruct(
+#      a = a+1,
+#      b = b+2,
+#      c = c+3);
+#  }
+#
+#  func int32 add(int32 a, int32 b) {
+#    done a + b;
+#  }
+
+  #func testRandom() {
+  #  InOut/print(s: STR"expecting 20\n");
+  #  int32 r = add(a: 5, b: 10 + add(a: 2, b: 3));
+  #  InOut/print(i: r);
+  #  InOut/printLn();
+  #
+  #  InOut/print(s: STR"(const)expecting 4:");
+  #  InOut/print(i: Window/ERR_DC);
+  #  InOut/printLn();
+  #  InOut/printLn();
+  #}
+  #
+  #func mainTest() {
+  #  InOut/print(i: testFunc1(t: 128));
+  #  InOut/printLn();
+  #}
+  #
+  #func int32 testFunc1(int32 t) {
+  #  done 256;
+  #}
+
+}

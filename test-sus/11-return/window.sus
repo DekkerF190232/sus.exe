@@ -21,6 +21,10 @@ package mogroft/Window {
     int32 bottom
   );
 
+  
+
+  # EXTERNAL
+
   struct WindowHandle (
     int32 value
   );
