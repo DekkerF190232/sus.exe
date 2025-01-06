@@ -3,17 +3,129 @@ package Main {
 
   use sus/InOut;
   use sus/System;
-  use mogroft/Window;
+  use main/test/Add;
+
+  use main/test/Return4Bytes;
+  use main/test/Return8Bytes;
+  use main/test/ReturnGt8Bytes;
 
   main {
-    test();
+    #Add/run();
+    #Return4Bytes/run();
+    #Return8Bytes/run();
+    ReturnGt8Bytes/run();
+
     InOut/print(s: STR"DONE.\n");
     System/exit(code: 0);
   }
 
-  func test() {
-    int32 a = 4;
-    int32 b = 6;
+}
+
+
+
+package main/test/Return8Bytes {
+
+  use sus/InOut;
+
+  func run() {
+    int32 _unused1 = 128;
+
+    S8 r = test8(a: 3, b: 4);
+    int32 _unused2 = 128;
+    
+    InOut/print(s: STR"expecting 46: ");
+    InOut/print(i: r.a);
+    InOut/print(i: r.b);
+    InOut/printLn();
+  }
+
+  struct S8 (
+    int32 a,
+    int32 b
+  );
+
+  func CON(stdcall) S8 test8(int32 a, int32 b) {
+    int32 _0 = 128;
+    int32 localA = a + 1;
+    int32 localB = b + 2;
+    int32 _1 = 128;
+    done S8(a = localA, b = localB);
+  }
+
+}
+
+
+
+package main/test/ReturnGt8Bytes {
+
+  use sus/InOut;
+
+  func run() {
+    S12 r = testGt8(a: 10, b: 20, c: 30);
+    
+    InOut/print(s: STR"expecting 112233: ");
+    InOut/print(i: r.a);
+    InOut/print(i: r.b);
+    InOut/print(i: r.c);
+  }
+
+  struct S12 (
+    int32 a,
+    int32 b,
+    int32 c
+  );
+
+  func CON(stdcall) S12 testGt8(int32 a, int32 b, int32 c) {
+    done S12(a = 1 + a, b = 2 + a, c = 3 + c);
+  }
+
+}
+
+
+
+package main/test/Return4Bytes {
+
+  use sus/InOut;
+
+  func run() {
+    int32 something = 1234;
+    int32 addRes = add(a: something, b: -1234 + 1);
+    
+    InOut/print(s: STR"expecting 1: ");
+    InOut/print(i: addRes);
+    InOut/printLn();
+
+    InOut/print(s: STR"expecting 1234: ");
+    InOut/print(i: something);
+    InOut/printLn();
+  }
+
+  func CON(stdcall) int32 add(int32 a, int32 b) {
+    done 123;
+  }
+
+}
+
+package main/test/Add {
+
+  use sus/InOut;
+  
+  func run() {
+    int32 t = 1234;
+    
+    testNone(addA: 1, addB:2);
+    InOut/printLn();
+
+    InOut/print(i: t);
+    InOut/printLn();
+  }
+
+  func CON(stdcall) testNone(int32 addA, int32 addB) {
+    InOut/print(s: STR"expecting 123");
+    #InOut/print(i:addA);
+    #InOut/print(i:addB);
+    int32 a = 4 + addA;
+    int32 b = 6 + addB;
     InOut/print(i:a);
     InOut/print(i:b);
   }

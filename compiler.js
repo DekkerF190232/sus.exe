@@ -1134,7 +1134,9 @@ function compile(state) {
     symTable,
     returnInfo,
     prevEBPOff,
-    prevESPOff
+    prevESPOff,
+    paramsSize,
+    convention
   ) => ({
     endAsmName,
     parent,
@@ -1142,6 +1144,8 @@ function compile(state) {
     returnInfo,
     prevEBPOff, // ebp + prevEBPOff = last scopes ebp
     prevESPOff, // ebp + prevESPOff = last scopes esp
+    paramsSize,
+    convention
   });
   const makeSymTableLoc = (scopes, row) => ({ scopes, row });
 
@@ -1174,8 +1178,10 @@ function compile(state) {
       parent,
       makeSymTable([], 0),
       undefined,
+      4,
       8,
-      4
+      0,
+      'sus'
     );
 
     let table = scope.symTable;
@@ -1192,11 +1198,12 @@ function compile(state) {
         if (findSymTableLoc(scope, name))
           throw makeErr(param.i, 'duplicate symbol: ' + name);
         paramOffset += size;
+        scope.paramsSize += size;
         table.rows.push(makeSymTableRow(name, type, paramOffset, size));
       }
     }
 
-    let symOffset = 0;
+    let symOffset = 4; // because compileScopeSus is scuffed as fuck
     for (const ins of listIns.kids) {
       if (ins.name !== 'ins-sym') continue;
       let type = getActualType(
@@ -1207,9 +1214,9 @@ function compile(state) {
       let size = evalSize(type);
       if (findSymTableLoc(scope, name))
         throw makeErr(ins.i, 'duplicate symbol: ' + name);
-      table.rows.push(makeSymTableRow(name, type, symOffset, size));
       table.size += size;
       symOffset -= size;
+      table.rows.push(makeSymTableRow(name, type, symOffset, size));
     }
 
     if (returnType) {
@@ -1754,12 +1761,14 @@ function compile(state) {
   // source, calling conventions: https://learn.microsoft.com/en-us/cpp/cpp/stdcall?view=msvc-170
   //
   //   - stack layout just after calling callee
-  //                                     [esp - 8]     = first local variable
-  //                                     [esp - 4]     = last base pointer
-  //                                     [esp + 0]     = return address
-  //                                     [esp + n]     = first argument, where n is the size of the first argument
-  //      if return type size bytes > 8  [esp + n + 4] = return structure pointer, where n is the size of all arguments
-  //      if return type size bytes > 8  [esp + n + 4] = return structure pointer, where n is the size of all arguments
+  //                                     [esp - 20]      = first local variable
+  //                                     [esp - 16]      = prev ebx
+  //                                     [esp - 12]      = prev edi
+  //                                     [esp - 8]       = prev esi
+  //                                     [esp - 4]       = last base pointer
+  //                                     [esp + 0]       = return address
+  //                                     [esp + n]       = first argument, where n is the size of the first argument
+  //      if return type size bytes > 8  [esp + n + 4]   = return structure pointer, where n is the size of all arguments
   //
   //   - location of return value
   //      if return type size bytes = 4  eax = return value
@@ -1767,10 +1776,12 @@ function compile(state) {
   //      if return type size bytes > 8  eax = pointer to returned value
   //
   //   - base pointer layout inside scope
-  //       ebp        = base pointer
+  //       ebp + 4    = last stack pointer      [ebp + 4]  = return address
   //       [ebp]      = last base pointer
-  //       ebp + 4    = last stack pointer
-  //       [ebp - 4]  = first local variable
+  //       [ebp - 4]  = prev esi
+  //       [ebp - 8]  = prev edi
+  //       [ebp - 12] = prev ebx
+  //       [ebp - 16] = first local variable
   function createScopeStd(sig, endAsmName, listIns, addressScope, parent) {
     let ebpOff = 4; // offset to get from base pointer inside scope to stack pointer just after calling
 
@@ -1780,7 +1791,9 @@ function compile(state) {
       makeSymTable([], 0),
       undefined,
       0,
-      4
+      4,
+      0,
+      'stdcall'
     );
     let table = scope.symTable;
 
@@ -1795,6 +1808,7 @@ function compile(state) {
           throw makeErr(param.i, 'duplicate symbol: ' + param.name);
         let size = evalSizeAligned(param.type);
         off += size;
+        scope.paramsSize += size;
         table.rows.push(makeSymTableRow(param.name, param.type, off, size));
       }
 
@@ -1816,11 +1830,14 @@ function compile(state) {
       let returnPointerSize = 4;
       let basePointerSize = 4;
 
+      let storedRegistersSize = 12;
+
       let off = 0;
 
       off += ebpOff;
       off -= returnPointerSize;
       off -= basePointerSize;
+      off -= storedRegistersSize;
 
       for (const nodeInsSym of listIns.kids.filter(
         (x) => x.name === 'ins-sym'
@@ -1836,6 +1853,8 @@ function compile(state) {
         table.size += size;
       }
     }
+
+    return scope;
   }
 
   function compileExprCallStd(expr, scope, addressScope, sig, nodeArgs) {
@@ -1851,9 +1870,9 @@ function compile(state) {
 
     // reserve return value and push pointer to return value as hidden argument
     if (hasReturn && returnSize > 8) {
-      r += line(`lea     eax, [esp - 4]`);
+      // r += line(`lea     eax, [esp - 4]`);
       r += line(`sub     esp, ${returnSize}`);
-      r += line(`push    eax`);
+      r += line(`push    esp`);
     }
 
     // push arguments
@@ -1870,11 +1889,11 @@ function compile(state) {
 
     r += line('call    ' + sig.asmName);
 
-    let returnStructPtrSize = hasReturn && returnSize > 8 ? 4 : 0;
-    if (returnStructPtrSize > 0) r += line(`add     esp, ${returnStructPtrSize}`);
+    if (hasReturn && returnSize > 8)
+      r += line(`add     esp, 4`);
 
-    if (returnSize === 8) r += line('push    edx');
     if (returnSize <= 8) r += line('push    eax');
+    if (returnSize === 8) r += line('push    edx');
 
     r += line('; stdcall call expression )');
     r += line();
@@ -1890,11 +1909,11 @@ function compile(state) {
     // store last base pointer and set base pointer to top of stack
     r += line('push    ebp');
     r += line('mov     ebp, esp');
-    // - base pointer layout from now on
-    //     ebp        = base pointer
-    //     [ebp]      = last base pointer
-    //     ebp + 4    = last stack pointer
-    //     [ebp - 4]  = first local variable
+
+    // store preserved registers
+    r += line('push    esi');
+    r += line('push    edi');
+    r += line('push    ebx');
 
     if (scope.symTable.size > 0)
       r += line('sub     esp, ' + scope.symTable.size);
@@ -1902,6 +1921,7 @@ function compile(state) {
     for (const ins of listIns.kids) {
       r += compileIns(ins, scope, addressScope);
     }
+
     if (scope.returnInfo) {
       if (listIns.kids.length === 0)
         throw makeErr(listIns.i, 'no done statement');
@@ -1911,10 +1931,27 @@ function compile(state) {
 
     r += line(scope.endAsmName + ':', 0);
 
-    // restore stack pointer because dynamic array allocations could shift it
-    r += line(`lea     esp, [ebp + 4}]`);
+    // restore preserved registers
+    r += line(`mov     esi, [ebp - 4]`);
+    r += line(`mov     edi, [ebp - 8]`);
+    r += line(`mov     ebx, [ebp - 12]`);
+
+    // store return address to where stack pointer will be
+    r += line(`mov     ecx, [ebp${getOffStr(scope.prevESPOff)}]`);
+    r += line(`mov     [ebp${getOffStr(scope.prevESPOff + scope.paramsSize)}], ecx`);
+    
+    // save this scopes base pointer
+    r += line(`mov     ecx, ebp`);
+
     // restore base pointer
-    r += line('mov     ebp, [ebp]');
+    r += line(`mov     ebp, [ecx${getOffStr(scope.prevEBPOff)}]`);
+
+    // restore esp to when no arguments where pushed (note there is still room for the return address)
+    r += line(
+      `lea     esp, [ecx${getOffStr(scope.prevESPOff + scope.paramsSize)}]`
+    )
+
+    r += line(`ret`);
 
     r += line('; std scope --- }');
 
@@ -1928,6 +1965,7 @@ function compile(state) {
     let asmNameEnd = asmName + '@end';
 
     let r = '';
+
     r += line(
       `;   func (stdcall) at ${(getLoc(nodeFunc.i) + '   ').padEnd(35, '=')} {`,
       0
@@ -1935,24 +1973,16 @@ function compile(state) {
     r += line('global  ' + asmName, 0);
     r += line(asmName + ':', 0);
 
-    let savedRegisters = ['esi', 'edi', 'ebx'];
-    for (const reg of savedRegisters) {
-      r += line('push    ' + reg);
-    }
-
     r += compileScopeStd(
       listIns,
       createScopeStd(sig, asmNameEnd, listIns, addressScope, undefined),
       addressScope
     );
 
-    for (const reg of savedRegisters) {
-      r += line('pop     ' + reg);
-    }
-
-    r += line(`ret`);
     r += line(`; } func at ${getLoc(nodeFunc.i).padEnd(35, ' ')} `, 0);
     r += line();
+
+    return r;
   }
 
   function compileFuncSus(nodeFunc, sig, addressScope) {
@@ -2006,13 +2036,14 @@ function compile(state) {
       r += line(`; - offset ${scope.returnInfo.off}`, 3);
     }
 
-    r += line('push    ebp ');
+    r += line('push    ebp');
     r += line('lea     ebp, [esp - 4]');
 
     // from now on
-    // [ebp] = first variable
-    // ebp + 4 = last scopes esp
     // ebp + 8 = last scopes ebp
+    // ebp + 4 = last scopes esp
+    // [ebp] = ?
+    // [ebp - 4] = first local variable
 
     if (scope.symTable.size > 0)
       r += line('sub     esp, ' + scope.symTable.size);
@@ -2030,8 +2061,9 @@ function compile(state) {
 
     r += line(scope.endAsmName + ':', 0);
 
-    r += line('lea     esp, [ebp + 8]');
-    r += line('mov     ebp, [ebp + 4]');
+    r += line('lea     ecx, [ebp + ' + scope.prevESPOff + ']');
+    r += line('mov     ebp, [ebp + ' + scope.prevEBPOff + '] ; wat');
+    r += line('mov     esp, ecx');
 
     return r;
   }
@@ -2061,6 +2093,66 @@ function compile(state) {
     }
   }
 
+  function compileExitSus(scopes, returnExpr, scope, addressScope) {
+    let rootScope = scopes[scopes.length - 1];
+    let scopeRes = resolveScopeBase(scopes);
+
+    let r = '';
+    r += line('; done instruction ========= (');
+
+    r += compileExpr(returnExpr, scope, addressScope);
+
+    r += scopeRes.asm;
+
+    r += line('; copy');
+
+    r += compileCopy(
+      'esp',
+      0,
+      scopeRes.register,
+      rootScope.returnInfo.off + 4 - rootScope.returnInfo.size,
+      rootScope.returnInfo.size,
+      false
+    );
+
+    r += line('; done instruction )');
+
+    return r;
+  }
+
+  function compileExitStd(scopes, returnExpr, scope, addressScope) {
+    let rootScope = scopes[scopes.length - 1];
+
+    let r = '';
+    r += line('; stdcall done instruction ========= (');
+
+    r += compileExpr(returnExpr, scope, addressScope);
+
+    if (rootScope.returnInfo.off !== undefined) {
+      if (rootScope.returnInfo.size <= 8) throw makeImplErr();
+
+      let scopeRes = resolveScopeBase(scopes);
+      r += scopeRes.asm;
+
+      // get return struct pointer
+      r += line(
+        `mov     edx, [${scopeRes.register}${getOffStr(
+          rootScope.returnInfo.off
+        )}]`
+      );
+
+      r += compileCopy('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
+      r += line(`mov     eax, edx`);
+    } else {
+      if (rootScope.returnInfo.size === 8) r += line('pop     edx');
+      if (rootScope.returnInfo.size <= 8) r += line('pop     eax');
+    }
+
+    r += line('; stdcall done instruction )');
+
+    return r;
+  }
+
   function compileExit(ins, scope, addressScope, levels) {
     let r = '';
 
@@ -2085,23 +2177,16 @@ function compile(state) {
       if (!returnExpr) throw makeErr(ins.i, 'expected return expression');
       checkType(returnExpr, scope, addressScope, targetScope.returnInfo.type);
 
-      r += line('; return expression ========= (');
-      r += compileExpr(returnExpr, scope, addressScope);
-
-      let scopeRes = resolveScopeBase(scopes);
-      r += scopeRes.asm;
-
-      r += line('; copy');
-
-      r += compileCopy(
-        'esp',
-        0,
-        scopeRes.register,
-        targetScope.returnInfo.off + 4 - targetScope.returnInfo.size,
-        targetScope.returnInfo.size,
-        false
-      );
-      r += line('; return expression )');
+      if (
+        targetScope.convention === undefined ||
+        targetScope.convention === 'sus'
+      ) {
+        r += compileExitSus(scopes, returnExpr, scope, addressScope);
+      } else if (targetScope.convention === 'stdcall') {
+        r += compileExitStd(scopes, returnExpr, scope, addressScope);
+      } else {
+        throw makeImplErr('compile exit: unknown calling convention');
+      }
       // r += line(`add     esp, ${rootScope.returnInfo.size}`); // left out because esp is overwritten next line
     } else {
       let returnExpr = ins.kids.filter((x) => x.name === 'expr');
@@ -2109,8 +2194,8 @@ function compile(state) {
     }
 
     for (let i = 0; i < lv; i++) {
-      // note: this line could probably be omitted for everything but the last iteration of the loop
       let s = scopes[i];
+      // note: this line could probably be omitted for everything but the last iteration of the loop
       r += line(`lea     esp, [ebp${getOffStr(s.prevESPOff)}]`);
       r += line(`mov     ebp, [ebp${getOffStr(s.prevEBPOff)}]`);
     }
@@ -2375,7 +2460,7 @@ function compile(state) {
 
   // note: generated assembly does not preserve edx
   function resolveScopeBase(scopes) {
-     let r = '';
+    let r = '';
     let amount = scopes.length - 1;
     if (amount === 0) return { asm: r, register: 'ebp' };
     r += line(`mov     edx, [ebp${getOffStr(scopes[0].prevEBPOff)}]`);
@@ -3432,6 +3517,8 @@ function loadStructMemberTypes(ctx, path, src, tree) {
 
         members.push(makeStructMember(member.props.name, type, null));
       }
+      if (members.length === 0)
+        throw new Error('structs must have at least one member');
       struct.members = members;
     }
   }
