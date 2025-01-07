@@ -1,7 +1,29 @@
+how to continue
+  goals: implement cdecl, use opengl, floats, maybe conversions, maybe function pointers, maybe strings
+
+  issues:
+    - need cdecl
+      - combine compileScopeSus and compileScopeStd
+
+  notes on assembly:
+    [>esp] should not be accessed
+
+
+
+
+
+
+
+
+
+
+
 ACTUALLY IMPLEMENTED
   - Top Level Statements
   - Functions
     - Parameters
+    - External functions
+    - calling conventions: sus, stdcall
   - Instructions
     - Local symbols
       - Initializing, Assigning
@@ -17,7 +39,7 @@ ACTUALLY IMPLEMENTED
     - Arithmetic Referencing, Dereferencing, Assigning
   - Stack-Arrays
   - Multiple Files: Automatic build script generator
-  - Packages: use statement
+  - Packages: use statement, main statement
   - Structures
     - Copying
       - Init: [x] Symbol

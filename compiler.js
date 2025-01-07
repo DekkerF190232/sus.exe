@@ -497,11 +497,15 @@ function parse(state) {
       if (!eat(/^=/)) return;
       eatEmpty();
 
+      let expr = tryParseNodeExpr();
+      if (!expr) return;
+      
+      if (!eat(/^;/)) return;
+      eatEmpty();
+
       append(makeNodeInsSym(name), (_) => {
         append(nodeType);
-        append(parseNodeExpr());
-        eatPicky(';');
-        eatEmpty();
+        append(expr);
       });
 
       return true;
@@ -518,15 +522,17 @@ function parse(state) {
       });
       if (!nodeTargetExpr) return;
 
-      let equals = eat(/^=/);
-      if (!equals) return;
+      if (!eat(/^=/)) return;
+      eatEmpty();
+
+      let expr = parseNodeExpr();
+
+      if (!eat(/;/)) return;
       eatEmpty();
 
       append(makeNodeInsAssign(), (_) => {
         append(nodeTargetExpr);
-        append(parseNodeExpr());
-        eatPicky(';');
-        eatEmpty();
+        append(expr);
       });
 
       return true;
@@ -1046,7 +1052,7 @@ function parse(state) {
 //
 
 // NOTES
-//  using goofy calling convention (like __stdcall but caller cleans stack instead of callee)
+//  using goofy calling convention (like stdcall but caller cleans stack instead of callee)
 
 function makeCompileState(ctx, name, text, isMain, root, n) {
   return { ctx, name, text, isMain, root, n };
@@ -3189,7 +3195,7 @@ function compile(state) {
 
 function lineNumber(str, idx) {
   let line = 1;
-  let col = 1;
+  let col = 0;
   for (let i = 0; i < str.length && i <= idx; i++) {
     const c = str[i];
     if (c == '\n') {

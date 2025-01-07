@@ -1,0 +1,15 @@
+package Main {
+
+  use sus/System;
+
+  main {
+    theFunction();
+    
+    System/exit(code: 0);
+  }
+
+  func theFunction() {
+    int32 test = 0;
+  }
+
+}

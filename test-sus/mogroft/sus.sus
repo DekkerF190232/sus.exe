@@ -1,0 +1,28 @@
+
+package sus/native/Win {
+
+  const int32 STD_OUTPUT_HANDLE = -11;
+
+  #func CON(stdcall) int32 strnlen(PTR[int8] buffer, int32 size) EXT;
+
+  func CON(stdcall) ExitProcess(int32 code) EXT;
+  func CON(stdcall) int32 GetStdHandle(int32 handle) EXT;
+  func CON(stdcall) boo WriteFile(int32 file, PTR[int8] buffer, int32 length, PTR[int32] written, PTR[ptr] overlapped) EXT;
+}
+
+
+package sus/System {
+
+  use sus/native/Win;
+
+  func exit(int32 code) {
+    Win/ExitProcess(code: code);
+  }
+
+  func print(PTR[int8] s) {
+    int32 handle = Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE);
+    #int32 length = Win/strnlen(buffer: s, size: 2147483647);
+    #boo _r = Win/WriteFile(file: handle, buffer: s, length: length, written: RTP[PTR[int32]](0), overlapped: RTP[PTR[ptr]](0));
+  }
+
+}
