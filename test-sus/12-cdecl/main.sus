@@ -5,21 +5,61 @@ package Main {
   use sus/System;
   use main/test/Add;
 
+  use main/test/Return0Bytes;
   use main/test/Return4Bytes;
   use main/test/Return8Bytes;
   use main/test/ReturnGt8Bytes;
 
   main {
-    #Add/run();
+    InOut/print(s: STR"RUNNING.\n");
+    InOut/printLn();
+	
+    #Return0Bytes/run();
     #Return4Bytes/run();
     #Return8Bytes/run();
     ReturnGt8Bytes/run();
 
+    InOut/printLn();
     InOut/print(s: STR"DONE.\n");
-    System/exit(code: 0);
+
+    System/exit(code: 123);
+  }
+
+  func int32 test() {
+    done 123;
   }
 
 }
+
+package main/test/Return0Bytes {
+
+  use sus/InOut;
+  
+  func run() {
+    int32 t = 1234;
+    
+    testNone(addA: 1, addB:2);
+    InOut/printLn();
+
+    InOut/print(i: t);
+    InOut/printLn();
+  }
+
+  func CON(cdecl) testNone(int32 addA, int32 addB) {
+    InOut/print(s: STR"expecting 12\n");
+    InOut/print(i:addA);
+    InOut/print(i:addB);
+    InOut/printLn();
+    InOut/print(s: STR"expecting 46\n");
+    int32 a = 3 + addA;
+    int32 b = 4 + addB;
+    InOut/print(i:a);
+    InOut/print(i:b);
+    InOut/printLn();
+  }
+
+}
+
 
 
 
@@ -76,7 +116,7 @@ package main/test/ReturnGt8Bytes {
   );
 
   func CON(cdecl) S12 testGt8(int32 a, int32 b, int32 c) {
-    done S12(a = 1 + a, b = 2 + a, c = 3 + c);
+    done S12(a = 1 + a, b = 2 + b, c = 3 + c);
   }
 
 }
@@ -101,33 +141,7 @@ package main/test/Return4Bytes {
   }
 
   func CON(cdecl) int32 add(int32 a, int32 b) {
-    done 123;
-  }
-
-}
-
-package main/test/Add {
-
-  use sus/InOut;
-  
-  func run() {
-    int32 t = 1234;
-    
-    testNone(addA: 1, addB:2);
-    InOut/printLn();
-
-    InOut/print(i: t);
-    InOut/printLn();
-  }
-
-  func CON(cdecl) testNone(int32 addA, int32 addB) {
-    InOut/print(s: STR"expecting 123");
-    #InOut/print(i:addA);
-    #InOut/print(i:addB);
-    int32 a = 4 + addA;
-    int32 b = 6 + addB;
-    InOut/print(i:a);
-    InOut/print(i:b);
+    done a+b;
   }
 
 }

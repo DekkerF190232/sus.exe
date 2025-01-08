@@ -1,17 +1,21 @@
 package Main {
 
-  use sus/InOut;
-  use sus/System;
-
   main {
-    theFunction();
-    
-    System/exit(code: 0);
+    int32 val = theFunction(a: 1, b: 2);
+    exit(code: val);
   }
 
-  func theFunction() {
-    int32 test = 0;
-    InOut/print(i: 1234);
+  func int32 theFunction(int32 a, int32 b) {
+    done a + b;
+  }
+
+  func exit(int32 code) {
+    ASM {
+      push    dword SUS{code}
+      extern  _ExitProcess@4
+      call    _ExitProcess@4
+      hlt
+    }
   }
 
 }

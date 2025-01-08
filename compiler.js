@@ -499,7 +499,7 @@ function parse(state) {
 
       let expr = tryParseNodeExpr();
       if (!expr) return;
-      
+
       if (!eat(/^;/)) return;
       eatEmpty();
 
@@ -1051,9 +1051,6 @@ function parse(state) {
 // ============================== COMPILER         ==============================
 //
 
-// NOTES
-//  using goofy calling convention (like stdcall but caller cleans stack instead of callee)
-
 function makeCompileState(ctx, name, text, isMain, root, n) {
   return { ctx, name, text, isMain, root, n };
 }
@@ -1114,18 +1111,6 @@ function compile(state) {
 
   // SCOPES ======================================
 
-  // note on offset layout:
-  // ...
-  // ebp -n     = second local variable, where n is size of first local variable
-  // ebp        = first local variable
-  // ebp +4     = base pointer of last scope
-  // ebp +8     = return address
-  // ebp +8+n   = first param of scope where n is size of param (params are rtl)
-  // ebp +8+n+m = return value of scope where n is size of all params and m is the size of the return type
-  // ...
-  //
-  // also: in functions the caller does the stack cleanup.
-
   const makeSymTable = (rows, size) => ({ rows, size }); // includes params and locals, note that params are not included in size
   const makeReturnInfo = (type, size, off) => ({ type, size, off });
   const makeSymTableRow = (symbol, type, off, size) => ({
@@ -1142,7 +1127,8 @@ function compile(state) {
     prevEBPOff,
     prevESPOff,
     paramsSize,
-    convention
+    convention,
+    sig
   ) => ({
     endAsmName,
     parent,
@@ -1151,7 +1137,8 @@ function compile(state) {
     prevEBPOff, // ebp + prevEBPOff = last scopes ebp
     prevESPOff, // ebp + prevESPOff = last scopes esp
     paramsSize,
-    convention
+    convention,
+    sig,
   });
   const makeSymTableLoc = (scopes, row) => ({ scopes, row });
 
@@ -1169,72 +1156,6 @@ function compile(state) {
 
   function evalSize(type) {
     return getSize(state.ctx, type);
-  }
-
-  function createScopeSus(
-    addressScope,
-    endAsmName,
-    listParam,
-    listIns,
-    parent,
-    returnType
-  ) {
-    let scope = makeScope(
-      endAsmName,
-      parent,
-      makeSymTable([], 0),
-      undefined,
-      4,
-      8,
-      0,
-      'sus'
-    );
-
-    let table = scope.symTable;
-
-    let paramOffset = 8;
-    if (listParam) {
-      for (const param of listParam.kids) {
-        let type = getActualType(
-          param.kids.find((x) => x.name === 'type'),
-          addressScope
-        );
-        let name = param.props.name;
-        let size = evalSize(type);
-        if (findSymTableLoc(scope, name))
-          throw makeErr(param.i, 'duplicate symbol: ' + name);
-        paramOffset += size;
-        scope.paramsSize += size;
-        table.rows.push(makeSymTableRow(name, type, paramOffset, size));
-      }
-    }
-
-    let symOffset = 4; // because compileScopeSus is scuffed as fuck
-    for (const ins of listIns.kids) {
-      if (ins.name !== 'ins-sym') continue;
-      let type = getActualType(
-        ins.kids.find((x) => x.name === 'type'),
-        addressScope
-      );
-      let name = ins.props.name;
-      let size = evalSize(type);
-      if (findSymTableLoc(scope, name))
-        throw makeErr(ins.i, 'duplicate symbol: ' + name);
-      table.size += size;
-      symOffset -= size;
-      table.rows.push(makeSymTableRow(name, type, symOffset, size));
-    }
-
-    if (returnType) {
-      let returnSize = evalSizeAligned(returnType);
-      scope.returnInfo = makeReturnInfo(
-        returnType,
-        returnSize,
-        paramOffset + returnSize
-      );
-    }
-
-    return scope;
   }
 
   // /
@@ -1670,14 +1591,13 @@ function compile(state) {
         asm += line(
           `;   main block at ${(getLoc(listIns.i) + '   ').padEnd(35, '=')} {`
         );
-        asm += compileScope(
+        asm += compileScopeSus(
           listIns,
           createScopeSus(
-            addressScope,
+            undefined,
             endAsmName,
-            undefined,
             listIns,
-            undefined,
+            addressScope,
             undefined
           ),
           addressScope
@@ -1736,27 +1656,152 @@ function compile(state) {
     let paramNames = nodeFunc.kids[0].kids.map((x) => x.props.name);
     let sig = findFunc(state.ctx, packageAddress, simpleName, paramNames);
 
-    if (sig.convention === 'stdcall') {
-      return compileFuncStdcall(nodeFunc, sig, addressScope);
-    } else if (sig.convention === undefined || sig.convention === 'sus') {
-      return compileFuncSus(nodeFunc, sig, addressScope);
-    } else {
-      throw makeErr(
-        nodeFunc.i,
-        'unknown calling convention: ' + sig.convention
-      );
+    // if (sig.convention === 'stdcall') {
+    //   return compileFuncStdcall(nodeFunc, sig, addressScope);
+    // } else if (sig.convention === 'cdecl') {
+    //   return compileFuncCdecl(nodeFunc, sig, addressScope);
+    // } else if (sig.convention === undefined || sig.convention === 'sus') {
+    //   return compileFuncSus(nodeFunc, sig, addressScope);
+    // } else {
+    //   throw makeErr(
+    //     nodeFunc.i,
+    //     'unknown calling convention: ' + sig.convention
+    //   );
+    return compileFuncDec(nodeFunc, sig, addressScope);
+  }
+
+  function compileScopeCdecl(listIns, scope, addressScope) {
+    let r = '';
+    r += line('; cdecl scope === {');
+    // store last base pointer and set base pointer to top of stack
+    r += line('push    ebp');
+    r += line('mov     ebp, esp');
+    // store preserved registers
+    r += line('push    esi');
+    r += line('push    edi');
+    r += line('push    ebx');
+
+    if (scope.symTable.size > 0)
+      r += line('sub     esp, ' + scope.symTable.size);
+
+    for (const ins of listIns.kids) {
+      r += compileIns(ins, scope, addressScope);
     }
+
+    if (scope.returnInfo) {
+      if (listIns.kids.length === 0)
+        throw makeErr(listIns.i, 'no done statement');
+      let last = listIns.kids[listIns.kids.length - 1];
+      if (last.name !== 'ins-done') throw makeErr(last.i, 'no done statement');
+    }
+
+    r += line(scope.endAsmName + ':', 0);
+
+    // restore preserved registers
+    r += line(`mov     esi, [ebp - 4]`);
+    r += line(`mov     edi, [ebp - 8]`);
+    r += line(`mov     ebx, [ebp - 12]`);
+
+    // restore esp
+    r += line(`mov     esp, ebp`);
+    // restore ebp
+    r += line(`pop     ebp`);
+
+    // r += line('; cdecl scope --- }');
+
+    return r;
+  }
+
+  // notes for cdecl calling convention:
+  // - # argument order: right to left
+  // - # callee - preserved registers: ESI, EDI, EBX, and EBP, ESP
+  // - # stack/args/params must be 4-byte aligned
+  // - # naming: leading underscore
+  // - # caller cleans stack
+  // - # non-float <= 4 byte values: eax
+  // - # pod 8 byte values: eax:edx, where eax holds the lower part, edx the higher
+  // - # non-pods | size > 8 bytes: hidden parameter on stack, which itself is returned in eax
+  // - # float 4 byte values: st0
+  // - # floating points: st0-st7 must be empty (popped or freed) before a function is called
+  // - # st1-st7 must be empty when exiting a function, st0 must be empty when not used as return value
+  //
+  // sources: https://en.wikipedia.org/wiki/X86_calling_conventions#cdecl (also look at table below)
+  //          https://learn.microsoft.com/en-us/cpp/cpp/cdecl?view=msvc-170
+  //          https://learn.microsoft.com/en-us/cpp/build/reference/decorated-names?view=msvc-170
+  function createScopeCdecl(sig, endAsmName, listIns, addressScope, parent) {
+    let ebpOff = 4; // offset to get from base pointer inside scope to stack pointer just after calling
+    let scope = makeScope(
+      endAsmName,
+      parent,
+      makeSymTable([], 0),
+      undefined,
+      0,
+      4,
+      0,
+      'cdecl',
+      sig
+    );
+    let table = scope.symTable;
+    {
+      // parameters
+      let off = 0;
+      off += ebpOff;
+      for (const param of sig.params) {
+        if (findSymTableLoc(scope, param.name))
+          throw makeErr(param.i, 'duplicate symbol: ' + param.name);
+        let size = evalSizeAligned(param.type);
+        off += size;
+        scope.paramsSize += size;
+        table.rows.push(makeSymTableRow(param.name, param.type, off, size));
+      }
+      // hidden return structure pointer parameter
+      if (sig.returnType) {
+        let returnSize = evalSizeAligned(sig.returnType);
+        let returnPointerSize = 4;
+        off += returnPointerSize;
+        scope.returnInfo = makeReturnInfo(
+          sig.returnType,
+          returnSize,
+          returnSize <= 8 ? undefined : off
+        );
+      }
+    }
+    // local variables
+    {
+      let returnPointerSize = 4;
+      let basePointerSize = 4;
+      let storedRegistersSize = 12;
+      let off = 0;
+      off += ebpOff;
+      off -= returnPointerSize;
+      off -= basePointerSize;
+      off -= storedRegistersSize;
+      for (const nodeInsSym of listIns.kids.filter(
+        (x) => x.name === 'ins-sym'
+      )) {
+        let nodeType = nodeInsSym.kids.find((x) => x.name === 'type');
+        let type = getActualType(nodeType, addressScope);
+        let size = evalSizeAligned(type);
+        let name = nodeInsSym.props.name;
+        if (findSymTableLoc(scope, name))
+          throw makeErr(nodeInsSym.i, 'duplicate symbol: ' + name);
+        table.rows.push(makeSymTableRow(name, type, off, size));
+        off -= size;
+        table.size += size;
+      }
+    }
+    return scope;
   }
 
   // notes for std calling convention:
   //   - arguments are widened to 32 bits
-  //   - # arguments are required to be pushed right to left before calling
-  //   - # the callee (called function) pops the arguments off the stack
+  //   - arguments are required to be pushed right to left before calling
+  //   - the callee (called function) pops the arguments off the stack
   //   - return values are widened to 32 bits
-  //   - # return values sized 32 bits are returned in eax
-  //   - # return values sized 64 bits are returned in edx and eax, where eax contains the lower bytes
-  //   - # return values sized more than 64 bits require the caller do pass a "hidden pointer" on the stack,
-  //     # this pointer is used for storing the return value and is itself returned in eax
+  //   - return values sized 32 bits are returned in eax
+  //   - return values sized 64 bits are returned in edx and eax, where eax contains the lower bytes
+  //   - return values sized more than 64 bits require the caller do pass a "hidden pointer" on the stack,
+  //     this pointer is used for storing the return value and is itself returned in eax
   //   - note: the practice of passing the hidden return pointer this way is itself officially not documented, but observed in disassemblies
   //   - note: it is assumed, that only "pods", plain old data objects, no complex c++ data is used as arguments and return types
   //   - preserved registers: ESI, EDI, EBX, and EBP
@@ -1799,7 +1844,8 @@ function compile(state) {
       0,
       4,
       0,
-      'stdcall'
+      'stdcall',
+      sig
     );
     let table = scope.symTable;
 
@@ -1862,6 +1908,50 @@ function compile(state) {
 
     return scope;
   }
+  function compileExprCallCdecl(expr, scope, addressScope, sig, nodeArgs) {
+    if (sig.params.length < nodeArgs.length)
+      throw makeErr(expr.i, 'to many arguments for ' + func.props.name);
+
+    let hasReturn = sig.returnType !== undefined;
+    let returnSize = hasReturn ? evalSizeAligned(sig.returnType) : undefined;
+
+    let r = '';
+
+    r += line('; cdecl call expression ==================== (');
+
+    // reserve return value and push pointer to return value as hidden argument
+    if (hasReturn && returnSize > 8) {
+      // r += line(`lea     eax, [esp - 4]`);
+      r += line(`sub     esp, ${returnSize}`);
+      r += line(`push    esp`);
+    }
+
+    // push arguments
+    let sizeArgs = 0;
+    for (const param of [...sig.params].reverse()) {
+      let arg = nodeArgs.find((x) => x.props.name == param.name);
+      let expr = arg.kids.find((x) => x.name === 'expr');
+      if (!arg)
+        throw makeErr(expr.i, 'can not find argument for param ' + param.name);
+      checkType(expr, scope, addressScope, param.type);
+      sizeArgs += evalSize(param.type);
+      r += compileExpr(expr, scope, addressScope);
+    }
+
+    r += line('call    ' + sig.asmName);
+
+    let poppedSize = sizeArgs;
+    if (hasReturn && returnSize > 8) poppedSize += 4;
+    if (poppedSize != 0) r += line(`add     esp, ${poppedSize}`);
+
+    if (returnSize <= 8) r += line('push    eax');
+    if (returnSize === 8) r += line('push    edx');
+
+    r += line('; cdecl call expression )');
+    r += line();
+
+    return r;
+  }
 
   function compileExprCallStd(expr, scope, addressScope, sig, nodeArgs) {
     if (sig.params.length < nodeArgs.length)
@@ -1895,8 +1985,7 @@ function compile(state) {
 
     r += line('call    ' + sig.asmName);
 
-    if (hasReturn && returnSize > 8)
-      r += line(`add     esp, 4`);
+    if (hasReturn && returnSize > 8) r += line(`add     esp, 4`);
 
     if (returnSize <= 8) r += line('push    eax');
     if (returnSize === 8) r += line('push    edx');
@@ -1944,8 +2033,10 @@ function compile(state) {
 
     // store return address to where stack pointer will be
     r += line(`mov     ecx, [ebp${getOffStr(scope.prevESPOff)}]`);
-    r += line(`mov     [ebp${getOffStr(scope.prevESPOff + scope.paramsSize)}], ecx`);
-    
+    r += line(
+      `mov     [ebp${getOffStr(scope.prevESPOff + scope.paramsSize)}], ecx`
+    );
+
     // save this scopes base pointer
     r += line(`mov     ecx, ebp`);
 
@@ -1955,23 +2046,18 @@ function compile(state) {
     // restore esp to when no arguments where pushed (note there is still room for the return address)
     r += line(
       `lea     esp, [ecx${getOffStr(scope.prevESPOff + scope.paramsSize)}]`
-    )
-
-    r += line(`ret`);
+    );
 
     r += line('; std scope --- }');
 
     return r;
   }
 
-  function compileFuncStdcall(nodeFunc, sig, addressScope) {
+  function compileFuncDec(nodeFunc, sig, addressScope) {
     let listIns = nodeFunc.kids.find((x) => x.name === 'list-inst');
-
     let asmName = sig.asmName;
     let asmNameEnd = asmName + '@end';
-
     let r = '';
-
     r += line(
       `;   func (stdcall) at ${(getLoc(nodeFunc.i) + '   ').padEnd(35, '=')} {`,
       0
@@ -1979,81 +2065,179 @@ function compile(state) {
     r += line('global  ' + asmName, 0);
     r += line(asmName + ':', 0);
 
-    r += compileScopeStd(
-      listIns,
-      createScopeStd(sig, asmNameEnd, listIns, addressScope, undefined),
-      addressScope
-    );
-
-    r += line(`; } func at ${getLoc(nodeFunc.i).padEnd(35, ' ')} `, 0);
-    r += line();
-
-    return r;
-  }
-
-  function compileFuncSus(nodeFunc, sig, addressScope) {
-    let listIns = nodeFunc.kids.find((x) => x.name === 'list-inst');
-    let listParam = nodeFunc.kids.find((x) => x.name === 'list-param');
-
-    let asmName = sig.asmName;
-    let asmNameEnd = asmName + '@end';
-
-    let r = '';
-    r += line(
-      `;   func at ${(getLoc(nodeFunc.i) + '   ').padEnd(35, '=')} {`,
-      0
-    );
-    r += line('global  ' + asmName, 0);
-    r += line(asmName + ':', 0);
-
-    r += compileScope(
-      listIns,
-      createScopeSus(
-        addressScope,
-        asmNameEnd,
-        listParam,
+    if (sig.convention === 'sus') {
+      // || sig.convention === undefined
+      r += compileScopeSus(
         listIns,
-        undefined,
-        sig.returnType
-      ),
-      addressScope
-    );
+        createScopeSus(sig, asmNameEnd, listIns, addressScope, undefined),
+        addressScope
+      );
+    } else if (sig.convention === 'stdcall') {
+      r += compileScopeStd(
+        listIns,
+        createScopeStd(sig, asmNameEnd, listIns, addressScope, undefined),
+        addressScope
+      );
+    } else if (sig.convention === 'cdecl') {
+      r += compileScopeCdecl(
+        listIns,
+        createScopeCdecl(sig, asmNameEnd, listIns, addressScope, undefined),
+        addressScope
+      );
+    } else {
+      throw makeErr(
+        nodeFunc.i,
+        'unknown calling convention: ' + sig.convention
+      );
+    }
 
     r += line(`ret`);
     r += line(`; } func at ${getLoc(nodeFunc.i).padEnd(35, ' ')} `, 0);
     r += line();
+    return r;
+  }
+
+  // notes:
+  // - params: rtl 4-byte aligned on stack
+  function createScopeSus(sig, endAsmName, listIns, addressScope, parent) {
+    let scope = makeScope(
+      endAsmName,
+      parent,
+      makeSymTable([], 0),
+      undefined,
+      0,
+      4,
+      0,
+      'sus',
+      sig
+    );
+
+    // ebp + 4 + 4  = points to first arguments first byte
+    // ebp + 4      = last scopes esp, points to return pointer
+    // [ebp]        = last scopes ebp
+    // [ebp - n]    = first local variable, where n is the size of that variable
+
+    let table = scope.symTable;
+
+    let returnPointerSize = 4;
+
+    // ebp + argOff points to the lowest byte of the argument.
+    let argOff = scope.prevESPOff + returnPointerSize;
+    if (sig) {
+      for (const param of sig.params) {
+        if (findSymTableLoc(scope, param.name))
+          throw makeErr(param.i, 'duplicate symbol: ' + param.name);
+        let size = evalSizeAligned(param.type);
+        table.rows.push(
+          makeSymTableRow(param.name, param.type, argOff, size)
+        );
+        argOff += size;
+        scope.paramsSize += size;
+      }
+    }
+
+    let symOffset = 0;
+    for (const ins of listIns.kids) {
+      if (ins.name !== 'ins-sym') continue;
+      let type = getActualType(
+        ins.kids.find((x) => x.name === 'type'),
+        addressScope
+      );
+      let name = ins.props.name;
+      let size = evalSize(type);
+      if (findSymTableLoc(scope, name))
+        throw makeErr(ins.i, 'duplicate symbol: ' + name);
+      table.size += size;
+      symOffset -= size;
+      table.rows.push(makeSymTableRow(name, type, symOffset, size));
+    }
+
+    if (sig && sig.returnType) {
+      let returnSize = evalSizeAligned(sig.returnType);
+      scope.returnInfo = makeReturnInfo(
+        sig.returnType,
+        returnSize,
+        argOff
+      );
+    }
+
+    return scope;
+  }
+
+  function compileOffNotes(listIns, scope, addressScope) {
+    let r = '';
+
+    r += line(`; offset notes`);
+    r += line(`;   general:`);
+
+    r += line(
+      `;     [ebp${getOffStr(scope.prevEBPOff)}] = previous base pointer`
+    );
+    r += line(
+      `;     ebp${getOffStr(scope.prevESPOff)} = previous stack pointer`
+    );
+    if (scope.sig) {
+      r += line(
+        `;     [ebp${getOffStr(scope.prevESPOff)}] = function return address`
+      );
+
+      r += line(';   scope function parameters: ');
+      let size = 0;
+      for (const param of scope.sig.params) {
+        let row = findSymTableLoc(scope, param.name).row;
+        r += line(
+          `;     [ebp${getOffStr(row.off)}] = ${typeToString(param.type)} ${
+            param.name
+          }`
+        );
+        size += row.size;
+      }
+      r += line(`;     => size = ` + size);
+    }
+
+    if (scope.returnInfo) {
+      r += line(';   scope return info ');
+      r += line(`;     [ebp${getOffStr(scope.returnInfo.off)}] = ${typeToString(scope.returnInfo.type)}`);
+      r += line(`;     => size = ` + scope.returnInfo.size);
+    }
+
+    r += line(';   scope symbols: ');
+    for (const row of scope.symTable.rows) {
+      r += line(
+        `;     [ebp${getOffStr(row.off)}] = ${typeToString(row.type)} ${
+          row.symbol
+        }`
+      );
+    }
+    r += line(`;     => size = ` + scope.symTable.size);
 
     return r;
   }
 
-  function compileScope(listIns, scope, addressScope) {
+  // after setting up stack
+  // [ebp + 4 + 4 + n + m] = first byte of the return structure, where n is the size of all args and m is the size of the return structure
+  // [ebp + 4 + 4] = first argument
+  // ebp + 4 = last scopes esp [ebp + 4] = return value
+  // [ebp] = last scopes ebp
+  // [ebp - n] = first local variable, where n is the size of that variable
+
+  function compileScopeSus(listIns, scope, addressScope) {
     let r = '';
 
-    r += line('; sussy scope');
-    if (scope.returnInfo) {
-      r += line(`; scope info`, 1);
-      r += line(`; return:`, 2);
-      r += line(
-        `; - type   ${typeToString(scope.returnInfo.type)} (${
-          scope.returnInfo.size
-        } bytes)`,
-        3
-      );
-      r += line(`; - offset ${scope.returnInfo.off}`, 3);
-    }
+    r += line('; sus scope === {');
+
+    r += line();
+    r += compileOffNotes(listIns, scope, addressScope);
+    r += line();
 
     r += line('push    ebp');
-    r += line('lea     ebp, [esp - 4]');
-
-    // from now on
-    // ebp + 8 = last scopes ebp
-    // ebp + 4 = last scopes esp
-    // [ebp] = ?
-    // [ebp - 4] = first local variable
+    r += line('mov     ebp, esp');
 
     if (scope.symTable.size > 0)
       r += line('sub     esp, ' + scope.symTable.size);
     r += line('');
+
+    // stack frame is setup
 
     for (const ins of listIns.kids) {
       r += compileIns(ins, scope, addressScope);
@@ -2067,9 +2251,10 @@ function compile(state) {
 
     r += line(scope.endAsmName + ':', 0);
 
-    r += line('lea     ecx, [ebp + ' + scope.prevESPOff + ']');
-    r += line('mov     ebp, [ebp + ' + scope.prevEBPOff + '] ; wat');
-    r += line('mov     esp, ecx');
+    r += line('mov     esp, ebp');
+    r += line('pop     ebp');
+
+    r += line('; sus scope --- }');
 
     return r;
   }
@@ -2102,60 +2287,70 @@ function compile(state) {
   function compileExitSus(scopes, returnExpr, scope, addressScope) {
     let rootScope = scopes[scopes.length - 1];
     let scopeRes = resolveScopeBase(scopes);
-
     let r = '';
     r += line('; done instruction ========= (');
-
     r += compileExpr(returnExpr, scope, addressScope);
-
     r += scopeRes.asm;
-
     r += line('; copy');
-
     r += compileCopy(
       'esp',
       0,
       scopeRes.register,
-      rootScope.returnInfo.off + 4 - rootScope.returnInfo.size,
+      rootScope.returnInfo.off,
       rootScope.returnInfo.size,
       false
     );
-
     r += line('; done instruction )');
-
     return r;
   }
 
   function compileExitStd(scopes, returnExpr, scope, addressScope) {
     let rootScope = scopes[scopes.length - 1];
-
     let r = '';
     r += line('; stdcall done instruction ========= (');
-
     r += compileExpr(returnExpr, scope, addressScope);
-
     if (rootScope.returnInfo.off !== undefined) {
       if (rootScope.returnInfo.size <= 8) throw makeImplErr();
-
       let scopeRes = resolveScopeBase(scopes);
       r += scopeRes.asm;
-
       // get return struct pointer
       r += line(
         `mov     edx, [${scopeRes.register}${getOffStr(
           rootScope.returnInfo.off
         )}]`
       );
-
       r += compileCopy('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
       r += line(`mov     eax, edx`);
     } else {
       if (rootScope.returnInfo.size === 8) r += line('pop     edx');
       if (rootScope.returnInfo.size <= 8) r += line('pop     eax');
     }
-
     r += line('; stdcall done instruction )');
+    return r;
+  }
 
+  function compileExitCdecl(scopes, returnExpr, scope, addressScope) {
+    let rootScope = scopes[scopes.length - 1];
+    let r = '';
+    r += line('; cdecl done instruction ========= (');
+    r += compileExpr(returnExpr, scope, addressScope);
+    if (rootScope.returnInfo.off !== undefined) {
+      if (rootScope.returnInfo.size <= 8) throw makeImplErr();
+      let scopeRes = resolveScopeBase(scopes);
+      r += scopeRes.asm;
+      // get return struct pointer
+      r += line(
+        `mov     edx, [${scopeRes.register}${getOffStr(
+          rootScope.returnInfo.off
+        )}]`
+      );
+      r += compileCopy('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
+      r += line(`mov     eax, edx`);
+    } else {
+      if (rootScope.returnInfo.size === 8) r += line('pop     edx');
+      if (rootScope.returnInfo.size <= 8) r += line('pop     eax');
+    }
+    r += line('; cdecl done instruction )');
     return r;
   }
 
@@ -2190,6 +2385,8 @@ function compile(state) {
         r += compileExitSus(scopes, returnExpr, scope, addressScope);
       } else if (targetScope.convention === 'stdcall') {
         r += compileExitStd(scopes, returnExpr, scope, addressScope);
+      } else if (targetScope.convention === 'cdecl') {
+        r += compileExitCdecl(scopes, returnExpr, scope, addressScope);
       } else {
         throw makeImplErr('compile exit: unknown calling convention');
       }
@@ -2311,15 +2508,14 @@ function compile(state) {
     r += line(`;   bloc at ${(getLoc(block.i) + '   ').padEnd(35, '=')} {`);
     indented(
       () =>
-        (r += compileScope(
+        (r += compileScopeSus(
           listIns,
           createScopeSus(
-            addressScope,
-            asmNameBlockEnd,
             undefined,
+            asmNameBlockEnd,
             listIns,
-            scope,
-            undefined
+            addressScope,
+            scope
           ),
           addressScope
         ))
@@ -2469,10 +2665,12 @@ function compile(state) {
     let r = '';
     let amount = scopes.length - 1;
     if (amount === 0) return { asm: r, register: 'ebp' };
+    r += line(`; going back ` + scopes.length + ' scopes {');
     r += line(`mov     edx, [ebp${getOffStr(scopes[0].prevEBPOff)}]`);
     for (let i = 1; i < amount; i++) {
       r += line(`mov     edx, [edx${getOffStr(scopes[i].prevEBPOff)}]`);
     }
+    r += line('; }');
     return { asm: r, register: 'edx' };
   }
 
@@ -2493,17 +2691,20 @@ function compile(state) {
 
     let byteSize = evalSize(symRow.type);
 
-    r += line(`; symbol init: ${symbol}`);
-    r += compileExpr(expr, scope, addressScope);
+    r += line(`; symbol init: ${symbol} {`);
+    indented(() => {
+      r += compileExpr(expr, scope, addressScope);
 
-    let symRes = resolveSymbolBase(loc);
+      let symRes = resolveSymbolBase(loc);
 
-    r += symRes.asm;
+      r += symRes.asm;
 
-    r += compileCopy('esp', 0, symRes.register, symRow.off, byteSize, true);
-    r += line(`add     esp, ${byteSize}`);
+      r += compileCopy('esp', 0, symRes.register, symRow.off, byteSize, true);
+      r += line(`add     esp, ${byteSize}`);
+    });
 
-    r += line(``);
+    r += line(`; }`);
+    r += line();
 
     return r;
   }
@@ -2663,6 +2864,10 @@ function compile(state) {
       r += compileExprCallSus(expr, scope, addressScope, sig, nodeArgs);
     } else if (sig.convention === 'stdcall') {
       r += compileExprCallStd(expr, scope, addressScope, sig, nodeArgs);
+    } else if (sig.convention === 'cdecl') {
+      r += compileExprCallCdecl(expr, scope, addressScope, sig, nodeArgs);
+    } else {
+      throw makeImplErr();
     }
 
     return r;
@@ -2680,7 +2885,7 @@ function compile(state) {
 
     // reserve return value
     if (sig.returnType) {
-      r += line(`sub     esp, ${evalSizeAligned(sig.returnType)}`);
+      r += line(`sub     esp, ${evalSizeAligned(sig.returnType)} ; reserve return value`);
     }
 
     // push arguments
@@ -2696,7 +2901,7 @@ function compile(state) {
     }
 
     r += line('call    ' + sig.asmName);
-    r += line(`add     esp, ${sizeArgs}`);
+    if (sizeArgs != 0) r += line(`add     esp, ${sizeArgs}`);
     r += line('; call expression )');
     r += line();
 
@@ -3614,6 +3819,8 @@ function getFuncAsmName(ctx, func) {
     );
   } else if (func.convention === 'stdcall') {
     return getFuncAsmNameStdcall(ctx, func);
+  } else if (func.convention === 'cdecl') {
+    return getFuncAsmNameCdecl(ctx, func);
   } else {
     throw new Error('unknown convention: ' + func.convention);
   }
@@ -3631,6 +3838,11 @@ function getFuncAsmNameStdcall(ctx, func) {
     .map((p) => getSizeAligned(ctx, p.type))
     .reduce((a, b) => a + b, 0);
   return `_${name}@${size}`;
+}
+
+function getFuncAsmNameCdecl(ctx, func) {
+  let name = func.name;
+  return `_${name}`;
 }
 
 // asm names }
