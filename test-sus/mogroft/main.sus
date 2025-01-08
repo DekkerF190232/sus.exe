@@ -3,13 +3,9 @@ package Main {
   use sus/System;
 
   main {
-    theFunction();
-    
+    System/println(s:STR"wth\n");
     System/exit(code: 0);
   }
 
-  func theFunction() {
-    int32 test = 0;
-  }
 
 }

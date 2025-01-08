@@ -1,0 +1,40 @@
+
+package Main {
+
+  use sus/InOut;
+  use sus/System;
+  use main/test/Add;
+
+  main {
+    Test test = new_Test();
+    
+    InOut/print(s: STR"expecting 1,2:\n");
+
+    funcptr[(PTR[Test] test)] print = test.print;
+    print(test: REF(test));
+	
+    System/exit(code: 0);
+  }
+
+  func CON(sus) int32 add(int32 a, int32 b) {
+    done a + b;
+  }
+
+  struct Test(
+    int32 x,
+    int32 y,
+    funcptr[(PTR[Test] test)] print
+  );
+
+  func test_print(PTR[Test] test) {
+    InOut/print(i: DRF(test).x);
+    InOut/print(s: STR",");
+    InOut/print(i: DRF(test).y);
+    InOut/print(s: STR"\n");
+  }
+
+  func Test new_Test() {
+    done Test(x = 1, y = 2, print = funcref(test_print));
+  }
+
+}

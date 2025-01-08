@@ -84,6 +84,8 @@ function parse(state) {
   const makeNodeExprBrackets = () => makeNode('expr-brackets', null, []); // expression
   const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get pointer of
   const makeNodeExprDrf = () => makeNode('expr-drf', null, []); // kids: expression to express value of
+  const makeNodeExprFuncref = (address) =>
+    makeNode('expr-funcref', { address }, []);
   const makeNodeExprRtp = () => makeNode('expr-reinterpret', null, []); // kids: type, expression
   const makeNodeExprSize = () => makeNode('expr-siz', null, []); // kids: type, expression
   const makeNodeType = (type) => makeNode('type', { type }, []);
@@ -669,6 +671,17 @@ function parse(state) {
         return drfNode;
       },
       () => {
+        if (!eat(/^funcref/)) return;
+        eatEmpty();
+        if (!eat(/^\(/)) return;
+        eatEmpty();
+        let funcrefNode = makeNodeExprFuncref();
+        funcrefNode.props.address = eatAddressName();
+        eatPicky(')');
+        eatEmpty();
+        return funcrefNode;
+      },
+      () => {
         if (!eat(/^RTP/)) return;
         eatEmpty();
 
@@ -1013,33 +1026,90 @@ function parse(state) {
   }
 
   function tryParseType() {
-    return tryParse((_) => {
-      let name = eatTypeNamePart();
-      eatEmpty();
+    return tryParse(
+      () => {
+        let funcSig = makeTypeFuncPtr(undefined, undefined, []);
 
-      if (!name) return undefined;
+        if (!eat(/^funcptr/)) return;
+        eatEmpty();
 
-      let isPrimitive = name.match(
-        /^(int8|int32|boo|PTR|ptr)(?![a-zA-Z0-9_\[<])/
-      );
-      if (isPrimitive) {
-        if (eat(/^\[/)) {
+        if (!eat(/^\[/)) return;
+        eatEmpty();
+
+        funcSig.convention = 'sus';
+        if (eat(/^CON/)) {
           eatEmpty();
-          let insideType = tryParseType();
-          if (!insideType) return undefined;
-          if (!eat(/^\]/)) return undefined;
+
+          if (!eat(/^\(/)) return;
           eatEmpty();
-          let type = makeTypePrim(name, [insideType]);
-          return type;
+
+          funcSig.convention = eatSymbol();
+          if (!funcSig.convention) funcSig.convention = 'sus';
+          eatEmpty();
+
+          if (!eat(/^\)/)) return;
+          eatEmpty();
         }
 
-        return makeTypePrim(name);
-      } else {
+        funcSig.returnType = tryParseType();
+
+        if (!eat(/\(/)) return;
+        eatEmpty();
+
+        let first = true;
+        while (!eat(/^\)/)) {
+          if (eof()) throw err('unexpected eof');
+          eatEmpty();
+
+          if (!first && !eat(/^,/)) return;
+          eatEmpty();
+
+          let param = makeTypeFuncPtrParam(undefined, undefined);
+
+          param.type = tryParseType();
+          if (!param.type) return;
+
+          param.name = eatSymbol();
+          if (!param.name) return;
+          eatEmpty();
+
+          funcSig.params.push(param);
+
+          first = false;
+        }
+        eatEmpty();
+
+        if (!eat(/^\]/)) return;
+        eatEmpty();
+
+        return funcSig;
+      },
+      (_) => {
+        let name = eatTypeNamePart();
+        eatEmpty();
+
+        if (!name) return undefined;
+
+        let isPrimitive = name.match(
+          /^(int8|int32|boo|PTR|ptr)(?![a-zA-Z0-9_\[<])/
+        );
+        if (isPrimitive) {
+          if (eat(/^\[/)) {
+            eatEmpty();
+            let insideType = tryParseType();
+            if (!insideType) return undefined;
+            if (!eat(/^\]/)) return undefined;
+            eatEmpty();
+            let type = makeTypePrim(name, [insideType]);
+            return type;
+          }
+
+          return makeTypePrim(name);
+        }
+
         return makeTypeNamed(name);
       }
-
-      return undefined;
-    });
+    );
   }
 
   function parseNodeType() {
@@ -1165,6 +1235,11 @@ function compile(state) {
   function resolveFuncSig(symbol, paramNames, addressScope) {
     let pkgSym = resolvePkgSym(state.ctx, addressScope, symbol);
     return findFunc(state.ctx, pkgSym.packageAddress, pkgSym.name, paramNames);
+  }
+
+  function resolveFuncSigsByName(symbol, addressScope) {
+    let pkgSym = resolvePkgSym(state.ctx, addressScope, symbol);
+    return findFuncs(state.ctx, pkgSym.packageAddress, pkgSym.name, undefined);
   }
 
   // /
@@ -1397,6 +1472,19 @@ function compile(state) {
         );
       let pointedType = type.args[0];
       return pointedType;
+    } else if (expr.name === 'expr-funcref') {
+      let address = expr.props.address;
+      let funcSigs = resolveFuncSigsByName(address, addressScope);
+      if (!funcSigs)
+        throw makeImplErr('could not find function by name ' + address);
+      if (funcSigs.length !== 1)
+        throw makeImplErr('mutliple functions with name ' + address);
+      let sig = funcSigs[0];
+      return makeTypeFuncPtr(
+        sig.convention,
+        sig.returnType,
+        sig.params.map((x) => makeTypeFuncPtrParam(x.name, x.type))
+      );
     } else {
       throw makeImplErr('unknown expression ' + expr.name);
     }
@@ -1908,12 +1996,15 @@ function compile(state) {
 
     return scope;
   }
-  function compileExprCallCdecl(expr, scope, addressScope, sig, nodeArgs) {
-    if (sig.params.length < nodeArgs.length)
+
+  function compileExprCallCdecl(expr, scope, addressScope, callInfo, nodeArgs) {
+    if (callInfo.typeFuncPtr.params.length < nodeArgs.length)
       throw makeErr(expr.i, 'to many arguments for ' + func.props.name);
 
-    let hasReturn = sig.returnType !== undefined;
-    let returnSize = hasReturn ? evalSizeAligned(sig.returnType) : undefined;
+    let hasReturn = callInfo.typeFuncPtr.returnType !== undefined;
+    let returnSize = hasReturn
+      ? evalSizeAligned(callInfo.typeFuncPtr.returnType)
+      : undefined;
 
     let r = '';
 
@@ -1928,7 +2019,7 @@ function compile(state) {
 
     // push arguments
     let sizeArgs = 0;
-    for (const param of [...sig.params].reverse()) {
+    for (const param of [...callInfo.typeFuncPtr.params].reverse()) {
       let arg = nodeArgs.find((x) => x.props.name == param.name);
       let expr = arg.kids.find((x) => x.name === 'expr');
       if (!arg)
@@ -1938,7 +2029,7 @@ function compile(state) {
       r += compileExpr(expr, scope, addressScope);
     }
 
-    r += line('call    ' + sig.asmName);
+    r += compileCallProc(callInfo);
 
     let poppedSize = sizeArgs;
     if (hasReturn && returnSize > 8) poppedSize += 4;
@@ -1953,12 +2044,14 @@ function compile(state) {
     return r;
   }
 
-  function compileExprCallStd(expr, scope, addressScope, sig, nodeArgs) {
-    if (sig.params.length < nodeArgs.length)
+  function compileExprCallStd(expr, scope, addressScope, callInfo, nodeArgs) {
+    if (callInfo.typeFuncPtr.params.length < nodeArgs.length)
       throw makeErr(expr.i, 'to many arguments for ' + func.props.name);
 
-    let hasReturn = sig.returnType !== undefined;
-    let returnSize = hasReturn ? evalSizeAligned(sig.returnType) : undefined;
+    let hasReturn = callInfo.typeFuncPtr.returnType !== undefined;
+    let returnSize = hasReturn
+      ? evalSizeAligned(callInfo.typeFuncPtr.returnType)
+      : undefined;
 
     let r = '';
 
@@ -1973,7 +2066,7 @@ function compile(state) {
 
     // push arguments
     let sizeArgs = 0;
-    for (const param of [...sig.params].reverse()) {
+    for (const param of [...callInfo.typeFuncPtr.params].reverse()) {
       let arg = nodeArgs.find((x) => x.props.name == param.name);
       let expr = arg.kids.find((x) => x.name === 'expr');
       if (!arg)
@@ -1983,7 +2076,7 @@ function compile(state) {
       r += compileExpr(expr, scope, addressScope);
     }
 
-    r += line('call    ' + sig.asmName);
+    r += compileCallProc(callInfo);
 
     if (hasReturn && returnSize > 8) r += line(`add     esp, 4`);
 
@@ -2128,9 +2221,7 @@ function compile(state) {
         if (findSymTableLoc(scope, param.name))
           throw makeErr(param.i, 'duplicate symbol: ' + param.name);
         let size = evalSizeAligned(param.type);
-        table.rows.push(
-          makeSymTableRow(param.name, param.type, argOff, size)
-        );
+        table.rows.push(makeSymTableRow(param.name, param.type, argOff, size));
         argOff += size;
         scope.paramsSize += size;
       }
@@ -2154,11 +2245,7 @@ function compile(state) {
 
     if (sig && sig.returnType) {
       let returnSize = evalSizeAligned(sig.returnType);
-      scope.returnInfo = makeReturnInfo(
-        sig.returnType,
-        returnSize,
-        argOff
-      );
+      scope.returnInfo = makeReturnInfo(sig.returnType, returnSize, argOff);
     }
 
     return scope;
@@ -2197,7 +2284,11 @@ function compile(state) {
 
     if (scope.returnInfo) {
       r += line(';   scope return info ');
-      r += line(`;     [ebp${getOffStr(scope.returnInfo.off)}] = ${typeToString(scope.returnInfo.type)}`);
+      r += line(
+        `;     [ebp${getOffStr(scope.returnInfo.off)}] = ${typeToString(
+          scope.returnInfo.type
+        )}`
+      );
       r += line(`;     => size = ` + scope.returnInfo.size);
     }
 
@@ -2750,15 +2841,10 @@ function compile(state) {
 
     let r = '';
 
-    let args = expr.kids.filter((x) => x.name === 'arg');
-    let paramNames = args.map((x) => x.props.name).sort();
-    let symbol = expr.props.name;
+    let callInfo = getCallInfo(expr, scope, addressScope);
 
-    let sig = resolveFuncSig(symbol, paramNames, addressScope);
-    if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol);
-
-    if (sig.returnType !== undefined)
-      throw makeErr(expr.i, 'function has return type: ' + symbol);
+    if (callInfo.typeFuncPtr.returnType !== undefined)
+      throw makeErr(expr.i, 'function has return type: ' + expr.props.name);
 
     r += compileExprCall(expr, scope, addressScope);
 
@@ -2839,33 +2925,69 @@ function compile(state) {
       asm += compileExprDrf(expr, scope, addressScope);
     } else if (expr.name === 'expr-member') {
       asm += compileExprMember(expr, scope, addressScope);
+    } else if (expr.name == 'expr-funcref') {
+      asm += compileExprFuncRef(expr, scope, addressScope);
     } else {
       throw makeImplErr('unknown expression ' + expr.name);
     }
     return asm;
   }
 
-  function compileExprCall(expr, scope, addressScope) {
+  function makeCallInfoAsmName(asmName, typeFuncPtr) {
+    return { kind: 'asm-name', asmName, typeFuncPtr };
+  }
+
+  function makeCallInfoSymbol(loc, typeFuncPtr) {
+    return { kind: 'symbol', loc, typeFuncPtr };
+  }
+
+  function getCallInfo(expr, scope, addressScope) {
     let nodeArgs = expr.kids.filter((x) => x.name === 'arg');
     let paramNames = nodeArgs.map((x) => x.props.name).sort();
     let symbol = expr.props.name;
 
-    let sig = resolveFuncSig(symbol, paramNames, addressScope);
-    if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol);
-    let asmName = sig.asmName;
+    let callInfo;
 
-    if (state.name !== sig.unitPath && !tableExternals.includes(asmName)) {
-      tableExternals.push(asmName);
+    let loc = findSymTableLoc(scope, symbol);
+
+    if (loc) {
+      let typeFuncPtr = loc.row.type;
+      callInfo = makeCallInfoSymbol(loc, typeFuncPtr);
+    } else {
+      let sig = resolveFuncSig(symbol, paramNames, addressScope);
+      if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol);
+      let asmName = sig.asmName;
+      if (state.name !== sig.unitPath && !tableExternals.includes(asmName)) {
+        tableExternals.push(asmName);
+      }
+
+      let typeFuncPtr = makeTypeFuncPtr(
+        sig.convention,
+        sig.returnType,
+        sig.params.map((x) => makeTypeFuncPtrParam(x.name, x.type))
+      );
+      callInfo = makeCallInfoAsmName(asmName, typeFuncPtr);
     }
+
+    return callInfo;
+  }
+
+  function compileExprCall(expr, scope, addressScope, callInfo = undefined) {
+    let nodeArgs = expr.kids.filter((x) => x.name === 'arg');
+
+    if (!callInfo) callInfo = getCallInfo(expr, scope, addressScope);
 
     let r = '';
 
-    if (sig.convention === undefined || sig.convention === 'sus') {
-      r += compileExprCallSus(expr, scope, addressScope, sig, nodeArgs);
-    } else if (sig.convention === 'stdcall') {
-      r += compileExprCallStd(expr, scope, addressScope, sig, nodeArgs);
-    } else if (sig.convention === 'cdecl') {
-      r += compileExprCallCdecl(expr, scope, addressScope, sig, nodeArgs);
+    if (
+      callInfo.typeFuncPtr.convention === undefined ||
+      callInfo.typeFuncPtr.convention === 'sus'
+    ) {
+      r += compileExprCallSus(expr, scope, addressScope, callInfo, nodeArgs);
+    } else if (callInfo.typeFuncPtr.convention === 'stdcall') {
+      r += compileExprCallStd(expr, scope, addressScope, callInfo, nodeArgs);
+    } else if (callInfo.typeFuncPtr.convention === 'cdecl') {
+      r += compileExprCallCdecl(expr, scope, addressScope, callInfo, nodeArgs);
     } else {
       throw makeImplErr();
     }
@@ -2873,8 +2995,8 @@ function compile(state) {
     return r;
   }
 
-  function compileExprCallSus(expr, scope, addressScope, sig, nodeArgs) {
-    let params = sig.params;
+  function compileExprCallSus(expr, scope, addressScope, callInfo, nodeArgs) {
+    let params = callInfo.typeFuncPtr.params;
 
     let r = '';
 
@@ -2884,8 +3006,12 @@ function compile(state) {
       throw makeErr(expr.i, 'to many arguments for ' + func.props.name);
 
     // reserve return value
-    if (sig.returnType) {
-      r += line(`sub     esp, ${evalSizeAligned(sig.returnType)} ; reserve return value`);
+    if (callInfo.typeFuncPtr.returnType) {
+      r += line(
+        `sub     esp, ${evalSizeAligned(
+          callInfo.typeFuncPtr.returnType
+        )} ; reserve return value`
+      );
     }
 
     // push arguments
@@ -2900,11 +3026,31 @@ function compile(state) {
       r += compileExpr(expr, scope, addressScope);
     }
 
-    r += line('call    ' + sig.asmName);
+    r += compileCallProc(callInfo);
+
     if (sizeArgs != 0) r += line(`add     esp, ${sizeArgs}`);
     r += line('; call expression )');
     r += line();
 
+    return r;
+  }
+
+  function compileCallProc(callInfo) {
+    let r = '';
+    if (callInfo.kind === 'symbol') {
+      let loc = callInfo.loc;
+
+      let row = loc.row;
+      let symRes = resolveSymbolBase(loc);
+      r += symRes.asm;
+      r += line(
+        `call     [${symRes.register}${getOffStr(row.off)}] ; symbol: ${row.symbol}`
+      );
+    } else if (callInfo.kind === 'asm-name') {
+      r += line('call    ' + callInfo.asmName);
+    } else {
+      throw makeImplErr();
+    }
     return r;
   }
 
@@ -2924,6 +3070,21 @@ function compile(state) {
     r += line(`pop     eax`);
     r += line(`mov     eax, [eax]`);
     r += line(`push    eax`);
+    return r;
+  }
+
+  function compileExprFuncRef(expr, scope, addressScope) {
+    let funcSigs = resolveFuncSigsByName(expr.props.address, addressScope);
+    if (!funcSigs)
+      throw makeImplErr(
+        'could not find function by name ' + expr.props.address
+      );
+    if (funcSigs.length !== 1)
+      throw makeImplErr('mutliple functions with name ' + expr.props.address);
+    let sig = funcSigs[0];
+
+    let r = '';
+    r += line(`push    ` + sig.asmName);
     return r;
   }
 
@@ -3458,6 +3619,17 @@ function makeTypeNamed(anyName, args = []) {
   return { kind: 'named', anyName, args };
 }
 
+function makeTypeFuncPtr(convention, returnType, params) {
+  return { kind: 'func-ptr', convention, returnType, params };
+}
+
+function makeTypeFuncPtrParam(name, type) {
+  return {
+    name,
+    type,
+  };
+}
+
 function typeEquals(a, b) {
   _ass(a.kind);
   _ass(b.kind);
@@ -3473,9 +3645,30 @@ function typeToString(type) {
   if (!type.kind) throw 0;
   switch (type.kind) {
     case 'prim':
-      return type.name + (type.args > 0 ? '[' + args.join(', ') + ']' : '');
+      return (
+        type.name +
+        (type.args > 0 ? '[' + args.map(typeToString).join(', ') + ']' : '')
+      );
     case 'struct':
       return type.name;
+    case 'func-ptr':
+      let r = 'funcptr[';
+      if (type.returnType) r += typeToString(type.returnType);
+
+      if (type.convention !== 'sus' && type.convention !== undefined) {
+        if (r.length > 0) r += ' ';
+        r += 'CON(' + type.convention + ')';
+      }
+
+      if (r.length > 0) r += ' ';
+      r += '(';
+      r += type.params
+        .map((x) => typeToString(x.type) + ' ' + x.name)
+        .join(', ');
+      r += ')';
+
+      r += ']';
+      return r;
     default:
       throw 0;
   }
@@ -3507,6 +3700,8 @@ function getSize(ctx, type) {
       default:
         throw new Error('unknown primitive type: ' + type.kind);
     }
+  } else if (type.kind === 'func-ptr') {
+    return 4;
   } else {
     throw new Error('unknown type: ' + type.kind);
   }
@@ -3628,17 +3823,34 @@ function findFunc(ctx, packageAddress, simpleName, paramNames) {
   );
 }
 
+function findFuncs(ctx, packageAddress, simpleName) {
+  return ctx.funcSigs.filter(
+    (x) => x.packageAddress === packageAddress && x.name === simpleName
+  );
+}
+
 function getType(ctx, addressScope, typeNode) {
   function resolveType(type) {
     _ass(type);
 
-    type.args = type.args.map(resolveType);
+    if (type.args) type.args = type.args.map(resolveType);
 
-    if (type.kind === 'named') {
+    if (type.kind === 'prim') {
+      // ...
+    } else if (type.kind === 'struct') {
+      // ...
+    } else if (type.kind === 'func-ptr') {
+      if (type.returnType) type.returnType = resolveType(type.returnType);
+      for (const param of type.params) {
+        param.type = resolveType(param.type);
+      }
+    } else if (type.kind === 'named') {
       let struct = resolveStruct(ctx, addressScope, type.anyName);
       if (!struct)
         throw new Error('could not find struct of name ' + type.anyName);
       return struct.type;
+    } else {
+      throw new Error('dont know this type');
     }
 
     return type;
@@ -3748,6 +3960,8 @@ function loadStructSizes(ctx, path, src, tree) {
       if (member.type.kind === 'struct') {
         off += calcSize(findStructByAddress(ctx, member.type.name), depth - 1);
       } else if (member.type.kind === 'prim') {
+        off += getSize(ctx, member.type);
+      } else if (member.type.kind === 'func-ptr') {
         off += getSize(ctx, member.type);
       } else {
         throw new Error('unknown type kind ' + member.type.kind);
