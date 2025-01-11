@@ -3,9 +3,154 @@ package Main {
   use sus/System;
 
   main {
-    System/println(s:STR"wth\n");
+    System/println(s:STR"Starting mogroft compiled using sus.exe\n");
+    
+    Window/run();
+
+    System/println(s:STR"Exiting.");
     System/exit(code: 0);
   }
 
+
+}
+
+package Window {
+
+  use sus/native/Win;
+  use sus/System;
+
+  struct Window (
+    WindowHandle windowHandle
+  );
+
+  func run() {
+    Window window = Window(windowHandle=RTP[WindowHandle](0));
+
+    # make window
+    registerClass();
+    createWindow(this: REF(window));
+    # boo _1 = Win/SetWindowPos(
+    #   handle: window.windowHandle, handleInsertAfter: RTP[WindowHandle](0),
+    #   x: 0, y: 0, cx: 0, cy: 0,
+    #   flags: Win/SWP_NOZORDER | Win/SWP_NOSIZE | Win/SWP_SHOWWINDOW
+    # );
+    boo _2 = Win/ShowWindow(handle: window.windowHandle, showCommand: Win/SW_SHOWNORMAL);
+    boo _3 = Win/UpdateWindow(handle: window.windowHandle);
+
+    runMessageLoop(this: REF(window));  
+  }
+
+  func runMessageLoop(PTR[Window] this) {
+    WindowMessage message = Win/new_WindowMessage();
+    
+    while (Win/GetMessageA(
+      message:   REF(message),
+      handle:    DRF(this).windowHandle,
+      filterMin: 0,
+      filterMax: 0
+    )) {
+      boo _4 = Win/TranslateMessage(message: REF(message));
+      int32 _5 = Win/DispatchMessageA(message: REF(message));
+    }
+  }
+
+  func CON(stdcall) int32 windowProc(WindowHandle handle, int32 message, int32 wParam, int32 lParam) {
+    done Win/DefWindowProcA(handle: handle, message:message, wParam: wParam, lParam: lParam);
+  }
+
+  func registerClass() {
+    int32 err = 0;
+
+    Win/SetLastError(code:0);
+
+    InstanceHandle instance = RTP[InstanceHandle](0);
+
+    # load icon
+    IconHandle icon = Win/LoadIconA(instance: instance, iconName: Win/fc_IDI_WINLOGO());
+    err = Win/GetLastError();
+    if (err != 0) {
+      errMsg(code: err, message: STR"Error loading icon: ");
+      System/exit(code: err);
+    }
+
+    CursorHandle cursor = Win/LoadCursorA(instance: instance, cursorName: Win/fc_IDC_ARROW());
+    err = Win/GetLastError();
+    if (err != 0) {
+      errMsg(code: err, message: STR"Error loading icon: ");
+      System/exit(code: err);
+    }
+
+    #System/print(s: STR"icon: ");
+    #System/println(i: RTP[int32](icon));
+    #System/print(s: STR"cursor: ");
+    #System/println(i: RTP[int32](cursor));
+
+    WindowClassExtendedAscii windowClass = WindowClassExtendedAscii(
+      cbSize     = size[WindowClassExtendedAscii](),
+      style      = Win/CS_OWNDC | Win/CS_HREDRAW | Win/CS_VREDRAW | Win/CS_DBLCLKS,
+      windowProc = funcref(windowProc),
+      cbClsExt = 0,
+      cbWndExt = 0,
+      instance   = instance,
+      icon       = icon,
+      cursor     = cursor,
+      background = RTP[BrushHandle](0),
+      menuName   = RTP[PTR[int8]](0),
+      className  = STR"Mogroft",
+      iconSmall  = RTP[IconHandle](0)
+    );
+
+    int32 _ignored = cast[int32](Win/RegisterClassExA(windowClass: REF(windowClass)));
+    err = Win/GetLastError();
+    if (err != 0) {
+      errMsg(code: err, message: STR"Error registering class: ");
+      System/exit(code: err);
+    }
+  }
+
+  func createWindow(PTR[Window] this) {
+    int32 style = Win/fc_WS_OVERLAPPEDWINDOW()|Win/WS_CLIPSIBLINGS|Win/WS_CLIPCHILDREN;
+    
+    Rectangle rectangle = Rectangle(
+      left = 100,
+      top = 100,
+      right = 600,
+      bottom = 600
+    );
+
+    boo res = Win/AdjustWindowRect(rectangle: REF(rectangle), style: style, menu: no);
+
+    DRF(this).windowHandle = Win/CreateWindowExA(
+      extendedStyle: 0,
+      className:     STR"Mogroft",
+      windowName:    STR"Mogroft sus.exe",
+      style:         style,
+      x:             0,
+      y:             0,
+      width:         500,
+      height:        500,
+      parentHandle:  RTP[WindowHandle](0),
+      menu:          RTP[MenuHandle](0),
+      instance:      RTP[InstanceHandle](0),
+      param:         RTP[ptr](0)
+    );
+
+    if (RTP[int32](DRF(this).windowHandle) == 0) {
+      int32 code = Win/GetLastError();
+      errMsg(code: code, message: STR"Failed to create window. GetLastError: ");
+      System/exit(code: code);
+    }
+
+  }
+
+  func errMsg(int32 code, PTR[int8] message) {
+    System/print(s: message);
+    System/print(s: STR" ");
+
+    System/print(i: code);
+    System/print(s: STR" = 0x");
+
+    System/println(i_0x: code);
+  }
 
 }

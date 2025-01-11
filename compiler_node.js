@@ -65,8 +65,7 @@ function buildContext(buildInfo, units) {
 
     console.log('  ' + unit.sourceFile);
   }
-
-  compiler.validateContext(ctx);
+  compiler.addToContextDone(ctx);
 
   console.log('');
 
@@ -133,7 +132,7 @@ function genScripts(buildInfo, units, context) {
     buildBat += 'nasm -f win32 -gcv8 ' + asmPathIn + EOL;
   }
 
-  let strLibs = '"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\kernel32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\ucrt\\x86\\ucrt.lib"';
+  let strLibs = '"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\User32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\kernel32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\ucrt\\x86\\ucrt.lib"';
   let strObjPaths = '';
 
   for (const unit of units) {

@@ -3,6 +3,7 @@ package sus/native/Win {
 
   # strings
   func CON(cdecl) int32 strnlen(PTR[int8] buffer, int32 size) EXT;
+  func CON(cdecl) _itoa_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) EXT;
 
   # stdout
   const int32 STD_OUTPUT_HANDLE = -11;
@@ -10,10 +11,162 @@ package sus/native/Win {
   func CON(stdcall) int32 GetStdHandle(int32 handle) EXT;
   func CON(stdcall) boo WriteFile(int32 file, PTR[int8] buffer, int32 length, PTR[int32] written, PTR[ptr] overlapped) EXT;
 
+  # errors
+  func CON(stdcall) SetLastError(int32 code) EXT;
+  func CON(stdcall) int32 GetLastError() EXT;
+
+  # threads
+  func CON(stdcall) Sleep(int32 ms) EXT;
+
   # windows
+
+  struct Rectangle (
+    int32 left,
+    int32 top,
+    int32 right,
+    int32 bottom
+  );
+
+  func CON(stdcall) boo AdjustWindowRect(PTR[Rectangle] rectangle, int32 style, boo menu) EXT;
+
+  func CON(stdcall) WindowHandle CreateWindowExA(
+    int32 extendedStyle,
+    PTR[int8] className,
+    PTR[int8] windowName,
+    int32 style,
+    int32 x,
+    int32 y,
+    int32 width,
+    int32 height,
+    WindowHandle parentHandle,
+    MenuHandle menu,
+    InstanceHandle instance,
+    ptr param) EXT;
+
+  const int32 WS_OVERLAPPED       = @00000000;
+  const int32 WS_POPUP            = @80000000;
+  const int32 WS_CHILD            = @40000000;
+  const int32 WS_MINIMIZE         = @20000000;
+  const int32 WS_VISIBLE          = @10000000;
+  const int32 WS_DISABLED         = @08000000;
+  const int32 WS_CLIPSIBLINGS     = @04000000;
+  const int32 WS_CLIPCHILDREN     = @02000000;
+  const int32 WS_MAXIMIZE         = @01000000;
+  const int32 WS_CAPTION          = @00C00000;
+  const int32 WS_BORDER           = @00800000;
+  const int32 WS_DLGFRAME         = @00400000;
+  const int32 WS_VSCROLL          = @00200000;
+  const int32 WS_HSCROLL          = @00100000;
+  const int32 WS_SYSMENU          = @00080000;
+  const int32 WS_THICKFRAME       = @00040000;
+  const int32 WS_GROUP            = @00020000;
+  const int32 WS_TABSTOP          = @00010000;
+  const int32 WS_MINIMIZEBOX      = @00020000;
+  const int32 WS_MAXIMIZEBOX      = @00010000;
+
+  func int32 fc_WS_OVERLAPPEDWINDOW() {
+    done WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+  }
+
+  const int32 CS_VREDRAW          = @0001;
+  const int32 CS_HREDRAW          = @0002;
+  const int32 CS_DBLCLKS          = @0008;
+  const int32 CS_OWNDC            = @0020;
+  const int32 CS_CLASSDC          = @0040;
+  const int32 CS_PARENTDC         = @0080;
+  const int32 CS_NOCLOSE          = @0200;
+  const int32 CS_SAVEBITS         = @0800;
+  const int32 CS_BYTEALIGNCLIENT  = @1000;
+  const int32 CS_BYTEALIGNWINDOW  = @2000;
+  const int32 CS_GLOBALCLASS      = @4000;
+
+  const int32 SWP_NOSIZE          = @0001;
+  const int32 SWP_NOMOVE          = @0002;
+  const int32 SWP_NOZORDER        = @0004;
+  const int32 SWP_NOREDRAW        = @0008;
+  const int32 SWP_NOACTIVATE      = @0010;
+  const int32 SWP_FRAMECHANGED    = @0020;
+  const int32 SWP_SHOWWINDOW      = @0040;
+  const int32 SWP_HIDEWINDOW      = @0080;
+  const int32 SWP_NOCOPYBITS      = @0100;
+  const int32 SWP_NOOWNERZORDER   = @0200;
+  const int32 SWP_NOSENDCHANGING  = @0400;
+
+  const int32 SW_SHOWNORMAL = 1;
+
+  struct InstanceHandle (int32 _unused);
   struct WindowHandle (int32 _unused);
-  func CON(stdcall) ShowWindow(WindowHandle handle, int32 showCommand) EXT;
-  
+  struct MenuHandle (int32 _unused);
+  struct IconHandle (int32 _unused);
+  struct CursorHandle (int32 _unused);
+  struct BrushHandle (int32 _unused);
+
+  func PTR[int8] fc_IDI_WINLOGO() { done RTP[PTR[int8]](32517); }
+  func PTR[int8] fc_IDC_ARROW() { done RTP[PTR[int8]](32512); }
+
+  func CON(stdcall) IconHandle LoadIconA(InstanceHandle instance, PTR[int8] iconName) EXT;
+
+  func CON(stdcall) CursorHandle LoadCursorA(InstanceHandle instance, PTR[int8] cursorName) EXT;
+
+  func CON(stdcall) int32 DefWindowProcA(WindowHandle handle, int32 message, int32 wParam, int32 lParam) EXT;
+
+  struct WindowClassExtendedAscii (
+    int32 cbSize,
+    int32 style,
+    funcptr[CON(stdcall) int32 (WindowHandle handle, int32 message, int32 wParam, int32 lParam)] 
+         windowProc,
+    int32 cbClsExt,
+    int32 cbWndExt,
+    InstanceHandle instance,
+    IconHandle icon,
+    CursorHandle cursor,
+    BrushHandle background,
+    PTR[int8] menuName,
+    PTR[int8] className,
+    IconHandle iconSmall
+  );
+  func CON(stdcall) boo ShowWindow(WindowHandle handle, int32 showCommand) EXT;
+  func CON(stdcall) int16 RegisterClassExA(PTR[WindowClassExtendedAscii] windowClass) EXT;
+
+  func CON(stdcall) boo SetWindowPos(
+      WindowHandle handle,
+      WindowHandle handleInsertAfter,
+      int32 x,
+      int32 y,
+      int32 cx,
+      int32 cy,
+      int32 flags) EXT;
+
+  struct Point (
+    int32 x,
+    int32 y
+  );
+
+  struct WindowMessage (
+    WindowHandle handle,
+    int32 message,
+    int32 wParam,
+    int32 lParam,
+    int32 time,
+    Point point
+  );
+  func WindowMessage new_WindowMessage() {
+    done WindowMessage(
+      handle=RTP[WindowHandle](0),
+      message = 0,
+      wParam = 0,
+      lParam = 0,
+      time = 0,
+      point = Point(x = 0, y = 0)
+    );
+  }
+
+  func CON(stdcall) boo GetMessageA(PTR[WindowMessage] message, WindowHandle handle, int32 filterMin, int32 filterMax) EXT;
+
+  func CON(stdcall) boo UpdateWindow(WindowHandle handle) EXT;
+  func CON(stdcall) boo TranslateMessage(PTR[WindowMessage] message) EXT;
+  func CON(stdcall) int32 DispatchMessageA(PTR[WindowMessage] message) EXT;
+
 }
 
 
@@ -21,22 +174,56 @@ package sus/System {
 
   use sus/native/Win;
 
+  func sleep(int32 ms) {
+    Win/Sleep(ms: ms);
+  }
+
   func exit(int32 code) {
     Win/ExitProcess(code: code);
   }
 
   func print(PTR[int8] s) {
+    print(s: s, length: Win/strnlen(buffer: s, size: 2147483647));
+  }
+
+  func print(PTR[int8] s, int32 length) {
     boo _r = Win/WriteFile(
 	    file:       Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE),
 	    buffer:     s,
-	    length:     Win/strnlen(buffer: s, size: 2147483647),
+	    length:     length,
 	    written:    RTP[PTR[int32]](0),
 	    overlapped: RTP[PTR[ptr]](0)
 	  );
   }
 
+  func print(int32 i) {
+    PTR[int8] buffer = ARR[int8](4);
+    Win/_itoa_s(value: i, buffer: buffer, size: 16, radix: 10);
+    print(s: buffer);
+  }
+
+  func print(int32 i_0x) {
+    PTR[int8] buffer = ARR[int8](4);
+    Win/_itoa_s(value: i_0x, buffer: buffer, size: 16, radix: 16);
+    print(s: buffer);
+  }
+
+  func println(int32 i_0x) {
+    print(i_0x: i_0x);
+    println();
+  }
+
+  func println(int32 i) {
+    print(i: i);
+    println();
+  }
+
   func println(PTR[int8] s) {
     print(s: s);
+    println();
+  }
+
+  func println() {
     print(s: STR"\n");
   }
 
