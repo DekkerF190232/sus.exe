@@ -173,7 +173,7 @@ package sus/native/Win {
 
   struct DeviceContextHandle(ptr _unused);
 
-  func CON(stdcall) DeviceContextHandle GetDC(WindowHandle handle) EXT;
+  func CON(stdcall) DeviceContextHandle GetDC(WindowHandle handle);
 
   struct PixelFormatDescriptor (
     int16 size,
@@ -205,30 +205,30 @@ package sus/native/Win {
   );
 
   func PixelFormatDescriptor new_PixelFormatDescriptor() {
-    done PixelFormatDescriptor (
-      size = cast[int16](0),
-      version = cast[int16](0),
+    done struct PixelFormatDescriptor (
+      size = 0,
+      version = 0,
       flags = 0,
-      pixelType = cast[int8](0),
-      colorBits = cast[int8](0),
-      redBits = cast[int8](0),
-      redShift = cast[int8](0),
-      greenBits = cast[int8](0),
-      greenShift = cast[int8](0),
-      blueBits = cast[int8](0),
-      blueShift = cast[int8](0),
-      alphaBits = cast[int8](0),
-      alphaShift = cast[int8](0),
-      accumBits = cast[int8](0),
-      accumRedBits = cast[int8](0),
-      accumGreenBits = cast[int8](0),
-      accumBlueBits = cast[int8](0),
-      accumAlphaBits = cast[int8](0),
-      depthBits = cast[int8](0),
-      stencilBits = cast[int8](0),
-      auxBuffers = cast[int8](0),
-      layerType = cast[int8](0),
-      reserved = cast[int8](0),
+      pixelType = 0,
+      colorBits = 0,
+      redBits = 0,
+      redShift = 0,
+      greenBits = 0,
+      greenShift = 0,
+      blueBits = 0,
+      blueShift = 0,
+      alphaBits = 0,
+      alphaShift = 0,
+      accumBits = 0,
+      accumRedBits = 0,
+      accumGreenBits = 0,
+      accumBlueBits = 0,
+      accumAlphaBits = 0,
+      depthBits = 0,
+      stencilBits = 0,
+      auxBuffers = 0,
+      layerType = 0,
+      reserved = 0,
       layerMask = 0,
       visibleMask = 0,
       damageMask = 0

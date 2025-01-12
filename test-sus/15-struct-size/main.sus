@@ -1,0 +1,57 @@
+
+package Main {
+
+  use sus/native/Win;
+  use sus/System;
+
+  main {
+
+    # - ...struct.int8...
+    # - ...struct.int16...
+    # - ...DRF(struct).int8...
+    # - ...DRF(struct).int16...
+    #
+    # - struct.int8 = ...
+    # - struct.int16 = ...
+    # - DRF(struct).int8 = ...
+    # - DRF(struct).int16 = ...
+
+    System/exit(code: 0);
+  }
+
+  # unaligned: 6
+  struct Struct(
+    int8 _1,
+    int8 _2,
+    int32 _3
+  );
+
+  func testValueInt8() {
+    Struct s = Struct(
+      _1 = cast[int8](@ff),
+      _2 = cast[int8](@ff),
+      _3 = cast[int32](@ffffffff),
+    );
+    System/print(s: STR"expecting 8:\n");
+    System/print(s: STR"           :");
+    System/print(i: size[Struct]());
+  }
+
+  #   changes:
+	#   # test: primitive sizes
+	#   # test: size operator
+	#   # test: array creation size
+	#   # test: struct layout:
+	#   	# UPDATE: misunderstandings (see OglTest test.h) 
+	#   	// https://learn.microsoft.com/en-us/cpp/preprocessor/pack?view=msvc-170
+	#   	- sources: https://en.wikipedia.org/wiki/Data_structure_alignment
+	#   	- follow microsoft rules https://learn.microsoft.com/en-us/cpp/c-language/padding-and-alignment-of-structure-members?view=msvc-170
+	#   # test: local variables and parameters must use stack-aligned sizing function
+	#   # todo: struct access below-4 byte members
+	#   # todo: visit copy / todos
+	#   	# to know: do padding areas need to be zeroed when calling another function?
+	#   	# padding is not required to be zeroed
+	#   - update size[type]() operator in *.sus
+	#   - update ARR[type]() operator in *.sus
+
+}

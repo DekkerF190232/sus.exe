@@ -1,0 +1,29 @@
+
+package Main {
+
+  struct T1 (
+    boo b1,
+    boo b2,
+    boo b3
+  );
+
+  struct T2 (
+    boo b,
+    int16 s,
+    T1 t1,
+    T1 t12,
+    int32 a
+  );
+
+  struct TestStruct (
+    int8 a,
+    int32 b,
+    int8 c,
+    int8 d
+  );
+
+  main {
+    int32 i = 0;
+  }
+
+}

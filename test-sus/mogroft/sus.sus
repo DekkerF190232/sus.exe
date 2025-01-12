@@ -171,6 +171,70 @@ package sus/native/Win {
   func CON(stdcall) boo TranslateMessage(PTR[WindowMessage] message) EXT;
   func CON(stdcall) int32 DispatchMessageA(PTR[WindowMessage] message) EXT;
 
+  struct DeviceContextHandle(ptr _unused);
+
+  func CON(stdcall) DeviceContextHandle GetDC(WindowHandle handle) EXT;
+
+  struct PixelFormatDescriptor (
+    int16 size,
+    int16 version,
+    int32 flags,
+    int8 pixelType,
+    int8 colorBits,
+    int8 redBits,
+    int8 redShift,
+    int8 greenBits,
+    int8 greenShift,
+    int8 blueBits,
+    int8 blueShift,
+    int8 alphaBits,
+    int8 alphaShift,
+    int8 accumBits,
+    int8 accumRedBits,
+    int8 accumGreenBits,
+    int8 accumBlueBits,
+    int8 accumAlphaBits,
+    int8 depthBits,
+    int8 stencilBits,
+    int8 auxBuffers,
+    int8 layerType,
+    int8 reserved,
+    int32 layerMask,
+    int32 visibleMask,
+    int32 damageMask
+  );
+
+  func PixelFormatDescriptor new_PixelFormatDescriptor() {
+    done PixelFormatDescriptor (
+      size = cast[int16](0),
+      version = cast[int16](0),
+      flags = 0,
+      pixelType = cast[int8](0),
+      colorBits = cast[int8](0),
+      redBits = cast[int8](0),
+      redShift = cast[int8](0),
+      greenBits = cast[int8](0),
+      greenShift = cast[int8](0),
+      blueBits = cast[int8](0),
+      blueShift = cast[int8](0),
+      alphaBits = cast[int8](0),
+      alphaShift = cast[int8](0),
+      accumBits = cast[int8](0),
+      accumRedBits = cast[int8](0),
+      accumGreenBits = cast[int8](0),
+      accumBlueBits = cast[int8](0),
+      accumAlphaBits = cast[int8](0),
+      depthBits = cast[int8](0),
+      stencilBits = cast[int8](0),
+      auxBuffers = cast[int8](0),
+      layerType = cast[int8](0),
+      reserved = cast[int8](0),
+      layerMask = 0,
+      visibleMask = 0,
+      damageMask = 0
+    );
+  }
+
 }
 
 package sus/System {
@@ -218,7 +282,7 @@ package sus/System {
     if (digits > 0) {
       print(s: STR".");
 
-      PTR[int8] buffer = ARR[int8](4);
+      PTR[int8] buffer = ARR[int8](16);
       Win/_itoa_s(value: decPart, buffer: buffer, size: 16, radix: 10);
       int32 nonZeroCount = Win/strnlen(buffer: buffer, size: 16);
       
@@ -233,7 +297,7 @@ package sus/System {
   }
 
   func print(int32 i) {
-    PTR[int8] buffer = ARR[int8](4);
+    PTR[int8] buffer = ARR[int8](16);
     Win/_itoa_s(value: i, buffer: buffer, size: 16, radix: 10);
     print(s: buffer);
   }
@@ -249,7 +313,7 @@ package sus/System {
   }
 
   func print(int32 i_0x) {
-    PTR[int8] buffer = ARR[int8](4);
+    PTR[int8] buffer = ARR[int8](16);
     Win/_itoa_s(value: i_0x, buffer: buffer, size: 16, radix: 16);
     print(s: buffer);
   }

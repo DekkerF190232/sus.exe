@@ -9,8 +9,8 @@ package Main {
 
     System/println(s:STR"Exiting.");
     System/exit(code: 0);
+    
   }
-
 
 }
 
@@ -20,11 +20,15 @@ package Window {
   use sus/System;
 
   struct Window (
-    WindowHandle windowHandle
+    WindowHandle windowHandle,
+    DeviceContextHandle deviceContextHandle
   );
 
   func run() {
-    Window window = Window(windowHandle=RTP[WindowHandle](0));
+    Window window = Window(
+      windowHandle=RTP[WindowHandle](0),
+      deviceContextHandle=RTP[DeviceContextHandle](0)
+    );
 
     # make window
     registerClass();

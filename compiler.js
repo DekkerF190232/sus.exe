@@ -42,6 +42,7 @@ function parse(state) {
   function makeNode(name, props, kids) {
     return { name, props, kids, i: state.i };
   }
+
   // node makers so i don't forget
   const makeNodeRoot = (_) => makeNode('root', undefined, []);
   const makeNodePackage = (name) => makeNode('package', { name }, []);
@@ -1266,14 +1267,14 @@ function compile(state) {
     return findSymTableLoc(scope.parent, sym, scopes);
   }
 
-  function evalSizeAligned(type) {
-    let size = getSizeAligned(state.ctx, type);
+  function evalSize4(type) {
+    let size = getSize4(state.ctx, type);
     _ass(!isNaN(size));
     return size;
   }
 
-  function evalSize(type) {
-    let size = getSize(state.ctx, type);
+  function evalSize1(type) {
+    let size = getSize1(state.ctx, type);
     _ass(!isNaN(size));
     return size;
   }
@@ -1373,8 +1374,6 @@ function compile(state) {
   function evalTypeCast(expr, scope, addressScope) {
     let wantedType = getActualType(expr.kids[0], addressScope);
     _ass(wantedType);
-    // TODO: make error if not convertible
-
     return wantedType; // lol
   }
 
@@ -1953,14 +1952,14 @@ function compile(state) {
       for (const param of sig.params) {
         if (findSymTableLoc(scope, param.name))
           throw makeErr(param.i, 'duplicate symbol: ' + param.name);
-        let size = evalSizeAligned(param.type);
+        let size = evalSize4(param.type);
         off += size;
         scope.paramsSize += size;
         table.rows.push(makeSymTableRow(param.name, param.type, off, size));
       }
       // hidden return structure pointer parameter
       if (sig.returnType) {
-        let returnSize = evalSizeAligned(sig.returnType);
+        let returnSize = evalSize4(sig.returnType);
         let returnPointerSize = 4;
         off += returnPointerSize;
         scope.returnInfo = makeReturnInfo(
@@ -1985,7 +1984,7 @@ function compile(state) {
       )) {
         let nodeType = nodeInsSym.kids.find((x) => x.name === 'type');
         let type = getActualType(nodeType, addressScope);
-        let size = evalSizeAligned(type);
+        let size = evalSize4(type);
         let name = nodeInsSym.props.name;
         if (findSymTableLoc(scope, name))
           throw makeErr(nodeInsSym.i, 'duplicate symbol: ' + name);
@@ -2062,7 +2061,7 @@ function compile(state) {
       for (const param of sig.params) {
         if (findSymTableLoc(scope, param.name))
           throw makeErr(param.i, 'duplicate symbol: ' + param.name);
-        let size = evalSizeAligned(param.type);
+        let size = evalSize4(param.type);
         off += size;
         scope.paramsSize += size;
         table.rows.push(makeSymTableRow(param.name, param.type, off, size));
@@ -2070,7 +2069,7 @@ function compile(state) {
 
       // hidden return structure pointer parameter
       if (sig.returnType) {
-        let returnSize = evalSizeAligned(sig.returnType);
+        let returnSize = evalSize4(sig.returnType);
         let returnPointerSize = 4;
         off += returnPointerSize;
         scope.returnInfo = makeReturnInfo(
@@ -2100,7 +2099,7 @@ function compile(state) {
       )) {
         let nodeType = nodeInsSym.kids.find((x) => x.name === 'type');
         let type = getActualType(nodeType, addressScope);
-        let size = evalSizeAligned(type);
+        let size = evalSize4(type);
         let name = nodeInsSym.props.name;
         if (findSymTableLoc(scope, name))
           throw makeErr(nodeInsSym.i, 'duplicate symbol: ' + name);
@@ -2119,7 +2118,7 @@ function compile(state) {
 
     let hasReturn = callInfo.typeFuncPtr.returnType !== undefined;
     let returnSize = hasReturn
-      ? evalSizeAligned(callInfo.typeFuncPtr.returnType)
+      ? evalSize4(callInfo.typeFuncPtr.returnType)
       : undefined;
 
     let r = '';
@@ -2143,7 +2142,7 @@ function compile(state) {
       if (!arg)
         throw makeErr(expr.i, 'can not find argument for param ' + param.name);
       checkType(expr, scope, addressScope, param.type);
-      sizeArgs += evalSize(param.type);
+      sizeArgs += evalSize4(param.type);
       r += compileExpr(expr, scope, addressScope);
     }
 
@@ -2174,7 +2173,7 @@ function compile(state) {
 
     let hasReturn = callInfo.typeFuncPtr.returnType !== undefined;
     let returnSize = hasReturn
-      ? evalSizeAligned(callInfo.typeFuncPtr.returnType)
+      ? evalSize4(callInfo.typeFuncPtr.returnType)
       : undefined;
 
     let r = '';
@@ -2199,7 +2198,7 @@ function compile(state) {
       if (!arg)
         throw makeErr(expr.i, 'can not find argument for param ' + param.name);
       checkType(expr, scope, addressScope, param.type);
-      sizeArgs += evalSize(param.type);
+      sizeArgs += evalSize4(param.type);
       r += compileExpr(expr, scope, addressScope);
     }
 
@@ -2352,7 +2351,7 @@ function compile(state) {
       for (const param of sig.params) {
         if (findSymTableLoc(scope, param.name))
           throw makeErr(param.i, 'duplicate symbol: ' + param.name);
-        let size = evalSizeAligned(param.type);
+        let size = evalSize4(param.type);
         table.rows.push(makeSymTableRow(param.name, param.type, argOff, size));
         argOff += size;
         scope.paramsSize += size;
@@ -2367,7 +2366,7 @@ function compile(state) {
         addressScope
       );
       let name = ins.props.name;
-      let size = evalSize(type);
+      let size = evalSize4(type);
       if (findSymTableLoc(scope, name))
         throw makeErr(ins.i, 'duplicate symbol: ' + name);
       table.size += size;
@@ -2376,7 +2375,7 @@ function compile(state) {
     }
 
     if (sig && sig.returnType) {
-      let returnSize = evalSizeAligned(sig.returnType);
+      let returnSize = evalSize4(sig.returnType);
       scope.returnInfo = makeReturnInfo(sig.returnType, returnSize, argOff);
     }
 
@@ -2800,7 +2799,7 @@ function compile(state) {
           r += line(`pop     eax`);
           r += line(`mov     word [edx], ax`);
         } else {
-          let byteSize = evalSizeAligned(exprType);
+          let byteSize = evalSize4(exprType);
           r += compileCopy('esp', 0, 'edx', 0, byteSize, true);
           r += line(`add     esp, ${byteSize}`);
         }
@@ -2831,7 +2830,7 @@ function compile(state) {
 
     checkType(expr, scope, addressScope, member.type);
 
-    let memberSizeBytes = evalSize(member.type);
+    let memberSizeBytes = evalSize4(member.type);
 
     if (structExpr.name === 'expr-sym') {
       let symbol = structExpr.props.symbol;
@@ -2886,7 +2885,7 @@ function compile(state) {
     if (!loc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
     let symRow = loc.row;
     let type = symRow.type;
-    let byteSize = evalSize(type);
+    let byteSize = evalSize4(type);
 
     r += line(`; symbol assign: ${symbol}`);
     r += compileExpr(expr, scope, addressScope);
@@ -2939,7 +2938,7 @@ function compile(state) {
     let loc = findSymTableLoc(scope, symbol);
     let symRow = loc.row;
 
-    let byteSize = evalSize(symRow.type);
+    let byteSize = evalSize4(symRow.type);
 
     r += line(`; symbol init: ${symbol} {`);
     indented(() => {
@@ -3049,7 +3048,7 @@ function compile(state) {
       asm += compileExprCast(expr, scope, addressScope);
     } else if (expr.name === 'expr-siz') {
       let exprType = getActualType(expr.kids[0], addressScope);
-      let size = evalSize(exprType);
+      let size = evalSize1(exprType);
       asm += line(`push    ${size}`);
     } else if (expr.name === 'expr-lit') {
       asm += compileExprLit(expr, scope, addressScope);
@@ -3154,7 +3153,7 @@ function compile(state) {
     // reserve return value
     if (callInfo.typeFuncPtr.returnType) {
       r += line(
-        `sub     esp, ${evalSizeAligned(
+        `sub     esp, ${evalSize4(
           callInfo.typeFuncPtr.returnType
         )} ; reserve return value`
       );
@@ -3168,7 +3167,7 @@ function compile(state) {
         throw makeErr(expr.i, 'can not find argument for param ' + param.name);
       let expr = arg.kids.find((x) => x.name === 'expr');
       checkType(expr, scope, addressScope, param.type);
-      sizeArgs += evalSize(param.type);
+      sizeArgs += evalSize4(param.type);
       r += compileExpr(expr, scope, addressScope);
     }
 
@@ -3259,7 +3258,7 @@ function compile(state) {
     // note: this is already checked to be a pointer
     let kidExpr = expr.kids[0].kids[0]; // exprDrf.expr.kids[0]
     let pointerType = evalType(kidExpr, scope, addressScope);
-    
+
     let r = '';
     r += compileExpr(kidExpr, scope, addressScope);
     r += line(`pop     edx`);
@@ -3268,7 +3267,7 @@ function compile(state) {
     _ass(pointerType.args.length === 1);
 
     let type = pointerType.args[0];
-    let typeSize = evalSize(type);
+    let typeSize = evalSize4(type);
     let typeName = typeToString(type);
 
     if (typeName === 'int8') {
@@ -3282,7 +3281,7 @@ function compile(state) {
     } else if (typeSize === 4) {
       r += line(`push    dword [edx]`);
     } else {
-      r += line(`sub     esp, ${typeSize}`)
+      r += line(`sub     esp, ${typeSize}`);
       r += compileCopy('edx', 0, 'esp', 0, typeSize, false);
     }
 
@@ -3312,7 +3311,7 @@ function compile(state) {
     let chain = resolveMemberChain(scope, addressScope, expr);
     let structExpr = chain.baseExpr;
     let member = chain.members[0];
-    let memberSizeBytes = evalSize(member.type);
+    let memberSizeBytes = evalSize4(member.type);
     let memberChainString = chain.members.map((x) => x.name).join('.');
 
     if (structExpr.name === 'expr-drf') {
@@ -3564,15 +3563,15 @@ function compile(state) {
     if (sizeType !== 'ptr' && sizeType !== 'int32')
       throw makeErr(sizeExpr.i, 'expected expression of type ptr or int32');
 
-    // NOTE: ARRAY EXPRESSIONS DIE AFTER GOING OUT OF SCOPE.
-
-    let typeSize = evalSize(type);
-    if (typeSize % 4 !== 0) throw makeImplErr();
+    let typeSize = evalSize1(type);
 
     asm += compileExpr(sizeExpr, scope, addressScope);
     asm += line(`pop     eax`);
     asm += line(`mov     ebx, ${typeSize}`);
     asm += line(`mul     ebx`);
+    asm += line(`add     eax, 3`);
+    asm += line(`shr     eax, 2`);
+    asm += line(`shl     eax, 2`);
 
     // push array, push array pointer
     asm += line(`sub     esp, eax`);
@@ -3713,7 +3712,8 @@ function compile(state) {
           return compileExprOpFloat(exprOp, scope, addressScope, op, 'fdivp');
         return compileExprOpDiv(exprOp, scope, addressScope, op);
       case '%':
-        if (exprATypeName === 'real32') throw makeImplErr('can not take mod of real32');
+        if (exprATypeName === 'real32')
+          throw makeImplErr('can not take mod of real32');
         return compileExprOpMod(exprOp, scope, addressScope, op);
       case '||':
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'or');
@@ -3741,7 +3741,7 @@ function compile(state) {
     asm += line(`pop     eax`);
     asm += line(`xor     edx, edx`);
     asm += line(`idiv    dword [esp]`);
-    asm += line(`mov     [esp], eax`) // eax = quotient
+    asm += line(`mov     [esp], eax`); // eax = quotient
 
     return asm;
   }
@@ -3885,7 +3885,7 @@ function compile(state) {
       asm += line('mov     ecx, ' + asmName);
 
       let type = const_.type;
-      let size = evalSizeAligned(type) / 4;
+      let size = evalSize4(type) / 4;
 
       asm += line(
         `; expr struct ${typeToString(type)} const: ${const_.fullName} {`
@@ -4062,26 +4062,30 @@ function typeToString(type) {
   }
 }
 
-// gives size in bytes
-function getSizeAligned(ctx, type) {
-  let r = getSize(ctx, type);
-  if (r % 4 !== 0) throw makeImplErr('unaligned!');
+// gives size in bytes, round up to 4 bytes
+function getSize4(ctx, type) {
+  let r = getSize1(ctx, type);
+  let m = r % 4;
+  if (m > 0) r += 4 - m;
   return r;
 }
 
-function getSize(ctx, type) {
+// gives size in bytes
+function getSize1(ctx, type) {
   _ass(type.kind);
-
   if (type.kind === 'struct') {
     let name = type.name;
     let struct = findStructByAddress(ctx, name);
     if (!struct) throw new Error('could not find struct ' + name);
     return struct.size;
   } else if (type.kind === 'prim') {
+    // https://learn.microsoft.com/en-us/cpp/c-language/padding-and-alignment-of-structure-members?view=msvc-170
     switch (type.name) {
       case 'boo':
       case 'int8':
+        return 1;
       case 'int16':
+        return 2;
       case 'int32':
       case 'real32':
       case 'ptr':
@@ -4374,30 +4378,89 @@ function loadIndexStruct(ctx) {
     struct.members = members;
   }
 
-  function calcSize(struct, depth = 1000) {
-    if (depth <= 0) throw new Error('probably recursive struct definition');
-    if (struct.size !== null) return;
+  // - first member in struct has lowest address.
+  // - offset % alignmentRequirement must be 0
+  // - first member in struct has lowest address.
+  // - packing size aka max alignmentRequirement is set to 4 bytes
+  // # - alignmentRequirement of struct is determined by biggest alignmentRequirement of their members
+  // # - alignmentRequirement of primitive datatypes is their size in bytes
+  // # -  adjacent same-sized members are packed into the same 1-, 2-, 4- byte aligned value before padding is inserted
+  // - source: https://learn.microsoft.com/en-us/cpp/c-language/padding-and-alignment-of-structure-members?view=msvc-170
+  //           https://learn.microsoft.com/en-us/cpp/preprocessor/pack?view=msvc-170
 
-    let off = 0;
+  function getAlignmentRequirement(struct, packingSize) {
+    let r = 0;
     for (const member of struct.members) {
-      member.off = off;
       if (member.type.kind === 'struct') {
-        let s = findStructByAddress(ctx, member.type.name);
-        calcSize(s, depth - 1);
-        off += s.size;
-      } else if (member.type.kind === 'prim') {
-        off += getSize(ctx, member.type);
-      } else if (member.type.kind === 'funcptr') {
-        off += getSize(ctx, member.type);
+        let subStruct = findStructByAddress(ctx, member.type.name);
+        r = Math.max(r, getAlignmentRequirement(subStruct));
+      } else if (
+        member.type.kind === 'prim' ||
+        member.type.kind === 'funcptr'
+      ) {
+        r = Math.max(r, getSize1(ctx, member.type));
       } else {
         throw new Error('unknown type kind ' + member.type.kind);
       }
+      if (r >= packingSize) return packingSize;
     }
+    return r;
+  }
+
+  function calcStructSize(struct, depth = 1000) {
+    if (depth <= 0) throw new Error('probably recursive struct definition');
+    if (struct.size !== null) return;
+
+    let packingSize = 4;
+
+    let off = 0;
+    let lastSize = 0;
+    for (const member of struct.members) {
+      let alignment;
+      let size;
+
+      if (member.type.kind === 'struct') {
+        let s = findStructByAddress(ctx, member.type.name);
+        calcStructSize(s, depth - 1);
+        size = s.size;
+        alignment = getAlignmentRequirement(s);
+      } else if (
+        member.type.kind === 'prim' ||
+        member.type.kind === 'funcptr'
+      ) {
+        size = getSize1(ctx, member.type);
+        alignment = size;
+      } else {
+        throw new Error('unknown type kind ' + member.type.kind);
+      }
+
+      alignment = Math.min(alignment);
+      // formula of https://en.wikipedia.org/wiki/Data_structure_alignment
+      let padding = (alignment - (off % alignment)) % alignment;
+      off = off + padding;
+      member.off = off;
+
+      off += size;
+    }
+    let alignment = getAlignmentRequirement(struct);
+    let padding = (alignment - (off % alignment)) % alignment;
+    off = off + padding;
+
     struct.size = off;
   }
 
   for (const struct of ctx.structs) {
-    calcSize(struct);
+    calcStructSize(struct);
+
+    // (
+    //   struct.size + ' ' +
+    //   struct.name +
+    //     '\n' +
+    //     struct.members
+    //       .map((x) => ('  ' + x.off).padEnd(' ', 3) + ' ' + x.name)
+    //       .join('\n') +
+    //     '\n'
+    // );
   }
 }
 
@@ -4482,7 +4545,7 @@ function getFuncAsmNameSussy(address, name, params) {
 function getFuncAsmNameStdcall(ctx, func) {
   let name = func.name;
   let size = func.params
-    .map((p) => getSizeAligned(ctx, p.type))
+    .map((p) => getSize4(ctx, p.type))
     .reduce((a, b) => a + b, 0);
   return `_${name}@${size}`;
 }
