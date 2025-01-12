@@ -1,0 +1,130 @@
+
+package Main {
+
+  use sus/native/Win;
+  use sus/System;
+
+  main {
+    testOp();
+    testRet();
+    testRetCdecl();
+    testPow();
+    testComp();
+    testLt4b();
+    testPrintR();
+
+    System/exit(code: 0);
+
+    # test calling powf
+    # test returning float sus
+    # test returning float cdecl: decl and calling
+    # - test: returning float stdcall
+    # test stdcall: reset float alu if not returning float
+    # test cdecl: reset float alu if returning float
+
+    # test: assigning 1-byte value of pointer
+    # - test: assigning 2-byte value of pointer
+    # - copy whole struct using drf
+    # reading 1-byte value of pointer
+    # - reading 2-byte value of pointer
+  }
+
+  func testPrintR() {
+    System/print(s: STR"expecting 1.50 -1.00 1.001:\n");
+    System/print(s: STR"          ");
+    System/print(r: 1.5234);
+    System/print(s: STR" ");
+    System/print(r: -1.001);
+    System/print(s: STR" ");
+    System/print(r: 1.0019, digits: 3);
+    System/println();
+  }
+
+  func testLt4b() {
+    PTR[int8] buffer = ARR[int8](4);
+    {
+      int32 i = 0;
+      while (i < 16) {
+        DRF(buffer + i) = cast[int8](0);
+        i = i + 1;
+      }
+    }
+    
+    System/print(s: STR"expecting:  0,0,0,0  0,0,0,0  0,0,0,0  0,0,0,0\n");
+    System/print(s: STR"         :");
+    print16bytes(buffer: buffer);
+    
+    {
+      int32 i = 0;
+      while (i < 16) {
+        DRF(buffer + i) = cast[int8](1);
+        i = i + 1;
+      }
+    }
+
+    DRF(buffer + 4) = cast[int8](24);
+    System/print(s: STR"expecting:  1,1,1,1  24,1,1,1  1,1,1,1  1,1,1,1\n");
+    System/print(s: STR"         :");
+    print16bytes(buffer: buffer);
+  }
+
+  func print16bytes(PTR[int8] buffer) {
+    int32 i = 0;
+    while (i < 16) {
+      if (i % 4 == 0) System/print(s: STR"  ");
+      else if (i > 0) System/print(s: STR",");
+      int8 byte = DRF(buffer + i);
+      System/print(i: cast[int32](byte));
+      i = i + 1;
+    }
+    System/println();
+  }
+
+  func testComp() {
+    System/println(s: STR"--- TEST COMP START");
+
+    System/print(s: STR"expecting 0: ");
+    System/println(b: 0.1 > 1.0);
+
+    System/print(s: STR"expecting 1: ");
+    System/println(b: 0.1 < 1.0);
+
+    System/print(s: STR"expecting 1: ");
+    System/println(b: -1.1 < 1.0);
+
+    System/println(s: STR"--- TEST COMP DONE");
+  }
+
+  func testPow() {
+    System/println(s:STR"expecting 64:");
+    real32 result = Win/powf(base: 8.0, power: 2.0);
+    System/println(i: cast[int32](result));
+  }
+
+  func testOp() {
+    real32 a = 1.6;
+    real32 b = 2.6;
+    System/print(s: STR"expecting 4:\n");
+    System/println(i: cast[int32](a + b));
+  }
+
+  func testRet() {
+    System/print(s: STR"expecting 4:\n");
+    System/println(i: cast[int32](add(a: 1.6, b: 2.6)));
+  }
+
+  func testRetCdecl() {
+    System/print(s: STR"expecting 4:\n");
+    System/println(i: cast[int32](addCdecl(a: 1.6, b: 2.6)));
+  }
+
+  func CON(cdecl) real32 addCdecl(real32 a, real32 b) {
+    done a + b;
+  }
+
+  func real32 add(real32 a, real32 b) {
+    done a + b;
+  }
+
+
+}

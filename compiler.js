@@ -74,6 +74,8 @@ function parse(state) {
   const makeNodeExprOp = (op) => makeNode('expr-op', { op }, []);
   const makeNodeExprMemberName = (name) =>
     makeNode('expr-member', { name }, []);
+  const makeNodeExprLitDecReal = (decReal) =>
+    makeNode('expr-lit', { litType: 'dec-real', value: decReal });
   const makeNodeExprLitDecInt = (decInt) =>
     makeNode('expr-lit', { litType: 'dec-int', value: decInt });
   const makeNodeExprLitHexInt = (hexInt) =>
@@ -122,6 +124,7 @@ function parse(state) {
   const eatAddressName = () =>
     eat(/^(?:(?:\w*[a-zA-Z_]\w*\/)*(?:\w*[a-zA-Z_]\w*))/);
   const eatTypeNamePart = () => eatAddressName();
+  const eatLitRealDec = () => eat(/^-?[0-9]+\.[0-9]+/);
   const eatLitIntDec = () => eat(/^-?[0-9]+/);
   const eatLitIntHex = () => eat(/^-?@[0-9a-fA-F]+/);
   const eatLitBoo = () => eat(/^(yes|no)/);
@@ -568,7 +571,7 @@ function parse(state) {
 
   function tryParseNodeExprOp(nodeExprA) {
     return tryParse((_) => {
-      let op = eat(/^([+\-*/]|==|!=|>=|<=|>|<|\|\||\&\&|\|)/);
+      let op = eat(/^([+\-*/%]|==|!=|>=|<=|>|<|\|\||\&\&|\|)/);
       if (!op) return undefined;
       eatEmpty();
       let n = makeNodeExprOp(op);
@@ -791,16 +794,25 @@ function parse(state) {
         return ctr;
       },
       (_) => {
+        let symbol = eatAddressName();
+        if (symbol === 'yes') return;
+        if (symbol === 'no') return;
+
+        if (!symbol) return undefined;
+        eatEmpty();
+        return makeNodeExprSym(symbol);
+      },
+      (_) => {
         let val = eatLitBoo();
         if (!val) return undefined;
         eatEmpty();
         return makeNodeExprLitBoo(val);
       },
       (_) => {
-        let symbol = eatAddressName();
-        if (!symbol) return undefined;
+        let val = eatLitRealDec();
+        if (!val) return undefined;
         eatEmpty();
-        return makeNodeExprSym(symbol);
+        return makeNodeExprLitDecReal(val);
       },
       (_) => {
         let val = eatLitIntDec();
@@ -1372,6 +1384,166 @@ function compile(state) {
     return wantedType; // lol
   }
 
+  function evalTypeOp(expr, scope, addressScope) {
+    function allowedEq(type) {
+      let a = ['boo', 'int32', 'PTR'];
+      return a.includes(typeBaseName(type));
+    }
+
+    function compatibleEq(a, b) {
+      if (typeToString(a) !== typeToString(b)) return;
+      return makeTypePrim('boo');
+    }
+
+    function allowedCmpSimple(type) {
+      let a = ['boo', 'int32', 'real32', 'PTR'];
+      return a.includes(typeBaseName(type));
+    }
+
+    function allowedCmp(type) {
+      let a = ['boo', 'int32', 'PTR'];
+      return a.includes(typeBaseName(type));
+    }
+
+    function compatibleCmp(a, b) {
+      if (typeToString(a) !== typeToString(b)) return;
+      return makeTypePrim('boo');
+    }
+
+    function allowedPm(type) {
+      let l = ['int32', 'real32', 'PTR'];
+      return l.includes(typeBaseName(type));
+    }
+
+    function compatiblePm(a, b) {
+      if ((typeBaseName(a) === 'real32') !== (typeBaseName(b) === 'real32'))
+        return;
+      if (
+        (typeBaseName(a) === 'PTR') === (typeBaseName(b) === 'PTR') &&
+        typeToString(a) !== typeToString(b)
+      )
+        return;
+      return a;
+    }
+
+    function allowedCalc(type) {
+      let l = ['int32', 'real32'];
+      return l.includes(typeBaseName(type));
+    }
+
+    function compatibleCalc(a, b) {
+      if (typeToString(a) !== typeToString(b)) return;
+      return a;
+    }
+
+    function allowedLogic(type) {
+      return typeToString(type) === 'boo';
+    }
+
+    function allowedBitwise(type) {
+      let l = ['int32'];
+      return l.includes(typeBaseName(type));
+    }
+
+    function compatibleBitwise(a, b) {
+      if (typeToString(a) !== typeToString(b)) return;
+      return a;
+    }
+
+    let op = expr.props.op;
+    switch (op) {
+      case '!=':
+      case '==':
+        // prettier-ignore
+        return evalBinOp(op, expr, scope, addressScope, allowedEq, compatibleEq );
+      case '<':
+      case '>':
+        // prettier-ignore
+        return evalBinOp(op, expr, scope, addressScope, allowedCmpSimple, compatibleCmp );
+      case '<=':
+      case '>=':
+        // prettier-ignore
+        return evalBinOp(op, expr, scope, addressScope, allowedCmp, compatibleCmp );
+      case '+':
+      case '-':
+        // prettier-ignore
+        return evalBinOp(op, expr, scope, addressScope, allowedPm, compatiblePm );
+      case '*':
+      case '/':
+      case '%':
+        // prettier-ignore
+        return evalBinOp(op, expr, scope, addressScope, allowedCalc, compatibleCalc );
+      case '|':
+        return evalBinOp(
+          op,
+          expr,
+          scope,
+          addressScope,
+          allowedBitwise,
+          compatibleBitwise
+        );
+      case '||':
+      case '&&':
+        // prettier-ignore
+        return evalBinOp(op, expr, scope, addressScope, allowedLogic, (a, b) => true );
+      default:
+        throw makeImplErr('unknown op ' + expr.props.op);
+    }
+  }
+
+  function evalBinOp(
+    op,
+    expr,
+    scope,
+    addressScope,
+    allowedFunc,
+    compatibleFunc
+  ) {
+    let a = expr.kids[0];
+    let b = expr.kids[1];
+    let typeA = evalType(a, scope, addressScope);
+    let typeB = evalType(b, scope, addressScope);
+    if (!allowedFunc(typeA))
+      throw makeErr(
+        expr.i,
+        'op ' + op + ' not supported for type ' + typeToString(typeA)
+      );
+    if (!allowedFunc(typeB))
+      throw makeErr(
+        expr.i,
+        'op ' + op + ' not supported for type ' + typeToString(typeB)
+      );
+    let r = compatibleFunc(typeA, typeB);
+    if (!r)
+      throw makeErr(
+        expr.i,
+        'op ' +
+          op +
+          ' not compatible for types ' +
+          typeToString(typeA) +
+          ' and ' +
+          typeToString(typeB)
+      );
+    return r;
+  }
+
+  function evalTypeLit(expr, scope, addressScope) {
+    switch (expr.props.litType) {
+      case 'boo':
+        return makeTypePrim('boo');
+      case 'dec-real':
+        return makeTypePrim('real32');
+      case 'dec-int':
+        return makeTypePrim('int32');
+      case 'hex-int':
+        return makeTypePrim('int32');
+      case 'ptr-str':
+        return makeTypePrim('PTR', [makeTypePrim('int8')]);
+      default:
+        throw makeImplErr('unknown literal type: ' + expr.props.litType);
+    }
+  }
+
   function evalType(exprParam, scope, addressScope) {
     let expr = exprParam.name === 'expr' ? exprParam.kids[0] : exprParam;
 
@@ -1382,64 +1554,9 @@ function compile(state) {
     } else if (expr.name === 'expr-siz') {
       return makeTypePrim('int32');
     } else if (expr.name === 'expr-lit') {
-      switch (expr.props.litType) {
-        case 'boo':
-          return makeTypePrim('boo');
-        case 'dec-real':
-          return makeTypePrim('real32');
-        case 'dec-int':
-          return makeTypePrim('int32');
-        case 'hex-int':
-          return makeTypePrim('int32');
-        case 'ptr-str':
-          return makeTypePrim('PTR', [makeTypePrim('int8')]);
-        default:
-          throw makeImplErr('unknown literal type: ' + expr.props.litType);
-      }
+      return evalTypeLit(expr, scope, addressScope);
     } else if (expr.name === 'expr-op') {
-      function allowedNum(type) {
-        if (!isTypePrimitive(type)) return false;
-        if (!['int32', 'ptr', 'PTR'].includes(typeBaseName(type))) return false;
-        return true;
-      }
-      function allowedEq(type) {
-        if (!isTypePrimitive(type)) return false;
-        if (!['boo', 'int32', 'real32', 'ptr', 'PTR'].includes(typeBaseName(type)))
-          return false;
-        return true;
-      }
-      const allowedComp = allowedEq;
-      function allowedBoo(type) {
-        if (!isTypePrimitive(type)) return false;
-        if (typeBaseName(type) !== 'boo') return false;
-        return true;
-      }
-      let op = expr.props.op;
-      switch (op) {
-        case '!=':
-        case '==':
-          // prettier-ignore
-          return evalBinOp(op, expr, scope, addressScope, allowedEq, (a, b) => true, (a, b) => makeTypePrim('boo') );
-        case '<':
-        case '>':
-        case '<=':
-        case '>=':
-          // prettier-ignore
-          return evalBinOp(op, expr, scope, addressScope, allowedComp, (a, b) => true, (a, b) => makeTypePrim('boo') );
-        case '+':
-        case '-':
-        case '*':
-        case '/':
-        case '|':
-          // prettier-ignore
-          return evalBinOp(op, expr, scope, addressScope, allowedNum, (a, b) => true, (a, b) => a );
-        case '||':
-        case '&&':
-          // prettier-ignore
-          return evalBinOp(op, expr, scope, addressScope, allowedBoo, (a, b) => true, (a, b) => a );
-        default:
-          throw makeImplErr('unknown op ' + expr.props.op);
-      }
+      return evalTypeOp(expr, scope, addressScope);
     } else if (expr.name === 'expr-member') {
       let tyeExpr = expr.kids[0];
       let memberName = expr.props.name;
@@ -1530,42 +1647,6 @@ function compile(state) {
       throw makeImplErr('unknown expression ' + expr.name);
     }
     throw makeImplErr('?');
-  }
-
-  function evalBinOp(
-    op,
-    expr,
-    scope,
-    addressScope,
-    allowedFunc,
-    compatibleFunc,
-    typeFunc
-  ) {
-    let a = expr.kids[0];
-    let b = expr.kids[1];
-    let typeA = evalType(a, scope, addressScope);
-    let typeB = evalType(b, scope, addressScope);
-    if (!allowedFunc(typeA))
-      throw makeErr(
-        expr.i,
-        'op ' + op + ' not supported for type ' + typeToString(typeA)
-      );
-    if (!allowedFunc(typeB))
-      throw makeErr(
-        expr.i,
-        'op ' + op + ' not supported for type ' + typeToString(typeB)
-      );
-    if (!compatibleFunc(typeA, typeB))
-      throw makeErr(
-        expr.i,
-        'op ' +
-          op +
-          ' not compatible for types ' +
-          typeToString(typeA) +
-          ' and ' +
-          typeToString(typeB)
-      );
-    return typeFunc(typeA, typeB);
   }
 
   // /
@@ -2045,6 +2126,8 @@ function compile(state) {
 
     r += line('; cdecl call expression ==================== (');
 
+    let isFloat =
+      hasReturn && typeToString(callInfo.typeFuncPtr.returnType) === 'real32';
     // reserve return value and push pointer to return value as hidden argument
     if (hasReturn && returnSize > 8) {
       // r += line(`lea     eax, [esp - 4]`);
@@ -2067,11 +2150,17 @@ function compile(state) {
     r += compileCallProc(callInfo);
 
     let poppedSize = sizeArgs;
+
     if (hasReturn && returnSize > 8) poppedSize += 4;
     if (poppedSize != 0) r += line(`add     esp, ${poppedSize}`);
 
-    if (returnSize <= 8) r += line('push    eax');
-    if (returnSize === 8) r += line('push    edx');
+    if (isFloat) {
+      r += line('sub     esp, 4');
+      r += line('fstp    dword [esp]');
+    } else {
+      if (returnSize <= 8) r += line('push    eax');
+      if (returnSize === 8) r += line('push    edx');
+    }
 
     r += line('; cdecl call expression )');
     r += line();
@@ -2091,6 +2180,9 @@ function compile(state) {
     let r = '';
 
     r += line('; stdcall call expression ==================== (');
+
+    let isFloat =
+      hasReturn && typeToString(callInfo.typeFuncPtr.returnType) === 'real32';
 
     // reserve return value and push pointer to return value as hidden argument
     if (hasReturn && returnSize > 8) {
@@ -2115,8 +2207,13 @@ function compile(state) {
 
     if (hasReturn && returnSize > 8) r += line(`add     esp, 4`);
 
-    if (returnSize <= 8) r += line('push    eax');
-    if (returnSize === 8) r += line('push    edx');
+    if (isFloat) {
+      r += line('sub     esp, 4');
+      r += line('fstp    dword [esp]');
+    } else {
+      if (returnSize <= 8) r += line('push    eax');
+      if (returnSize === 8) r += line('push    edx');
+    }
 
     r += line('; stdcall call expression )');
     r += line();
@@ -2435,7 +2532,17 @@ function compile(state) {
     let r = '';
     r += line('; stdcall done instruction ========= (');
     r += compileExpr(returnExpr, scope, addressScope);
-    if (rootScope.returnInfo.off !== undefined) {
+
+    let returnTypeName = typeToString(rootScope.returnInfo.type);
+
+    // reset fpu
+    r += line(`finit`);
+
+    if (returnTypeName === 'real32') {
+      // move float into sp0
+      r += line(`fld     dword [esp]`);
+      r += line(`add     esp, 4`);
+    } else if (rootScope.returnInfo.off !== undefined) {
       if (rootScope.returnInfo.size <= 8) throw makeImplErr();
       let scopeRes = resolveScopeBase(scopes);
       r += scopeRes.asm;
@@ -2460,7 +2567,16 @@ function compile(state) {
     let r = '';
     r += line('; cdecl done instruction ========= (');
     r += compileExpr(returnExpr, scope, addressScope);
-    if (rootScope.returnInfo.off !== undefined) {
+    let returnTypeName = typeToString(rootScope.returnInfo.type);
+
+    // reset fpu
+    r += line(`finit`);
+
+    if (returnTypeName === 'real32') {
+      // move float into sp0
+      r += line(`fld     dword [esp]`);
+      r += line(`add     esp, 4`);
+    } else if (rootScope.returnInfo.off !== undefined) {
       if (rootScope.returnInfo.size <= 8) throw makeImplErr();
       let scopeRes = resolveScopeBase(scopes);
       r += scopeRes.asm;
@@ -2670,16 +2786,24 @@ function compile(state) {
 
     switch (targetExpr.name) {
       case 'expr-drf':
-        let byteSize = evalSizeAligned(exprType);
-
         r += line(`; deref assign`);
         r += compileExpr(expr, scope, addressScope);
 
         r += compileExpr(targetExpr.kids[0], scope, addressScope);
         r += line(`pop     edx`);
 
-        r += compileCopy('esp', 0, 'edx', 0, byteSize, true);
-        r += line(`add     esp, ${byteSize}`);
+        let exprTypeName = typeToString(exprType);
+        if (exprTypeName === 'int8') {
+          r += line(`pop     eax`);
+          r += line(`mov     byte [edx], al`);
+        } else if (exprTypeName === 'int16') {
+          r += line(`pop     eax`);
+          r += line(`mov     word [edx], ax`);
+        } else {
+          let byteSize = evalSizeAligned(exprType);
+          r += compileCopy('esp', 0, 'edx', 0, byteSize, true);
+          r += line(`add     esp, ${byteSize}`);
+        }
         break;
       case 'expr-sym':
         r += compileInsAssSym(targetExpr, expr, scope, addressScope);
@@ -2928,27 +3052,7 @@ function compile(state) {
       let size = evalSize(exprType);
       asm += line(`push    ${size}`);
     } else if (expr.name === 'expr-lit') {
-      switch (expr.props.litType) {
-        case 'hex-int':
-          asm += line(
-            'push    0' +
-              expr.props.value.slice(1, expr.props.value.length) +
-              'h'
-          );
-          break;
-        case 'dec-int':
-          asm += line('push    ' + expr.props.value);
-          break;
-        case 'boo':
-          asm += line('push    ' + (expr.props.value === 'yes' ? 1 : 0));
-          break;
-        case 'ptr-str':
-          let asmName = findAsmNameLitPtrStr(expr.props.value);
-          asm += line('push    ' + asmName);
-          break;
-        default:
-          throw makeImplErr('unknown literal type: ' + expr.props.litType);
-      }
+      asm += compileExprLit(expr, scope, addressScope);
     } else if (expr.name === 'expr-op') {
       asm += compileExprOp(expr, scope, addressScope);
     } else if (expr.name === 'expr-sym') {
@@ -3112,10 +3216,30 @@ function compile(state) {
     let wanted = typeToString(wantedType);
     let actual = typeToString(actualType);
 
-    if (wanted === 'int32' && actual === 'int16') {
-      // int16 is on stack, make to int32
+    if (wanted === 'int32' && actual === 'real32') {
+      r += line(`finit`);
+      r += line(`fld     dword [esp]`);
+      r += line(`fisttp  dword [esp]`);
+    } else if (wanted === 'real32' && actual === 'int32') {
+      r += line(`finit`);
+      r += line(`fild    dword [esp]`);
+      r += line(`fst     dword [esp]`);
+    } else if (wanted === 'int8' && actual === 'int32') {
+      r += line(`xor     eax, eax`);
+      r += line(`mov     al, [esp]`);
+      r += line(`mov     [esp], eax`);
+    } else if (wanted === 'int32' && actual === 'int8') {
+      r += line(`xor     eax, eax`);
+      r += line(`mov     al, [esp]`);
+      r += line(`mov     [esp], eax`);
+    } else if (wanted === 'int32' && actual === 'int16') {
+      r += line(`xor     eax, eax`);
+      r += line(`mov     ax, [esp]`);
+      r += line(`mov     [esp], eax`);
     } else if (wanted === 'int16' && actual === 'int32') {
-      // int16 is on stack, make to int32
+      r += line(`xor     eax, eax`);
+      r += line(`mov     ax, [esp]`);
+      r += line(`mov     [esp], eax`);
     } else {
       throw makeErr(expr.i, 'unknown conversion: ' + wanted + ' -> ' + actual);
     }
@@ -3134,11 +3258,36 @@ function compile(state) {
   function compileExprDrf(expr, scope, addressScope) {
     // note: this is already checked to be a pointer
     let kidExpr = expr.kids[0].kids[0]; // exprDrf.expr.kids[0]
+    let pointerType = evalType(kidExpr, scope, addressScope);
+    
     let r = '';
     r += compileExpr(kidExpr, scope, addressScope);
-    r += line(`pop     eax`);
-    r += line(`mov     eax, [eax]`);
-    r += line(`push    eax`);
+    r += line(`pop     edx`);
+
+    _ass(typeBaseName(pointerType) === 'PTR');
+    _ass(pointerType.args.length === 1);
+
+    let type = pointerType.args[0];
+    let typeSize = evalSize(type);
+    let typeName = typeToString(type);
+
+    if (typeName === 'int8') {
+      r += line(`xor     eax, eax`);
+      r += line(`mov     al, [edx]`);
+      r += line(`push    eax`);
+    } else if (typeName === 'int16') {
+      r += line(`xor     eax, eax`);
+      r += line(`mov     ax, [edx]`);
+      r += line(`push    eax`);
+    } else if (typeSize === 4) {
+      r += line(`push    dword [edx]`);
+    } else {
+      r += line(`sub     esp, ${typeSize}`)
+      r += compileCopy('edx', 0, 'esp', 0, typeSize, false);
+    }
+
+    // r += line(`mov     edx, [edx]`);
+    // r += line(`push    edx`);
     return r;
   }
 
@@ -3432,7 +3581,99 @@ function compile(state) {
     return asm;
   }
 
+  function convertRealLit(str) {
+    let buffer = Buffer.alloc(4);
+    buffer.writeFloatBE(parseFloat(str));
+    return '0' + buffer.toString('hex') + 'h';
+  }
+
+  function compileExprLit(expr, scope, addressScope) {
+    let asm = '';
+    switch (expr.props.litType) {
+      case 'dec-real':
+        asm += line(
+          'push    ' +
+            convertRealLit(expr.props.value) +
+            ' ; ' +
+            expr.props.value
+        );
+        break;
+      case 'hex-int':
+        asm += line(
+          'push    0' + expr.props.value.slice(1, expr.props.value.length) + 'h'
+        );
+        break;
+      case 'dec-int':
+        asm += line('push    ' + expr.props.value);
+        break;
+      case 'boo':
+        asm += line('push    ' + (expr.props.value === 'yes' ? 1 : 0));
+        break;
+      case 'ptr-str':
+        let asmName = findAsmNameLitPtrStr(expr.props.value);
+        asm += line('push    ' + asmName);
+        break;
+      default:
+        throw makeImplErr('unknown literal type: ' + expr.props.litType);
+    }
+    return asm;
+  }
+
+  // inst converts this table into boolean value on the stack: https://www.felixcloutier.com/x86/fcomi:fcomip:fucomi:fucomip#description
+  // note: should probably assign fpu flags into register and find it that way.
+  // Comparison Results* 	ZF 	PF 	CF
+  // ST0 > ST(i) 	0 	0 	0
+  // ST0 < ST(i) 	0 	0 	1
+  // ST0 = ST(i) 	1 	0 	0
+  // Unordered** 	1 	1 	1
+
+  // inst moves comparison result into eax
+  function compileExprOpCompFloatGt(exprOp, scope, addressScope, op) {
+    let a = exprOp.kids[0];
+    let b = exprOp.kids[1];
+    let r = '';
+    r += compileExpr(a, scope, addressScope);
+    r += compileExpr(b, scope, addressScope);
+    r += line(`xor     eax, eax`);
+    r += line(`finit`);
+    r += line(`fld     dword [esp]`);
+    r += line(`fld     dword [esp + 4]`);
+    r += line(`fucomi  st0, st1`);
+    r += line('seta    al'); // al = (zf = 0 ^ cf = 0)
+    r += line('setnp   dl'); // dl = (pf = 0)
+    r += line('and     al, dl'); // al = (zf = 0 ^ pf = 0 ^ cf = 0)
+    r += line(`add     esp, 4`);
+    r += line(`mov     [esp], eax`);
+    return r;
+  }
+
+  // inst moves comparison result into eax
+  function compileExprOpCompFloatLt(exprOp, scope, addressScope, op) {
+    let a = exprOp.kids[0];
+    let b = exprOp.kids[1];
+    let r = '';
+    r += line(`xor     eax, eax`);
+    r += compileExpr(a, scope, addressScope);
+    r += compileExpr(b, scope, addressScope);
+    r += line(`finit`);
+    r += line(`fld     dword [esp]`);
+    r += line(`fld     dword [esp + 4]`);
+    r += line(`fucomi  st0, st1`);
+    r += line(`setb    al`); // al = (cf = 1)
+    r += line(`setnz   bl`); // bl = (zf = 0)
+    r += line(`setnp   cl`); // cl = (pf = 0)
+    r += line('and     al, bl');
+    r += line('and     al, cl'); // al = (zf = 0 ^ pf = 0 ^ cf = 1)
+    r += line(`add     esp, 4`);
+    r += line(`mov     [esp], eax`);
+    return r;
+  }
+
   function compileExprOp(exprOp, scope, addressScope) {
+    let exprA = exprOp.kids[0];
+    let exprAType = evalType(exprA, scope, addressScope);
+    let exprATypeName = typeToString(exprAType);
+
     let op = exprOp.props.op;
     switch (op) {
       case '==':
@@ -3440,23 +3681,40 @@ function compile(state) {
       case '!=':
         return compileExprOpComp(exprOp, scope, addressScope, 'setne');
       case '>':
+        if (exprATypeName === 'real32') {
+          return compileExprOpCompFloatGt(exprOp, scope, addressScope, op);
+        }
         return compileExprOpComp(exprOp, scope, addressScope, 'setg');
       case '<':
+        if (exprATypeName === 'real32') {
+          return compileExprOpCompFloatLt(exprOp, scope, addressScope, op);
+        }
         return compileExprOpComp(exprOp, scope, addressScope, 'setl');
       case '>=':
         return compileExprOpComp(exprOp, scope, addressScope, 'setge');
       case '<=':
         return compileExprOpComp(exprOp, scope, addressScope, 'setle');
       case '-':
+        if (exprATypeName === 'real32')
+          return compileExprOpFloat(exprOp, scope, addressScope, op, 'fsubp');
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'sub');
       case '+':
+        if (exprATypeName === 'real32')
+          return compileExprOpFloat(exprOp, scope, addressScope, op, 'faddp');
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'add');
       case '|':
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'or');
       case '*':
+        if (exprATypeName === 'real32')
+          return compileExprOpFloat(exprOp, scope, addressScope, op, 'fmulp');
         return compileExprOpMul(exprOp, scope, addressScope, op, 'imul');
       case '/':
-        return compileExprOpSimple(exprOp, scope, addressScope, op, 'idiv');
+        if (exprATypeName === 'real32')
+          return compileExprOpFloat(exprOp, scope, addressScope, op, 'fdivp');
+        return compileExprOpDiv(exprOp, scope, addressScope, op);
+      case '%':
+        if (exprATypeName === 'real32') throw makeImplErr('can not take mod of real32');
+        return compileExprOpMod(exprOp, scope, addressScope, op);
       case '||':
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'or');
       case '&&':
@@ -3464,6 +3722,59 @@ function compile(state) {
       default:
         throw makeImplErr('unknown operand ' + op);
     }
+  }
+
+  function compileExprOpDiv(exprOp, scope, addressScope, op) {
+    if (exprOp.kids.length != 2)
+      throw makeErr('expected 2 params for op ' + op);
+    let a = exprOp.kids[0];
+    let b = exprOp.kids[1];
+    let asm = '';
+    asm += compileExpr(b, scope, addressScope);
+    asm += compileExpr(a, scope, addressScope);
+
+    // [esp] = dividend
+    // [ebp + 4] = divisor
+
+    // https://stackoverflow.com/a/8022107
+    // https://www.felixcloutier.com/x86/idiv
+    asm += line(`pop     eax`);
+    asm += line(`xor     edx, edx`);
+    asm += line(`idiv    dword [esp]`);
+    asm += line(`mov     [esp], eax`) // eax = quotient
+
+    return asm;
+  }
+
+  function compileExprOpMod(exprOp, scope, addressScope, op) {
+    if (exprOp.kids.length != 2)
+      throw makeErr('expected 2 params for op ' + op);
+    let a = exprOp.kids[0];
+    let b = exprOp.kids[1];
+    let asm = '';
+    asm += compileExpr(b, scope, addressScope);
+    asm += compileExpr(a, scope, addressScope);
+    // refer to compileExprOpDiv
+    asm += line(`pop     eax`);
+    asm += line(`xor     edx, edx`);
+    asm += line(`idiv    dword [esp]`);
+    asm += line(`mov     [esp], edx`); // edx = remainder
+    return asm;
+  }
+
+  function compileExprOpFloat(exprOp, scope, addressScope, op, inst) {
+    let r = '';
+    let a = exprOp.kids[0];
+    let b = exprOp.kids[1];
+    r += compileExpr(a, scope, addressScope);
+    r += compileExpr(b, scope, addressScope);
+    r += line(`finit`);
+    r += line(`fld     dword [esp + 4]`);
+    r += line(`fld     dword [esp]`);
+    r += line(`add     esp, 4`);
+    r += line(`${inst.padEnd(8, ' ')}st1, st0`);
+    r += line(`fst     dword [esp]`);
+    return r;
   }
 
   function compileExprOpComp(exprOp, scope, addressScope, inst) {
@@ -3990,7 +4301,9 @@ export function addToContextDone(ctx) {
 }
 
 function loadIndexConst(ctx) {
-  for (const [fullName, indexRow] of Object.entries(ctx.loadContext.indexConsts)) {
+  for (const [fullName, indexRow] of Object.entries(
+    ctx.loadContext.indexConsts
+  )) {
     let type = getType(ctx, indexRow.addressScope, indexRow.nodeConst.kids[0]);
     ctx.consts.push(
       makeConst(
@@ -4128,12 +4441,9 @@ function loadFuncSigs(ctx, path, src, tree) {
     let addressScope = buildAddressScope(ctx, pkg);
     for (const nodeFunc of pkg.kids) {
       if (nodeFunc.name !== 'func') continue;
-      ctx.loadContext.indexFuncs.push(makeIndexFuncRow(
-        path,
-        nodeFunc,
-        addressScope,
-        pkg.props.name
-      ));
+      ctx.loadContext.indexFuncs.push(
+        makeIndexFuncRow(path, nodeFunc, addressScope, pkg.props.name)
+      );
     }
   }
 }
