@@ -1689,32 +1689,58 @@ function compile(state) {
     let r = '';
 
     if (expr.name === 'expr-lit') {
-      switch (expr.props.litType) {
-        case 'dec-int':
-          r += line('dd    ' + expr.props.value);
-          break;
-        case 'hex-int':
-          r += line(
-            'dd    0' + expr.props.value.slice(1, expr.props.value.length) + 'h'
-          );
-          break;
-        case 'boo':
-          r += line('dd    ' + (expr.props.value === 'yes' ? 1 : 0));
-          break;
-        case 'ptr-str':
-          let asmName = findAsmNameLitPtrStr(expr.props.value);
-          _ass(asmName);
-          r += line('dd ' + asmName);
-          break;
-        default:
-          throw makeImplErr('unknown literal type: ' + expr.props.litType);
-      }
+      r += compileDefinitionExprLit(expr, addressScope);
+    } else if (expr.name === 'expr-cast') {
+      r += compileDefintionExprCast(expr, addressScope);
     } else if (expr.name === 'expr-ctr') {
       r += compileDefinitionExprCtr(expr, addressScope);
     } else {
       throw makeImplErr('can not make constant of expression ' + expr.name);
     }
 
+    return r;
+  }
+
+  function compileDefintionExprCast(expr, addressScope) {
+    let kid = expr.kids[1];
+    let wantedType = getActualType(expr.kids[0], addressScope);
+    let wanted = typeToString(wantedType);
+    // let actualType = evalType(kid, scope, addressScope);
+    // let actual = typeToString(actualType);
+    if (kid.name === 'expr-lit') {
+      return compileDefinitionExprLit(kid, addressScope, wanted);
+    } else {
+      throw makeErr(expr.i, 'not a literal');
+    }
+  }
+
+  function compileDefinitionExprLit(expr, addressScope, typeName = undefined) {
+    let r = '';
+    switch (expr.props.litType) {
+      case 'dec-int':
+        if (typeName === undefined) r += line('dd    ' + expr.props.value);
+        else if (typeName === 'int16') r += line('dw    ' + expr.props.value);
+        else if (typeName === 'int8') r += line('db    ' + expr.props.value);
+        else throw makeErr(expr.i, 'can not cast int32 to ' + typeName);
+        break;
+      case 'hex-int':
+        let val = '0' + expr.props.value.slice(1, expr.props.value.length) + 'h';
+        if (typeName === undefined) r += line('dd    ' + val);
+        else if (typeName === 'int16') r += line('dw    ' + val);
+        else if (typeName === 'int8') r += line('db    ' + val);
+        else throw makeErr(expr.i, 'can not cast int32 to ' + typeName);
+        break;
+      case 'boo':
+        r += line('db    ' + (expr.props.value === 'yes' ? 1 : 0));
+        break;
+      case 'ptr-str':
+        let asmName = findAsmNameLitPtrStr(expr.props.value);
+        _ass(asmName);
+        r += line('dd ' + asmName);
+        break;
+      default:
+        throw makeImplErr('unknown literal type: ' + expr.props.litType);
+    }
     return r;
   }
 
@@ -1745,7 +1771,6 @@ function compile(state) {
       let type = member.type;
 
       checkType(expr, undefined, addressScope, type);
-
       r += compileDefinitionExpr(expr, addressScope);
     }
 
@@ -2514,7 +2539,7 @@ function compile(state) {
     r += compileExpr(returnExpr, scope, addressScope);
     r += scopeRes.asm;
     r += line('; copy');
-    r += compileCopy(
+    r += compileCopy4(
       'esp',
       0,
       scopeRes.register,
@@ -2551,7 +2576,7 @@ function compile(state) {
           rootScope.returnInfo.off
         )}]`
       );
-      r += compileCopy('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
+      r += compileCopy4('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
       r += line(`mov     eax, edx`);
     } else {
       if (rootScope.returnInfo.size === 8) r += line('pop     edx');
@@ -2585,7 +2610,7 @@ function compile(state) {
           rootScope.returnInfo.off
         )}]`
       );
-      r += compileCopy('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
+      r += compileCopy4('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
       r += line(`mov     eax, edx`);
     } else {
       if (rootScope.returnInfo.size === 8) r += line('pop     edx');
@@ -2776,7 +2801,7 @@ function compile(state) {
     let exprType = evalType(expr, scope, addressScope);
     if (!typeEquals(targetType, exprType))
       throw makeErr(
-        ins.i,
+        targetExpr.i,
         'target of type ' +
           typeToString(targetType) +
           ' can not be assigned to type ' +
@@ -2799,8 +2824,8 @@ function compile(state) {
           r += line(`pop     eax`);
           r += line(`mov     word [edx], ax`);
         } else {
-          let byteSize = evalSize4(exprType);
-          r += compileCopy('esp', 0, 'edx', 0, byteSize, true);
+          let byteSize = evalSize1(exprType);
+          r += compileCopy1('esp', 0, 'edx', 0, byteSize, true);
           r += line(`add     esp, ${byteSize}`);
         }
         break;
@@ -2830,7 +2855,7 @@ function compile(state) {
 
     checkType(expr, scope, addressScope, member.type);
 
-    let memberSizeBytes = evalSize4(member.type);
+    let memberSizeBytes = evalSize1(member.type);
 
     if (structExpr.name === 'expr-sym') {
       let symbol = structExpr.props.symbol;
@@ -2848,7 +2873,7 @@ function compile(state) {
 
       let off = symRow.off + chain.off;
 
-      r += compileCopy('esp', 0, 'ebp', off, memberSizeBytes, true);
+      r += compileCopy1('esp', 0, 'ebp', off, memberSizeBytes, true);
       r += line(`add     esp, ${memberSizeBytes}`);
 
       r += line();
@@ -2862,7 +2887,7 @@ function compile(state) {
       r += line(`pop     edx`);
 
       let off = chain.off;
-      r += compileCopy('esp', 0, 'edx', off, memberSizeBytes, true);
+      r += compileCopy1('esp', 0, 'edx', off, memberSizeBytes, true);
       r += line(`add     esp, ${memberSizeBytes}`);
 
       r += line();
@@ -2896,7 +2921,7 @@ function compile(state) {
     // r += line('pop     eax');
     // r += line(`mov     [${symRes.register}${getOffStr(row.off)}], eax`);
 
-    r += compileCopy('esp', 0, symRes.register, symRow.off, byteSize, true);
+    r += compileCopy4('esp', 0, symRes.register, symRow.off, byteSize, true);
     r += line(`add     esp, ${byteSize}`);
 
     r += line();
@@ -2948,7 +2973,7 @@ function compile(state) {
 
       r += symRes.asm;
 
-      r += compileCopy('esp', 0, symRes.register, symRow.off, byteSize, true);
+      r += compileCopy4('esp', 0, symRes.register, symRow.off, byteSize);
       r += line(`add     esp, ${byteSize}`);
     });
 
@@ -2958,8 +2983,47 @@ function compile(state) {
     return r;
   }
 
+  function compileCopy1(fromReg, fromOff, toReg, toOff, sizeBytes) {
+    if ([fromReg, toReg].includes('eax')) throw makeImplErr('lol');
+    let unalignedPortion = sizeBytes % 4;
+    let alignedPortion = sizeBytes - unalignedPortion;
+    let r = '';
+    if (alignedPortion > 0) {
+      r += compileCopy4(fromReg, fromOff, toReg, toOff, alignedPortion);
+    }
+    if (unalignedPortion == 1) {
+      r += line(
+        `mov     al, [${fromReg}${getOffStr(fromOff + alignedPortion)}]`
+      );
+      r += line(
+        `mov     byte [${toReg}${getOffStr(toOff + alignedPortion)}], al`
+      );
+    } else if (unalignedPortion == 2) {
+      r += line(
+        `mov     ax, [${fromReg}${getOffStr(fromOff + alignedPortion)}]`
+      );
+      r += line(
+        `mov     word [${toReg}${getOffStr(toOff + alignedPortion)}], ax`
+      );
+    } else if (unalignedPortion == 3) {
+      r += line(
+        `mov     ax, [${fromReg}${getOffStr(fromOff + alignedPortion)}]`
+      );
+      r += line(
+        `mov     word [${toReg}${getOffStr(toOff + alignedPortion)}], ax`
+      );
+      r += line(
+        `mov     al, [${fromReg}${getOffStr(fromOff + alignedPortion + 2)}]`
+      );
+      r += line(
+        `mov     byte [${toReg}${getOffStr(toOff + alignedPortion + 2)}], al`
+      );
+    }
+    return r;
+  }
+
   // already uses: eax
-  function compileCopy(
+  function compileCopy4(
     fromReg,
     fromOffBytes,
     toReg,
@@ -3224,9 +3288,9 @@ function compile(state) {
       r += line(`fild    dword [esp]`);
       r += line(`fst     dword [esp]`);
     } else if (wanted === 'int8' && actual === 'int32') {
-      r += line(`xor     eax, eax`);
-      r += line(`mov     al, [esp]`);
-      r += line(`mov     [esp], eax`);
+      // r += line(`xor     eax, eax`);
+      // r += line(`mov     al, [esp]`);
+      // r += line(`mov     [esp], eax`);
     } else if (wanted === 'int32' && actual === 'int8') {
       r += line(`xor     eax, eax`);
       r += line(`mov     al, [esp]`);
@@ -3236,9 +3300,9 @@ function compile(state) {
       r += line(`mov     ax, [esp]`);
       r += line(`mov     [esp], eax`);
     } else if (wanted === 'int16' && actual === 'int32') {
-      r += line(`xor     eax, eax`);
-      r += line(`mov     ax, [esp]`);
-      r += line(`mov     [esp], eax`);
+      // r += line(`xor     eax, eax`);
+      // r += line(`mov     ax, [esp]`);
+      // r += line(`mov     [esp], eax`);
     } else {
       throw makeErr(expr.i, 'unknown conversion: ' + wanted + ' -> ' + actual);
     }
@@ -3282,7 +3346,7 @@ function compile(state) {
       r += line(`push    dword [edx]`);
     } else {
       r += line(`sub     esp, ${typeSize}`);
-      r += compileCopy('edx', 0, 'esp', 0, typeSize, false);
+      r += compileCopy4('edx', 0, 'esp', 0, typeSize, false);
     }
 
     // r += line(`mov     edx, [edx]`);
@@ -3510,36 +3574,47 @@ function compile(state) {
   function compileExprCtr(expr, scope, addressScope) {
     let r = '';
 
-    r += line('; ctr ' + expr.props.name);
+    r += line('; ctr ' + expr.props.name + '(');
 
-    let structRow = resolveStruct(state.ctx, addressScope, expr.props.name);
-    if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + expr.props.name);
+    indented(() => {
+      let structRow = resolveStruct(state.ctx, addressScope, expr.props.name);
+      if (!structRow)
+        throw makeErr(expr.i, 'unknown struct: ' + expr.props.name);
 
-    let inits = expr.kids.filter((x) => x.name === 'member-init');
+      let inits = expr.kids.filter((x) => x.name === 'member-init');
 
-    if (structRow.members < inits.length)
-      throw makeErr(
-        expr.i,
-        'to many member initializations for ' + structRow.name
-      );
-
-    for (const member of structRow.members) {
-      let init = inits.find((x) => x.props.name == member.name);
-      if (!init)
+      if (structRow.members < inits.length)
         throw makeErr(
           expr.i,
-          'can not find initialization for member ' + member.name
+          'to many member initializations for ' + structRow.name
         );
 
-      let expr = init.kids.find((x) => x.name === 'expr');
-      let type = member.type;
+      let resultSize = structRow.size + ((4 - (structRow.size % 4)) % 4);
+      r += line('sub     esp, ' + resultSize);
 
-      checkType(expr, scope, addressScope, type);
+      for (const member of structRow.members) {
+        let init = inits.find((x) => x.props.name == member.name);
+        if (!init)
+          throw makeErr(
+            expr.i,
+            'can not find initialization for member ' + member.name
+          );
 
-      r += compileExpr(expr, scope, addressScope);
-    }
+        let expr = init.kids.find((x) => x.name === 'expr');
+        let type = member.type;
 
-    r += line();
+        checkType(expr, scope, addressScope, type);
+
+        // let memberSize = evalSize1(type);
+        let memberSize = evalSize4(type);
+        r += line(`; ${member.name} =`);
+        r += compileExpr(expr, scope, addressScope);
+        r += compileCopy4('esp', 0, 'esp', memberSize + member.off, memberSize);
+        r += line(`add     esp, ${memberSize}`);
+      }
+    });
+
+    r += line('; )');
 
     return r;
   }

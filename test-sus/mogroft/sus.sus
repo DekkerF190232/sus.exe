@@ -204,6 +204,13 @@ package sus/native/Win {
     int32 damageMask
   );
 
+  func int8 fc_PFD_TYPE_RGBA() {
+    done cast[int8](0);
+  }
+
+  const int32 PFD_DRAW_TO_WINDOW          = @00000004;
+  const int32 PFD_SUPPORT_OPENGL          = @00000020;
+
   func PixelFormatDescriptor new_PixelFormatDescriptor() {
     done PixelFormatDescriptor (
       size = cast[int16](0),

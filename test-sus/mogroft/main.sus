@@ -1,12 +1,12 @@
 package Main {
 
   use sus/System;
+  use sus/native/Win;
+
 
   main {
     System/println(s:STR"Starting mogroft compiled using sus.exe\n");
-    
     Window/run();
-
     System/println(s:STR"Exiting.");
     System/exit(code: 0);
     
@@ -41,7 +41,21 @@ package Window {
     boo _2 = Win/ShowWindow(handle: window.windowHandle, showCommand: Win/SW_SHOWNORMAL);
     boo _3 = Win/UpdateWindow(handle: window.windowHandle);
 
-    runMessageLoop(this: REF(window));  
+    runMessageLoop(this: REF(window));
+
+    runMessageLoop(this: REF(window));
+  }
+
+  
+  func createContext(PTR[Window] this) {
+    PixelFormatDescriptor pfd = Win/new_PixelFormatDescriptor();
+    pfd.size = cast[int16](size[PixelFormatDescriptor]());
+    pfd.version = cast[int16](1);
+    pfd.flags = Win/PFD_DRAW_TO_WINDOW | Win/PFD_SUPPORT_OPENGL;
+    pfd.pixelType = Win/fc_PFD_TYPE_RGBA();
+    pfd.colorBits = cast[int8](32);
+    pfd.alphaBits = cast[int8](32);
+    pfd.depthBits = cast[int8](24);
   }
 
   func runMessageLoop(PTR[Window] this) {

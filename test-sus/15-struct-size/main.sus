@@ -5,7 +5,8 @@ package Main {
   use sus/System;
 
   main {
-
+    testCtrGet();
+    
     # - ...struct.int8...
     # - ...struct.int16...
     # - ...DRF(struct).int8...
@@ -16,7 +17,36 @@ package Main {
     # - DRF(struct).int8 = ...
     # - DRF(struct).int16 = ...
 
+    # - constructor
+
     System/exit(code: 0);
+  }
+
+  func testCtrGet() {
+    Struct s = Struct(
+      _1 = cast[int8](@77),
+      _2 = cast[int8](@44),
+      _3 = @1111
+    );
+    System/println(s: STR"expecting 77 44 1111:");
+    printStructHex(s: REF(s));
+    
+    s._2 = cast[int8](@33);
+    System/println(s: STR"expecting 77 33 1111:");
+    printStructHex(s: REF(s));
+
+    PTR[Struct] ps = REF(s);
+    DRF(ps)._2 = cast[int8](@88);
+    System/println(s: STR"expecting 77 33 1111:");
+    printStructHex(s: REF(s));
+  }
+
+  func printStructHex(PTR[Struct] s) {
+    System/print(i_0x: cast[int32](DRF(s)._1));
+    System/print(s: STR" ");
+    System/print(i_0x: cast[int32](DRF(s)._2));
+    System/print(s: STR" ");
+    System/println(i_0x: DRF(s)._3);
   }
 
   # unaligned: 6
@@ -27,11 +57,7 @@ package Main {
   );
 
   func testValueInt8() {
-    Struct s = Struct(
-      _1 = cast[int8](@ff),
-      _2 = cast[int8](@ff),
-      _3 = cast[int32](@ffffffff),
-    );
+    Struct s = Struct(_1=cast[int8](0), _2=cast[int8](0), _3=0);
     System/print(s: STR"expecting 8:\n");
     System/print(s: STR"           :");
     System/print(i: size[Struct]());
