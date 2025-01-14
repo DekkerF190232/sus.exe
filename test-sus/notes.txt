@@ -24,6 +24,7 @@ ACTUALLY IMPLEMENTED
     - Parameters
     - External functions
     - calling conventions: sus, stdcall
+  - Function pointers
   - Instructions
     - Local symbols
       - Initializing, Assigning
@@ -48,45 +49,38 @@ ACTUALLY IMPLEMENTED
       - Read member: [x] Symbol base, [x] Deref base, [x] Member chaining, [x] Struct member
       - Ref member: [x] Symbol base, [ ] Deref base
 
+BUGS
+  - type system does not catch error:
+      array[int32, 5] a = array[int32, 5](@11223344);
+      PTR[int32] p = REF(a);
+      PTR[int8] p2 = p+1; # <== here
+  - alignment for const constructors does not work because padding bytes are not added
+
 ISSUES
   - code
     - parser: inconsistant parsing naming and use of tryParse etc, always using eatSpace ...
     - compiler: compiler state should be used more, not addressScope, scope etc.
   - unmet requirements
-    - only allow usage of sym after init
+    - only allow usage of local symbol after init
+    - more aggressive "eatPicky" parsing for better error messages
     - error messages for util functions
     - use statement checks
     - naming checks: functions, consts etc.
-    - create byte arrays for strings.
-    - assign single bytes in byte arrays.
-    - make "safe" type conversion possible
-    - add unsigned types, unsigned type literals, size types?
-    - function return types?
+    - add unsigned types, chars, strings
+    - no main block, only main method, string syntax sugar, compiler directives/macros
     - have "default" function parameters, which don't need a name
     - have "const" type
-    - have better syntax for pointers etc.
-  - possible bugs
-    - conflict for constructors accessed using full path and divisions between symbols
+    - quicker/simpler syntax for pointers etc. less keywords.
 
 MISSING
-  - calling conventions
   - compile-time-sized arrays
-  - compiler-impl.sus
-    - String expression syntax sugar
-    - Alloc implementation
-    - Free implementation
-  - Function pointers
-    - types
-    - calling
-    - lambdas
+  - Lambdas
   - Interfaces
-  - Type/Template arguments
-  - Variable size before creation structs
   - Macros
-  - Calling convention declarations
   - Mogroft
-    - Window
-    - Missing operators
+    - Matrices
+    - VAOs, VBOS
+    - Textures
 
 QUESTION
   WHAT HAPPENS WHEN ASSIGNING ARRAY OUTSIDE OF IT'S SCOPE
@@ -96,7 +90,23 @@ NOTES FOR NEVER
 
   const/readable type attribute
 
+
+NOTES FOR FEATURES NOW NOW
+
+
+  array[int8, 32] arr;
+  arr = array[int8, 32](cast[int8](0));
+
+  arr.1 = 0; # later.
+
+  DRF(REF(arr) + 1) = 0;
+
+
+
+
+
 NOTES FOR FEATURES NOW
+
 
   Return
     func add(int32 a, int32 b) {

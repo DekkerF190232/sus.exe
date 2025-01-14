@@ -261,38 +261,6 @@ package sus/native/Win {
     );
   }
 
-  struct PaintStruct (
-    DeviceContextHandle dch,
-    boo erase,
-    Rectangle rectangle,
-    boo restore,
-    array[int8, 3] _padding1,
-    boo incUpdate,
-    array[int8, 3] _padding2,
-    array[int8, 32] rgbReserved
-  );
-  
-  func PaintStruct new_PaintStruct() {
-    done PaintStruct (
-      dch=RTP[DeviceContextHandle](0),
-      erase=no,
-      rectangle=Rectangle(
-        left=0,
-        top=0,
-        right=0,
-        bottom=0
-      ),
-      restore = no,
-      _padding1 = array[int8,3](cast[int8](0)),
-      incUpdate = no,
-      _padding2 = array[int8, 3](cast[int8](0)),
-      rgbReserved = array[int8, 32](cast[int8](0))
-    );
-  }
-  
-  func CON(stdcall) DeviceContextHandle BeginPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
-  func CON(stdcall) DeviceContextHandle EndPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
-
 }
 
 package sus/System {

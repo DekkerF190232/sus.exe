@@ -5,7 +5,7 @@ import process from 'node:process';
 import { EOL } from 'node:os';
 
 const makeUnit = (sourceFile, empty) => ({ sourceFile, empty }); // sourceFile path is relative to source folder
-const makeBuildInfo = (sourceFolder, buildFolder) => ({ sourceFolder, buildFolder });
+const makeBuildInfo = (sourceFolder, buildFolder, doShowAlign) => ({ sourceFolder, buildFolder, doShowAlign });
 
 const EXT_SRC = '.sus';
 const EXT_TREE = '.stj'; // sussy tree json
@@ -14,13 +14,36 @@ const EXT_OBJ = '.sus.obj';
 
 (function run() {
   let params = process.argv.slice(2);
-  if (params.length !== 1) {
-    console.log('usage:');
-    console.log('  compiler_node.js <folder>');
-    process.exit(1);
+
+  let doShowAlign = false;
+  let sourceFolder = undefined;
+  let parsValid = true;
+
+  for (const p of params) {
+    if (p.startsWith('-')) {
+      if (p === '-show-align') {
+        doShowAlign = true;
+      } else {
+        console.log('error: unknown flag: ' + p);
+        parsValid = false;
+        break;
+      }
+    } else {
+      if (sourceFolder) {
+        console.log('error: duplicate build folder: ' + p);
+        parsValid = false;
+        break;
+      }
+      sourceFolder = p;
+    }
   }
 
-  let sourceFolder = params[0];
+  if (params.length > 2 || !parsValid) {
+    console.log('usage:');
+    console.log('  compiler_node.js <folder> [-show-align]');
+    console.log('');
+    process.exit(1);
+  }
 
   console.log('Sussing "' + sourceFolder + '"' + EOL);
 
@@ -29,7 +52,7 @@ const EXT_OBJ = '.sus.obj';
     .map((x) => makeUnit(x.slice(path.join(sourceFolder).length), false));
 
   let buildFolder = '.sus-build';
-  let buildInfo = makeBuildInfo(sourceFolder, buildFolder);
+  let buildInfo = makeBuildInfo(sourceFolder, buildFolder, doShowAlign);
 
   cleanBuild(buildInfo);
   let context = buildContext(buildInfo, units);
@@ -56,7 +79,7 @@ function cleanBuild(buildInfo) {
 function buildContext(buildInfo, units) {
   console.log('Building context');
 
-  let ctx = compiler.doMakeContext();
+  let ctx = compiler.doMakeContext(buildInfo.doShowAlign);
 
   for (const unit of units) {
     let srcPath = path.join(buildInfo.sourceFolder, unit.sourceFile);
@@ -132,7 +155,7 @@ function genScripts(buildInfo, units, context) {
     buildBat += 'nasm -f win32 -gcv8 ' + asmPathIn + EOL;
   }
 
-  let strLibs = '"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\User32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\kernel32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\ucrt\\x86\\ucrt.lib"';
+  let strLibs = '"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\OpenGL32.Lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\Gdi32.Lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\User32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\kernel32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\ucrt\\x86\\ucrt.lib"';
   let strObjPaths = '';
 
   for (const unit of units) {

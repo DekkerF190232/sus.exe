@@ -6,8 +6,18 @@ package Main {
 
   main {
     System/println(s:STR"Starting mogroft compiled using sus.exe\n");
+    
     Window/run();
+    
     System/println(s:STR"Exiting.");
+    
+    int32 err = Win/GetLastError();
+    System/print(s: STR"Last Error: ");
+    System/print(i: err);
+    System/print(s: STR" (0x");
+    System/print(i_0x: err);
+    System/print(s: STR")\n");
+      
     System/exit(code: 0);
     
   }
@@ -15,47 +25,92 @@ package Main {
 }
 
 package Window {
-
+  
+  use mogroft/Renderer;
   use sus/native/Win;
   use sus/System;
 
   struct Window (
     WindowHandle windowHandle,
-    DeviceContextHandle deviceContextHandle
+    DeviceContextHandle deviceContextHandle,
+    GlRenderContextHandle glRenderContextHandle,
+    RenderState renderState
   );
 
   func run() {
     Window window = Window(
       windowHandle=RTP[WindowHandle](0),
-      deviceContextHandle=RTP[DeviceContextHandle](0)
+      deviceContextHandle=RTP[DeviceContextHandle](0),
+      glRenderContextHandle=RTP[GlRenderContextHandle](0),
+      renderState = Renderer/def_RenderState
     );
 
     # make window
     registerClass();
     createWindow(this: REF(window));
-    # boo _1 = Win/SetWindowPos(
-    #   handle: window.windowHandle, handleInsertAfter: RTP[WindowHandle](0),
-    #   x: 0, y: 0, cx: 0, cy: 0,
-    #   flags: Win/SWP_NOZORDER | Win/SWP_NOSIZE | Win/SWP_SHOWWINDOW
-    # );
-    boo _2 = Win/ShowWindow(handle: window.windowHandle, showCommand: Win/SW_SHOWNORMAL);
-    boo _3 = Win/UpdateWindow(handle: window.windowHandle);
+    
+    # show window
+    boo _1 = Win/ShowWindow(handle: window.windowHandle, showCommand: Win/SW_SHOWNORMAL);
+    boo _2 = Win/UpdateWindow(handle: window.windowHandle);
 
-    runMessageLoop(this: REF(window));
-
+    # create opengl context
+    createContext(this: REF(window));
+    
+    # use context
+    boo _3 = Win/wglMakeCurrent(dch: window.deviceContextHandle, glRenderContextHandle: window.glRenderContextHandle);
+    if (_3 == no) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error setting window context:");
+      System/exit(code: err);
+    }
+     
     runMessageLoop(this: REF(window));
   }
 
   
   func createContext(PTR[Window] this) {
+    DRF(this).deviceContextHandle = Win/GetDC(handle: DRF(this).windowHandle);
+    
+    if (RTP[int32](DRF(this).deviceContextHandle) == 0) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error loading icon:");
+      System/exit(code: err);
+    }
+
+    # chose pixel format
     PixelFormatDescriptor pfd = Win/new_PixelFormatDescriptor();
-    pfd.size = cast[int16](size[PixelFormatDescriptor]());
-    pfd.version = cast[int16](1);
-    pfd.flags = Win/PFD_DRAW_TO_WINDOW | Win/PFD_SUPPORT_OPENGL;
-    pfd.pixelType = Win/fc_PFD_TYPE_RGBA();
-    pfd.colorBits = cast[int8](32);
-    pfd.alphaBits = cast[int8](32);
-    pfd.depthBits = cast[int8](24);
+    pfd.size        = cast[int16](size[PixelFormatDescriptor]());
+    pfd.version     = cast[int16](1);
+    pfd.flags       = Win/PFD_DRAW_TO_WINDOW | Win/PFD_SUPPORT_OPENGL;
+    pfd.pixelType   = Win/fc_PFD_TYPE_RGBA();
+    pfd.colorBits   = cast[int8](32);
+    pfd.alphaBits   = cast[int8](32);
+    pfd.depthBits   = cast[int8](24);
+    int32 pixelFormat = Win/ChoosePixelFormat(
+      dch: DRF(this).deviceContextHandle,
+      pfd: REF(pfd)
+    );
+    if (pixelFormat == 0) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error choosing pixel format:");
+      System/exit(code: err);
+    }
+    
+    # set pixel format
+    boo _1 = Win/SetPixelFormat(dch: DRF(this).deviceContextHandle, format: pixelFormat, pfd: REF(pfd));
+    if (_1 == no) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error setting pixel format:");
+      System/exit(code: err);
+    }
+    
+    # create context
+    DRF(this).glRenderContextHandle = Win/wglCreateContext(dch: DRF(this).deviceContextHandle);
+    if (RTP[int32](DRF(this).glRenderContextHandle) == 0) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error setting pixel format:");
+      System/exit(code: err);
+    }
   }
 
   func runMessageLoop(PTR[Window] this) {
@@ -67,12 +122,40 @@ package Window {
       filterMin: 0,
       filterMax: 0
     )) {
-      boo _4 = Win/TranslateMessage(message: REF(message));
-      int32 _5 = Win/DispatchMessageA(message: REF(message));
+      boo   _1 = Win/TranslateMessage(message: REF(message));
+      int32 _2 = Win/DispatchMessageA(message: REF(message));
     }
   }
 
   func CON(stdcall) int32 windowProc(WindowHandle handle, int32 message, int32 wParam, int32 lParam) {
+    if (message == Win/WM_PAINT) {
+      PaintStruct ps = Win/new_PaintStruct();
+      
+      int32 width = lParam & @ffff;
+      int32 height = lParam >> cast[int8](16) & @ffff;
+      
+      System/print(s: STR"params:");
+      System/print(i: wParam);
+      System/print(s: STR", ");
+      System/println(i: lParam);
+      
+      ASM {
+        int3
+      }
+      
+      #System/print(s: STR"size: ");
+      #System/print(i: width);
+      #System/print(s: STR",");
+      #System/println(i: height);
+      
+      DeviceContextHandle _1 = Win/BeginPaint(handle: handle, paintStruct: REF(ps));
+      DeviceContextHandle _2 = Win/EndPaint(handle: handle, paintStruct: REF(ps));
+      
+      done 0;
+    }
+    #System/print(s: STR"message: 0x");
+    #System/println(i_0x: message);
+  
     done Win/DefWindowProcA(handle: handle, message:message, wParam: wParam, lParam: lParam);
   }
 
@@ -97,11 +180,6 @@ package Window {
       errMsg(code: err, message: STR"Error loading icon: ");
       System/exit(code: err);
     }
-
-    #System/print(s: STR"icon: ");
-    #System/println(i: RTP[int32](icon));
-    #System/print(s: STR"cursor: ");
-    #System/println(i: RTP[int32](cursor));
 
     WindowClassExtendedAscii windowClass = WindowClassExtendedAscii(
       cbSize     = size[WindowClassExtendedAscii](),
@@ -136,7 +214,10 @@ package Window {
       bottom = 600
     );
 
-    boo res = Win/AdjustWindowRect(rectangle: REF(rectangle), style: style, menu: no);
+    boo res = Win/AdjustWindowRect(
+      rectangle: REF(rectangle),
+      style:     style, menu: no
+    );
 
     DRF(this).windowHandle = Win/CreateWindowExA(
       extendedStyle: 0,

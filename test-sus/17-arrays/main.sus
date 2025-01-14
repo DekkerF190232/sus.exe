@@ -1,0 +1,58 @@
+
+package Main {
+
+  use sus/InOut;
+  use sus/System;
+  use main/test/Add;
+
+ struct PaintStruct (
+    int32 dch,
+    boo erase,
+    array[int32, 4] rectangle,
+    boo restore,
+    boo incUpdate,
+    array[int8, 32] rgbReserved
+  );
+
+  main {
+    System/println(i: size[PaintStruct]());
+    System/println();
+
+    array[int32, 5] a = array[int32, 5](@11223344);
+    PTR[int32] p = REF(a);
+    DRF(p + 0) = @ff;
+
+    PTR[int8] p2 = p + 6;
+    DRF(p2) = cast[int8](@ff);
+
+    System/print(s: STR"expecting: 20\n");
+    System/print(s: STR"         : ");
+    System/println(i: size[array[int32, 5]]());
+
+    System/print(s: STR"expecting: ff 0 0 0  44 33 ff 11 | 44 33 22 11  44 33 22 11 | 44 33 22 11\n");
+    System/print(s: STR"         : ");
+    printBytes(pointer: REF(a), count: size[array[int32, 5]]());
+    System/println();
+
+    System/exit(code: 0);
+  }
+
+  func printBytes(PTR[int8] pointer, int32 count) {
+    int32 i = 0;
+    while (i < count) {
+      if (i > 0) {
+        if (i % 8 == 0) System/print(s: STR" | ");
+        else if (i % 4 == 0) System/print(s: STR"  ");
+        else System/print(s: STR" ");
+      }
+
+      int8 byte = DRF(pointer + i);
+      System/print(i_0x: cast[int32](byte));
+
+      i = i + 1;
+    }
+
+    System/println();
+  }
+
+}

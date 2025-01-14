@@ -1,0 +1,21 @@
+
+package mogroft/Renderer {
+
+  use sus/Gl;
+  
+  struct RenderState(
+    int32 width,
+    int32 height
+  );
+  
+  const RenderState def_RenderState = RenderState(width = 0, height = 0);
+  
+  func render(PTR[RenderState] this) {
+    
+  }
+  
+  func resize(PTR[RenderState] this, int32 width, int32 height) {
+    
+  }
+
+}

@@ -86,6 +86,7 @@ function parse(state) {
   const makeNodeExprLitPtrStr = (str) =>
     makeNode('expr-lit', { litType: 'ptr-str', value: str });
   const makeNodeExprArr = () => makeNode('expr-arr', null, []); // kids: type, expression for size
+  const makeNodeExprArray = (size) => makeNode('expr-array', { size }, []); // kids: type, expression for size
   const makeNodeExprBrackets = () => makeNode('expr-brackets', null, []); // expression
   const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get pointer of
   const makeNodeExprDrf = () => makeNode('expr-drf', null, []); // kids: expression to express value of
@@ -572,7 +573,7 @@ function parse(state) {
 
   function tryParseNodeExprOp(nodeExprA) {
     return tryParse((_) => {
-      let op = eat(/^([+\-*/%]|==|!=|>=|<=|>|<|\|\||\&\&|\|)/);
+      let op = eat(/^([+\-*/%]|>>|<<|==|!=|>=|<=|>|<|\|\||\&\&|&|\|)/);
       if (!op) return undefined;
       eatEmpty();
       let n = makeNodeExprOp(op);
@@ -639,6 +640,34 @@ function parse(state) {
         eatEmpty();
 
         let arrayNode = makeNodeExprArr();
+        arrayNode.kids.push(type);
+        arrayNode.kids.push(parseNodeExpr());
+
+        eatPicky(')');
+        eatEmpty();
+
+        return arrayNode;
+      },
+      () => {
+        if (!eat(/^array/)) return;
+        eatEmpty();
+        if (!eat(/^\[/)) return;
+        let type = parseNodeType();
+        eatEmpty();
+
+        eatPicky(',');
+        eatEmpty();
+
+        let size = expect(eatLitIntDec(), 'array size');
+        let sizeNr = parseInt(size);
+
+        eatPicky(']');
+        eatEmpty();
+
+        if (!eat(/^\(/)) return;
+        eatEmpty();
+
+        let arrayNode = makeNodeExprArray(sizeNr);
         arrayNode.kids.push(type);
         arrayNode.kids.push(parseNodeExpr());
 
@@ -1075,6 +1104,33 @@ function parse(state) {
   function tryParseType() {
     return tryParse(
       () => {
+        if (!eat(/^array/)) return;
+        eatEmpty();
+
+        if (!eat(/^\[/)) return;
+        eatEmpty();
+
+        let type = tryParseType();
+        if (!type) return;
+
+        if (!eat(/^,/)) return;
+        eatEmpty();
+
+        let size = eat(/^[0-9][0-9]*/);
+        if (!size) return;
+        eatEmpty();
+
+        let sizeNr = parseInt(size);
+        if (sizeNr <= 0) {
+          throw err('array type size must be above 0');
+        }
+
+        if (!eat(/^\]/)) return;
+        eatEmpty();
+
+        return makeTypeArray(type, sizeNr);
+      },
+      () => {
         let funcSig = makeTypeFuncPtr(undefined, undefined, []);
 
         if (!eat(/^funcptr/)) return;
@@ -1417,10 +1473,8 @@ function compile(state) {
     function compatiblePm(a, b) {
       if ((typeBaseName(a) === 'real32') !== (typeBaseName(b) === 'real32'))
         return;
-      if (
-        (typeBaseName(a) === 'PTR') === (typeBaseName(b) === 'PTR') &&
-        typeToString(a) !== typeToString(b)
-      )
+      // prettier-ignore
+      if ( (typeBaseName(a) === 'PTR') === (typeBaseName(b) === 'PTR') && typeToString(a) !== typeToString(b) )
         return;
       return a;
     }
@@ -1437,6 +1491,17 @@ function compile(state) {
 
     function allowedLogic(type) {
       return typeToString(type) === 'boo';
+    }
+
+    function allowedShift(type) {
+      let l = ['int32', 'int8'];
+      return l.includes(typeBaseName(type));
+    }
+
+    function compatibleShift(a, b) {
+      if (typeToString(a) !== 'int32') return;
+      if (typeToString(b) !== 'int8') return;
+      return a;
     }
 
     function allowedBitwise(type) {
@@ -1472,15 +1537,14 @@ function compile(state) {
       case '%':
         // prettier-ignore
         return evalBinOp(op, expr, scope, addressScope, allowedCalc, compatibleCalc );
+      case '>>':
+      case '<<':
+        // prettier-ignore
+        return evalBinOp( op, expr, scope, addressScope, allowedShift, compatibleShift );
       case '|':
-        return evalBinOp(
-          op,
-          expr,
-          scope,
-          addressScope,
-          allowedBitwise,
-          compatibleBitwise
-        );
+      case '&':
+        // prettier-ignore
+        return evalBinOp( op, expr, scope, addressScope, allowedBitwise, compatibleBitwise );
       case '||':
       case '&&':
         // prettier-ignore
@@ -1560,6 +1624,8 @@ function compile(state) {
       let tyeExpr = expr.kids[0];
       let memberName = expr.props.name;
       let structType = evalType(tyeExpr, scope, addressScope);
+      if (structType.kind !== 'struct')
+        throw makeErr(expr.i, 'expected struct type');
       let structName = structType.name;
       let structRow = findStructByAddress(state.ctx, structName);
       if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + structName);
@@ -1642,6 +1708,10 @@ function compile(state) {
         sig.returnType,
         sig.params.map((x) => makeTypeFuncPtrParam(x.name, x.type))
       );
+    } else if (expr.name === 'expr-array') {
+      let typeType = getActualType(expr.kids[0], addressScope);
+      let size = expr.props.size;
+      return makeTypeArray(typeType, size);
     } else {
       throw makeImplErr('unknown expression ' + expr.name);
     }
@@ -1724,7 +1794,8 @@ function compile(state) {
         else throw makeErr(expr.i, 'can not cast int32 to ' + typeName);
         break;
       case 'hex-int':
-        let val = '0' + expr.props.value.slice(1, expr.props.value.length) + 'h';
+        let val =
+          '0' + expr.props.value.slice(1, expr.props.value.length) + 'h';
         if (typeName === undefined) r += line('dd    ' + val);
         else if (typeName === 'int16') r += line('dw    ' + val);
         else if (typeName === 'int8') r += line('db    ' + val);
@@ -3134,8 +3205,10 @@ function compile(state) {
       asm += compileExprDrf(expr, scope, addressScope);
     } else if (expr.name === 'expr-member') {
       asm += compileExprMember(expr, scope, addressScope);
-    } else if (expr.name == 'expr-funcref') {
+    } else if (expr.name === 'expr-funcref') {
       asm += compileExprFuncRef(expr, scope, addressScope);
+    } else if (expr.name === 'expr-array') {
+      asm += compileExprArray(expr, scope, addressScope);
     } else {
       throw makeImplErr('unknown expression ' + expr.name);
     }
@@ -3351,6 +3424,39 @@ function compile(state) {
 
     // r += line(`mov     edx, [edx]`);
     // r += line(`push    edx`);
+    return r;
+  }
+
+  function compileExprArray(expr, scope, addressScope) {
+    let r = '';
+
+    let elType = getActualType(expr.kids[0]);
+    let size = expr.props.size;
+    _ass(size);
+
+    let templateExpr = expr.kids[1];
+    checkType(templateExpr, scope, addressScope, elType);
+
+    let elSize = evalSize1(elType);
+    let elSizeAligned = elSize + ((4 - (elSize % 4)) % 4);
+    let totalSize = elSize * size;
+    let totalSizeAligned = totalSize + ((4 - (totalSize % 4)) % 4);
+
+    r += line(`; array expr (`);
+    let dwordCount = totalSizeAligned / 4;
+    r += line(`sub     esp, ${totalSizeAligned - 4}`);
+
+    r += line(`; 0`);
+    let exprStr = compileExpr(templateExpr, scope, addressScope);
+    r += exprStr;
+
+    // 1, dupe expr size times:
+    for (let i = 1; i < dwordCount; i++) {
+      r += line(`; ${i}`);
+      r += compileCopy4('esp', 0, 'esp', i * 4, elSizeAligned);
+    }
+    r += line(`; )`);
+
     return r;
   }
 
@@ -3778,6 +3884,12 @@ function compile(state) {
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'add');
       case '|':
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'or');
+      case '&':
+        return compileExprOpSimple(exprOp, scope, addressScope, op, 'and');
+      case '>>':
+        return compileExprOpShift(exprOp, scope, addressScope, op, 'shr');
+      case '<<':
+        return compileExprOpShift(exprOp, scope, addressScope, op, 'shl');
       case '*':
         if (exprATypeName === 'real32')
           return compileExprOpFloat(exprOp, scope, addressScope, op, 'fmulp');
@@ -3797,6 +3909,19 @@ function compile(state) {
       default:
         throw makeImplErr('unknown operand ' + op);
     }
+  }
+  
+  function compileExprOpShift(exprOp, scope, addressScope, op, asmOp) {
+    if (exprOp.kids.length != 2)
+      throw makeErr('expected 2 params for op ' + op);
+    let a = exprOp.kids[0];
+    let b = exprOp.kids[1];
+    let asm = '';
+    asm += compileExpr(a, scope, addressScope);
+    asm += compileExpr(b, scope, addressScope);
+    asm += line(`pop     ecx`);
+    asm += line(`${asmOp.padEnd(8, ' ')}dword [esp], cl`);
+    return asm;
   }
 
   function compileExprOpDiv(exprOp, scope, addressScope, op) {
@@ -3870,7 +3995,6 @@ function compile(state) {
     return asm;
   }
 
-  // (very inefficient lol)
   function compileExprOpSimple(exprOp, scope, addressScope, op, asmOp) {
     if (exprOp.kids.length != 2)
       throw makeErr('expected 2 params for op ' + op);
@@ -4086,6 +4210,10 @@ function makeTypeFuncPtr(convention, returnType, params) {
   return { kind: 'funcptr', convention, returnType, params };
 }
 
+function makeTypeArray(type, size) {
+  return { kind: 'array', type, size };
+}
+
 function makeTypeFuncPtrParam(name, type) {
   return {
     name,
@@ -4114,6 +4242,13 @@ function typeToString(type) {
       );
     case 'struct':
       return type.name;
+    case 'array':
+      let ar = 'array[';
+      ar += typeToString(type.type);
+      ar += ', ';
+      ar += type.size;
+      ar += ']';
+      return ar;
     case 'funcptr':
       let r = 'funcptr[';
       if (type.returnType) r += typeToString(type.returnType);
@@ -4133,7 +4268,7 @@ function typeToString(type) {
       r += ']';
       return r;
     default:
-      throw 0;
+      throw new Error('unknown type: ' + type.kind);
   }
 }
 
@@ -4171,7 +4306,10 @@ function getSize1(ctx, type) {
     }
   } else if (type.kind === 'funcptr') {
     return 4;
-  } else {
+  } else if (type.kind === 'array') {
+    return getSize1(ctx, type.type) * type.size;
+  }
+  {
     throw new Error('unknown type: ' + type.kind);
   }
 }
@@ -4181,6 +4319,7 @@ function getSize1(ctx, type) {
 // ctx start  ================================================================= {
 
 const makeContext = (
+  doShowAlign,
   packages,
   structs,
   funcSigs,
@@ -4188,6 +4327,7 @@ const makeContext = (
   unitPaths,
   loadContext
 ) => ({
+  doShowAlign,
   packages,
   structs,
   funcSigs,
@@ -4343,6 +4483,8 @@ function getType(ctx, addressScope, typeNode) {
       for (const param of type.params) {
         param.type = resolveType(param.type);
       }
+    } else if (type.kind === 'array') {
+      type.type = resolveType(type.type);
     } else if (type.kind === 'named') {
       let struct = resolveStruct(ctx, addressScope, type.anyName);
       if (!struct)
@@ -4358,8 +4500,16 @@ function getType(ctx, addressScope, typeNode) {
   return resolveType(typeNode.props.type);
 }
 
-export function doMakeContext() {
-  return makeContext([], [], [], [], [], makeLoadContext({}, [], {}));
+export function doMakeContext(doShowAlign) {
+  return makeContext(
+    doShowAlign,
+    [],
+    [],
+    [],
+    [],
+    [],
+    makeLoadContext({}, [], {})
+  );
 }
 
 export function addToContext(ctx, path, src) {
@@ -4463,23 +4613,37 @@ function loadIndexStruct(ctx) {
   // - source: https://learn.microsoft.com/en-us/cpp/c-language/padding-and-alignment-of-structure-members?view=msvc-170
   //           https://learn.microsoft.com/en-us/cpp/preprocessor/pack?view=msvc-170
 
-  function getAlignmentRequirement(struct, packingSize) {
-    let r = 0;
-    for (const member of struct.members) {
-      if (member.type.kind === 'struct') {
-        let subStruct = findStructByAddress(ctx, member.type.name);
-        r = Math.max(r, getAlignmentRequirement(subStruct));
-      } else if (
-        member.type.kind === 'prim' ||
-        member.type.kind === 'funcptr'
-      ) {
-        r = Math.max(r, getSize1(ctx, member.type));
-      } else {
-        throw new Error('unknown type kind ' + member.type.kind);
-      }
-      if (r >= packingSize) return packingSize;
+  function getAlignmentRequirement(type) {
+    if (type.kind === 'struct') {
+      let struct = findStructByAddress(ctx, type.name);
+      return struct.members
+        .map((x) => getAlignmentRequirement(x.type))
+        .reduce((a, b) => Math.max(a, b), 0);
+    } else if (type.kind === 'array') {
+      return getAlignmentRequirement(type.type);
+    } else if (type.kind === 'prim') {
+      return getSize1(ctx, type);
+    } else if (type.kind === 'funcptr') {
+      return getSize1(ctx, type);
     }
-    return r;
+
+    throw new Error('unknown type kind ' + type.kind);
+  }
+
+  function calcMemberSize(type, structDepth) {
+    if (type.kind === 'struct') {
+      let struct = findStructByAddress(ctx, type.name);
+      calcStructSize(struct, structDepth);
+      return struct.size;
+    } else if (type.kind === 'array') {
+      return getSize1(ctx, type.type) * type.size;
+    } else if (type.kind === 'prim') {
+      return getSize1(ctx, type);
+    } else if (type.kind === 'funcptr') {
+      return getSize1(ctx, type);
+    } else {
+      throw new Error('can not calc size of ' + type.kind + ' type');
+    }
   }
 
   function calcStructSize(struct, depth = 1000) {
@@ -4489,27 +4653,15 @@ function loadIndexStruct(ctx) {
     let packingSize = 4;
 
     let off = 0;
-    let lastSize = 0;
     for (const member of struct.members) {
-      let alignment;
-      let size;
+      let size = calcMemberSize(member.type, depth - 1);
+      let alignment = Math.min(
+        packingSize,
+        getAlignmentRequirement(member.type)
+      );
+      _ass(alignment >= 1 && alignment <= 4);
+      _ass(size > 0);
 
-      if (member.type.kind === 'struct') {
-        let s = findStructByAddress(ctx, member.type.name);
-        calcStructSize(s, depth - 1);
-        size = s.size;
-        alignment = getAlignmentRequirement(s);
-      } else if (
-        member.type.kind === 'prim' ||
-        member.type.kind === 'funcptr'
-      ) {
-        size = getSize1(ctx, member.type);
-        alignment = size;
-      } else {
-        throw new Error('unknown type kind ' + member.type.kind);
-      }
-
-      alignment = Math.min(alignment);
       // formula of https://en.wikipedia.org/wiki/Data_structure_alignment
       let padding = (alignment - (off % alignment)) % alignment;
       off = off + padding;
@@ -4517,25 +4669,35 @@ function loadIndexStruct(ctx) {
 
       off += size;
     }
-    let alignment = getAlignmentRequirement(struct);
-    let padding = (alignment - (off % alignment)) % alignment;
+    // formula of https://en.wikipedia.org/wiki/Data_structure_alignment
+    let structAlignment = Math.min(
+      packingSize,
+      getAlignmentRequirement(struct.type)
+    );
+    let padding = (structAlignment - (off % structAlignment)) % structAlignment;
     off = off + padding;
 
     struct.size = off;
   }
 
   for (const struct of ctx.structs) {
+    if (struct.name === 'Window/Window') {
+      console.log('lol');
+    }
     calcStructSize(struct);
 
-    // (
-    //   struct.size + ' ' +
-    //   struct.name +
-    //     '\n' +
-    //     struct.members
-    //       .map((x) => ('  ' + x.off).padEnd(' ', 3) + ' ' + x.name)
-    //       .join('\n') +
-    //     '\n'
-    // );
+    if (ctx.doShowAlign) {
+      console.log(
+        struct.size +
+          ' ' +
+          struct.name +
+          '\n' +
+          struct.members
+            .map((x) => ('  ' + x.off).padEnd(' ', 3) + ' ' + x.name)
+            .join('\n') +
+          '\n'
+      );
+    }
   }
 }
 
