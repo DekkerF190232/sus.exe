@@ -50,7 +50,7 @@ function parse(state) {
   const makeNodeCtr = (name) => makeNode('expr-ctr', { name }, []);
   const makeNodeMemberInit = (name) => makeNode('member-init', { name }, []);
   const makeNodeStruct = (name) => makeNode('struct', { name }, []);
-  const makeNodeConst = (name) => makeNode('const', { name }, []); // type, expr
+  const makeNodeStatic = (name) => makeNode('static', { name }, []); // type, expr
   const makeNodeMember = (name) => makeNode('member', { name }, []);
   const makeNodeFunc = (name, convention, external) =>
     makeNode('func', { name, convention, external }, []); // list-param, list-ins
@@ -254,7 +254,7 @@ function parse(state) {
               return true;
             },
             tryParseStruct,
-            tryParseConst,
+            tryParseStatic,
             tryParseUsing
           ) &&
           !eof()
@@ -269,18 +269,18 @@ function parse(state) {
     });
   }
 
-  function tryParseConst() {
+  function tryParseStatic() {
     return tryParse(() => {
-      let nodeConst = makeNodeConst(undefined);
+      let nodeStatic = makeNodeStatic(undefined);
 
-      if (!eat(/^const[ \t\n]/)) return;
+      if (!eat(/^static[ \t\n]/)) return;
       eatEmpty();
 
       let type = tryParseNodeType();
       if (!type) return;
 
-      nodeConst.props.name = eatSymbol();
-      if (!nodeConst.props.name) return;
+      nodeStatic.props.name = eatSymbol();
+      if (!nodeStatic.props.name) return;
       eatEmpty();
 
       if (!eat(/^=/)) return;
@@ -292,7 +292,7 @@ function parse(state) {
       if (!eat(/^;/)) return;
       eatEmpty();
 
-      append(nodeConst, () => {
+      append(nodeStatic, () => {
         append(type);
         append(expr);
       });
@@ -1645,8 +1645,8 @@ function compile(state) {
       if (loc) type = loc.row.type;
 
       if (!type) {
-        let const_ = resolveConst(state.ctx, addressScope, symbol);
-        if (const_) type = const_.type;
+        let static_ = resolveStatic(state.ctx, addressScope, symbol);
+        if (static_) type = static_.type;
       }
 
       if (!type) throw makeErr(expr.i, 'can not find symbol ' + symbol);
@@ -1722,69 +1722,102 @@ function compile(state) {
 
   // COMPILATION METHODS ============================================
 
-  function baseCompileConst() {
+  function baseCompileStatic() {
     let r = '';
     for (const pkg of state.root.kids.filter((x) => x.name === 'package')) {
       let addressScope = buildAddressScope(state.ctx, pkg);
-      for (const nodeConst of pkg.kids.filter((x) => x.name === 'const')) {
-        r += compileConst(nodeConst, addressScope);
+      for (const nodeStatic of pkg.kids.filter((x) => x.name === 'static')) {
+        r += compileStatic(nodeStatic, addressScope);
       }
     }
     return r;
   }
 
-  function compileConst(nodeConst, addressScope) {
+  function compileStatic(nodeStatic, addressScope) {
     let r = '';
 
-    let name = nodeConst.props.name;
-    let expectedType = getActualType(nodeConst.kids[0], addressScope);
-    let expr = nodeConst.kids[1];
+    let name = nodeStatic.props.name;
+    let expectedType = getActualType(nodeStatic.kids[0], addressScope);
+    let expr = nodeStatic.kids[1];
 
     checkType(expr, null, addressScope, expectedType);
 
-    let asmName = getConstAsmName(
+    let asmName = getStaticAsmName(
       name,
       addressScope.usings[addressScope.usings.length - 1]
     );
     r += line('global ' + asmName, 0);
     r += line(asmName + ':', 0);
-    r += compileDefinitionExpr(expr, addressScope);
+    r += compileStaticExpr(expr, addressScope);
 
     return r;
   }
 
-  function compileDefinitionExpr(expr, addressScope) {
+  function compileStaticExpr(expr, addressScope) {
     if (expr.name === 'expr') expr = expr.kids[0];
 
     let r = '';
 
     if (expr.name === 'expr-lit') {
-      r += compileDefinitionExprLit(expr, addressScope);
+      r += compileStaticExprLit(expr, addressScope);
     } else if (expr.name === 'expr-cast') {
-      r += compileDefintionExprCast(expr, addressScope);
+      r += compileStaticExprCast(expr, addressScope);
+    } else if (expr.name === 'expr-reinterpret') {
+      r += compileStaticExprReinterpret(expr, addressScope);
     } else if (expr.name === 'expr-ctr') {
-      r += compileDefinitionExprCtr(expr, addressScope);
+      r += compileStaticExprCtr(expr, addressScope);
     } else {
-      throw makeImplErr('can not make constant of expression ' + expr.name);
+      throw makeImplErr('not a valid static init ' + expr.name);
     }
 
     return r;
   }
 
-  function compileDefintionExprCast(expr, addressScope) {
+  function compileStaticExprCast(expr, addressScope) {
     let kid = expr.kids[1];
     let wantedType = getActualType(expr.kids[0], addressScope);
     let wanted = typeToString(wantedType);
-    // let actualType = evalType(kid, scope, addressScope);
-    // let actual = typeToString(actualType);
+    if (kid.name === 'expr') kid = kid.kids[0];
     if (kid.name === 'expr-lit') {
-      return compileDefinitionExprLit(kid, addressScope, wanted);
+      return compileStaticExprLit(kid, addressScope, wanted);
     } else {
       throw makeErr(expr.i, 'not a literal');
     }
   }
 
-  function compileDefinitionExprLit(expr, addressScope, typeName = undefined) {
+  function compileStaticExprReinterpret(expr, addressScope) {
+    let kid = expr.kids[1];
+    let wantedType = getActualType(expr.kids[0], addressScope);
+    let wanted = typeToString(wantedType);
+
+    let exprType = evalType(kid, null, addressScope);
+    let exprSize = evalSize1(exprType);
+    let sizeWanted = evalSize1(wantedType);
+
+    if (sizeWanted != exprSize) {
+      throw makeErr(
+        expr.i,
+        'expected size ' +
+          sizeWanted +
+          ' (' +
+          wanted +
+          ') expr but got size ' +
+          exprSize +
+          ' (' +
+          typeToString(exprType) +
+          ')'
+      );
+    }
+
+    if (kid.name === 'expr') kid = kid.kids[0];
+    if (kid.name === 'expr-lit') {
+      return compileStaticExprLit(kid, addressScope);
+    } else {
+      throw makeErr(expr.i, 'not a literal: ' + kid.name);
+    }
+  }
+
+  function compileStaticExprLit(expr, addressScope, typeName = undefined) {
     let r = '';
     switch (expr.props.litType) {
       case 'dec-int':
@@ -1815,39 +1848,56 @@ function compile(state) {
     return r;
   }
 
-  function compileDefinitionExprCtr(expr, addressScope) {
+  function compileStaticExprCtr(expr, addressScope) {
     let r = '';
     r += line('; ctr ' + expr.props.name);
 
-    let structRow = resolveStruct(state.ctx, addressScope, expr.props.name);
-    if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + expr.props.name);
+    let struct = resolveStruct(state.ctx, addressScope, expr.props.name);
+    if (!struct) throw makeErr(expr.i, 'unknown struct: ' + expr.props.name);
 
     let inits = expr.kids.filter((x) => x.name === 'member-init');
 
-    if (structRow.members < inits.length)
+    if (struct.members < inits.length)
       throw makeErr(
         expr.i,
-        'to many member initializations for ' + structRow.name
+        'to many member initializations for ' + struct.name
       );
 
-    for (const member of structRow.members) {
+    let currentOff = 0;
+    for (const member of struct.members) {
       let init = inits.find((x) => x.props.name == member.name);
-      if (!init)
-        throw makeErr(
-          expr.i,
-          'can not find initialization for member ' + member.name
-        );
+      // prettier-ignore
+      if (!init) throw makeErr( expr.i, 'can not find initialization for member ' + member.name );
 
       let expr = init.kids.find((x) => x.name === 'expr');
       let type = member.type;
+      let size = evalSize1(type);
+
+      let missingOff = member.off - currentOff;
+      if (missingOff > 0)
+        r += line(`${compileStaticPadding(missingOff)} ; off padding`);
 
       checkType(expr, undefined, addressScope, type);
-      r += compileDefinitionExpr(expr, addressScope);
+      r += compileStaticExpr(expr, addressScope);
+      currentOff += size;
     }
+
+    let paddingBytes = struct.size - currentOff;
+    if (paddingBytes > 0)
+      r += compileStaticPadding(paddingBytes) + ` ; end padding`;
 
     r += line();
 
     return r;
+  }
+
+  function compileStaticPadding(bytes) {
+    let rp = '';
+    for (let i = 0; i < bytes; i++) {
+      if (i > 0) rp += ', ';
+      rp += `0`;
+    }
+    return line(`db      ${rp}`);
   }
 
   function baseCompileDataTable() {
@@ -2881,24 +2931,17 @@ function compile(state) {
 
     switch (targetExpr.name) {
       case 'expr-drf':
-        r += line(`; deref assign`);
-        r += compileExpr(expr, scope, addressScope);
+        r += line(`; dref assign {`);
 
+        r += compileExpr(expr, scope, addressScope);
         r += compileExpr(targetExpr.kids[0], scope, addressScope);
         r += line(`pop     edx`);
 
-        let exprTypeName = typeToString(exprType);
-        if (exprTypeName === 'int8') {
-          r += line(`pop     eax`);
-          r += line(`mov     byte [edx], al`);
-        } else if (exprTypeName === 'int16') {
-          r += line(`pop     eax`);
-          r += line(`mov     word [edx], ax`);
-        } else {
-          let byteSize = evalSize1(exprType);
-          r += compileCopy1('esp', 0, 'edx', 0, byteSize, true);
-          r += line(`add     esp, ${byteSize}`);
-        }
+        let byteSize = evalSize1(exprType);
+        r += compileCopy1('esp', 0, 'edx', 0, byteSize, true);
+        r += line(`add     esp, ${byteSize}`);
+
+        r += line('; }');
         break;
       case 'expr-sym':
         r += compileInsAssSym(targetExpr, expr, scope, addressScope);
@@ -2932,22 +2975,38 @@ function compile(state) {
       let symbol = structExpr.props.symbol;
 
       let symLoc = findSymTableLoc(scope, symbol);
-      if (!symLoc) throw makeErr(structExpr.i, 'can not find symbol ' + symbol);
-      let symRow = symLoc.row;
+      if (!symLoc) {
+        let static_ = resolveStatic(state.ctx, addressScope, symbol);
+        if (!static_)
+          throw makeErr(structExpr.i, 'can not find symbol ' + symbol);
+        let asmName = getStaticAsmName(
+          static_.simpleName,
+          static_.packageAddress
+        );
+        r += line(`; static member assign: ${symbol}.${memberChainString}`);
+        r += compileExpr(expr, scope, addressScope);
+        r += line(`mov     edx, ${asmName}`);
+        let off = chain.off;
+        r += compileCopy1('esp', 0, 'edx', off, memberSizeBytes, true);
+        r += line(`add     esp, ${memberSizeBytes}`);
+        r += line();
+      } else {
+        let symRow = symLoc.row;
 
-      r += line(`; member assign: ${symbol}.${memberChainString}`);
+        r += line(`; member assign: ${symbol}.${memberChainString}`);
 
-      r += compileExpr(expr, scope, addressScope);
+        r += compileExpr(expr, scope, addressScope);
 
-      let symRes = resolveSymbolBase(symLoc);
-      r += symRes.asm;
+        let symRes = resolveSymbolBase(symLoc);
+        r += symRes.asm;
 
-      let off = symRow.off + chain.off;
+        let off = symRow.off + chain.off;
 
-      r += compileCopy1('esp', 0, 'ebp', off, memberSizeBytes, true);
-      r += line(`add     esp, ${memberSizeBytes}`);
+        r += compileCopy1('esp', 0, 'ebp', off, memberSizeBytes, true);
+        r += line(`add     esp, ${memberSizeBytes}`);
 
-      r += line();
+        r += line();
+      }
     } else if (structExpr.name === 'expr-drf') {
       let addressExpr = structExpr.kids[0];
 
@@ -2978,7 +3037,22 @@ function compile(state) {
     let symbol = exprSym.props.symbol;
 
     let loc = findSymTableLoc(scope, symbol);
-    if (!loc) throw makeErr(targetExpr.i, 'can not find symbol ' + symbol);
+    if (!loc) {
+      let static_ = resolveStatic(state.ctx, addressScope, symbol);
+      if (!static_) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
+      r += line(`; static assign`);
+      let asmName = getStaticAsmName(
+        static_.simpleName,
+        static_.packageAddress
+      );
+      r += compileExpr(expr, scope, addressScope);
+      r += line(`mov     edx, ${asmName}`);
+      let byteSize = evalSize1(static_.type);
+      r += compileCopy1('esp', 0, 'edx', 0, byteSize, true);
+      r += line(`add     esp, ${byteSize}`);
+      return r;
+    }
+
     let symRow = loc.row;
     let type = symRow.type;
     let byteSize = evalSize4(type);
@@ -3010,7 +3084,7 @@ function compile(state) {
     let r = '';
     let amount = scopes.length - 1;
     if (amount === 0) return { asm: r, register: 'ebp' };
-    r += line(`; going back ` + scopes.length + ' scopes {');
+    r += line(`; going back ` + amount + ' scope(s) {');
     r += line(`mov     edx, [ebp${getOffStr(scopes[0].prevEBPOff)}]`);
     for (let i = 1; i < amount; i++) {
       r += line(`mov     edx, [edx${getOffStr(scopes[i].prevEBPOff)}]`);
@@ -3506,14 +3580,17 @@ function compile(state) {
         let off = row.off + chain.off;
         r += compilePush(symRes.register, off, memberSizeBytes);
       } else {
-        let const_ = resolveConst(state.ctx, addressScope, symbol);
-        if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+        let static_ = resolveStatic(state.ctx, addressScope, symbol);
+        if (!static_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
 
-        let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
+        let asmName = getStaticAsmName(
+          static_.simpleName,
+          static_.packageAddress
+        );
         _ass(asmName);
 
         if (
-          state.name !== const_.unitPath &&
+          state.name !== static_.unitPath &&
           !tableExternals.includes(asmName)
         ) {
           tableExternals.push(asmName);
@@ -3613,12 +3690,15 @@ function compile(state) {
         r += line(`lea     eax, [${symRes.register}${getOffStr(off)}] ${c}`);
         r += line(`push    eax`);
       } else {
-        let const_ = resolveConst(state.ctx, addressScope, symbol);
-        if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
-        let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
+        let static_ = resolveStatic(state.ctx, addressScope, symbol);
+        if (!static_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+        let asmName = getStaticAsmName(
+          static_.simpleName,
+          static_.packageAddress
+        );
         _ass(asmName);
         if (
-          state.name !== const_.unitPath &&
+          state.name !== static_.unitPath &&
           !tableExternals.includes(asmName)
         ) {
           tableExternals.push(asmName);
@@ -3661,17 +3741,23 @@ function compile(state) {
       );
       r += line(`push    eax`);
     } else {
-      let const_ = resolveConst(state.ctx, addressScope, symbol);
-      if (!const_) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
+      let static_ = resolveStatic(state.ctx, addressScope, symbol);
+      if (!static_) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
 
-      let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
+      let asmName = getStaticAsmName(
+        static_.simpleName,
+        static_.packageAddress
+      );
       _ass(asmName);
 
-      if (state.name !== const_.unitPath && !tableExternals.includes(asmName)) {
+      if (
+        state.name !== static_.unitPath &&
+        !tableExternals.includes(asmName)
+      ) {
         tableExternals.push(asmName);
       }
 
-      r += line(`push    ${asmName}; const ref: ${const_.fullName}`);
+      r += line(`push    ${asmName}; const ref: ${static_.fullName}`);
     }
 
     return r;
@@ -3910,7 +3996,7 @@ function compile(state) {
         throw makeImplErr('unknown operand ' + op);
     }
   }
-  
+
   function compileExprOpShift(exprOp, scope, addressScope, op, asmOp) {
     if (exprOp.kids.length != 2)
       throw makeErr('expected 2 params for op ' + op);
@@ -4071,23 +4157,29 @@ function compile(state) {
         _ass(false);
       }
     } else {
-      let const_ = resolveConst(state.ctx, addressScope, symbol);
-      if (!const_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+      let static_ = resolveStatic(state.ctx, addressScope, symbol);
+      if (!static_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
 
-      let asmName = getConstAsmName(const_.simpleName, const_.packageAddress);
+      let asmName = getStaticAsmName(
+        static_.simpleName,
+        static_.packageAddress
+      );
       _ass(asmName);
 
-      if (state.name !== const_.unitPath && !tableExternals.includes(asmName)) {
+      if (
+        state.name !== static_.unitPath &&
+        !tableExternals.includes(asmName)
+      ) {
         tableExternals.push(asmName);
       }
 
       asm += line('mov     ecx, ' + asmName);
 
-      let type = const_.type;
+      let type = static_.type;
       let size = evalSize4(type) / 4;
 
       asm += line(
-        `; expr struct ${typeToString(type)} const: ${const_.fullName} {`
+        `; expr struct ${typeToString(type)} static: ${static_.fullName} {`
       );
       for (let i = 0; i < size; i++) {
         asm += line(`push    dword [ecx${getOffStr(i * 4)}]`);
@@ -4102,12 +4194,12 @@ function compile(state) {
 
   // compilation start ========================================
   let stringDefinitions = baseCompileDataTable();
-  let constDefinitions = baseCompileConst();
+  let staticDefinitions = baseCompileStatic();
   let resultTopLevel = baseCompileMain();
   let resultFunctions = baseCompileFunctions();
 
   if (
-    constDefinitions.length === 0 &&
+    staticDefinitions.length === 0 &&
     resultTopLevel.length === 0 &&
     resultFunctions.length === 0
   )
@@ -4117,17 +4209,19 @@ function compile(state) {
 
   let eol = '\n';
 
-  program += '; external functions' + eol;
+  program += '; external symbols' + eol;
   for (const asmName of tableExternals) {
     program += '  extern  ' + asmName + eol;
   }
   program += '' + eol;
 
-  program += '; data definitions' + eol;
+  program += '; statics ' + eol;
+  program += 'section .data' + eol;
+  program += staticDefinitions + eol;
+
+  program += '; strings' + eol;
   program += 'section .text' + eol;
   program += stringDefinitions + eol;
-  program += '; const definitions' + eol;
-  program += constDefinitions + eol;
 
   program += '; code' + eol;
   program += 'section .text' + eol;
@@ -4318,28 +4412,32 @@ function getSize1(ctx, type) {
 
 // ctx start  ================================================================= {
 
+export function makeCompileConfig(doShowAlign, doShowFunctions) {
+  return { doShowAlign, doShowFunctions };
+}
+
 const makeContext = (
-  doShowAlign,
+  compileConfig,
   packages,
   structs,
   funcSigs,
-  consts,
+  statics,
   unitPaths,
   loadContext
 ) => ({
-  doShowAlign,
+  compileConfig,
   packages,
   structs,
   funcSigs,
-  consts,
+  statics,
   unitPaths,
   loadContext,
 });
 
-const makeLoadContext = (indexStructs, indexFuncs, indexConsts) => ({
+const makeLoadContext = (indexStructs, indexFuncs, indexStatics) => ({
   indexStructs,
   indexFuncs,
-  indexConsts,
+  indexStatics,
 });
 const makeIndexStructRow = (nodeMembers, addressScope) => ({
   nodeMembers,
@@ -4351,10 +4449,10 @@ const makeIndexFuncRow = (path, nodeFunc, addressScope, packageName) => ({
   addressScope,
   packageName,
 });
-const makeIndexConstRow = (packageName, path, nodeConst, addressScope) => ({
+const makeIndexStaticRow = (packageName, path, nodeStatic, addressScope) => ({
   packageName,
   path,
-  nodeConst,
+  nodeStatic,
   addressScope,
 });
 
@@ -4378,7 +4476,7 @@ const makeFuncSig = (
   returnType,
 });
 
-const makeConst = (unitPath, packageAddress, simpleName, fullName, type) => ({
+const makeStatic = (unitPath, packageAddress, simpleName, fullName, type) => ({
   unitPath,
   packageAddress,
   simpleName,
@@ -4421,7 +4519,7 @@ function resolveStruct(ctx, addressScope, name) {
 //     use test/Test; # Using statements need full package name
 //       ...
 //       Test/someFunction();     # -> fullName = test/Test/someFunction
-//       int32 c = SOME_CONST;    # -> fullName = Main/SOME_CONST
+//       int32 c = SOME_STATIC;    # -> fullName = Main/SOME_STATIC
 //       ...
 //   }
 
@@ -4443,9 +4541,9 @@ function resolvePkgSym(ctx, addressScope, address) {
   return makePkgSym(addressString, symbolSimp, fullName);
 }
 
-function resolveConst(ctx, addressScope, symbol) {
+function resolveStatic(ctx, addressScope, symbol) {
   let pkgSym = resolvePkgSym(ctx, addressScope, symbol);
-  return ctx.consts.find((x) => x.fullName === pkgSym.fullName);
+  return ctx.statics.find((x) => x.fullName === pkgSym.fullName);
 }
 
 function findPackageDefinitions(ctx, name) {
@@ -4500,9 +4598,9 @@ function getType(ctx, addressScope, typeNode) {
   return resolveType(typeNode.props.type);
 }
 
-export function doMakeContext(doShowAlign) {
+export function doMakeContext(compileConfig) {
   return makeContext(
-    doShowAlign,
+    compileConfig,
     [],
     [],
     [],
@@ -4520,25 +4618,25 @@ export function addToContext(ctx, path, src) {
   loadPackages(ctx, path, src, tree);
   loadStructs(ctx, path, src, tree);
   loadFuncSigs(ctx, path, src, tree);
-  loadConsts(ctx, path, src, tree);
+  loadStatics(ctx, path, src, tree);
 }
 
 export function addToContextDone(ctx) {
   loadIndexStruct(ctx);
   loadIndexFunc(ctx);
-  loadIndexConst(ctx);
+  loadIndexStatic(ctx);
 }
 
-function loadIndexConst(ctx) {
+function loadIndexStatic(ctx) {
   for (const [fullName, indexRow] of Object.entries(
-    ctx.loadContext.indexConsts
+    ctx.loadContext.indexStatics
   )) {
-    let type = getType(ctx, indexRow.addressScope, indexRow.nodeConst.kids[0]);
-    ctx.consts.push(
-      makeConst(
+    let type = getType(ctx, indexRow.addressScope, indexRow.nodeStatic.kids[0]);
+    ctx.statics.push(
+      makeStatic(
         indexRow.path,
         indexRow.packageName,
-        indexRow.nodeConst.props.name,
+        indexRow.nodeStatic.props.name,
         fullName,
         type
       )
@@ -4552,18 +4650,18 @@ function loadPackages(ctx, path, src, tree) {
   }
 }
 
-function loadConsts(ctx, path, src, tree) {
+function loadStatics(ctx, path, src, tree) {
   for (const pkg of tree.kids.filter((x) => x.name === 'package')) {
     let addressScope = buildAddressScope(ctx, pkg);
-    for (const nodeConst of pkg.kids.filter((x) => x.name === 'const')) {
-      let fullName = pkg.props.name + '/' + nodeConst.props.name;
-      let row = makeIndexConstRow(
+    for (const nodeStatic of pkg.kids.filter((x) => x.name === 'static')) {
+      let fullName = pkg.props.name + '/' + nodeStatic.props.name;
+      let row = makeIndexStaticRow(
         pkg.props.name,
         path,
-        nodeConst,
+        nodeStatic,
         addressScope
       );
-      ctx.loadContext.indexConsts[fullName] = row;
+      ctx.loadContext.indexStatics[fullName] = row;
     }
   }
 }
@@ -4679,24 +4777,14 @@ function loadIndexStruct(ctx) {
 
     struct.size = off;
   }
+  if (ctx.compileConfig.doShowAlign) {
+    console.log('SHOWING STRUCT ALIGNMENT');
+    for (const struct of ctx.structs) {
+      calcStructSize(struct);
 
-  for (const struct of ctx.structs) {
-    if (struct.name === 'Window/Window') {
-      console.log('lol');
-    }
-    calcStructSize(struct);
-
-    if (ctx.doShowAlign) {
-      console.log(
-        struct.size +
-          ' ' +
-          struct.name +
-          '\n' +
-          struct.members
-            .map((x) => ('  ' + x.off).padEnd(' ', 3) + ' ' + x.name)
-            .join('\n') +
-          '\n'
-      );
+      // prettier-ignore
+      console.log( struct.name + ' (' + struct.size + ')' + '\n' + 
+        struct.members.map((x) => '  ' + ('' + x.off).padEnd(3, ' ') + ' ' + x.name + ' (' + getSize1(ctx, x.type) + ')' ) .join('\n') );
     }
   }
 }
@@ -4733,6 +4821,13 @@ function loadIndexFunc(ctx) {
     sig.asmName = getFuncAsmName(ctx, sig);
     ctx.funcSigs.push(sig);
   }
+
+  if (ctx.compileConfig.doShowFunctions) {
+    console.log('SHOWING FUNCTIONS:');
+    for (const funcSig of ctx.funcSigs) {
+      console.log('  ' + funcSig.asmName);
+    }
+  }
 }
 
 function loadFuncSigs(ctx, path, src, tree) {
@@ -4752,9 +4847,9 @@ function loadFuncSigs(ctx, path, src, tree) {
 
 // note on valid nasm names: letters, numbers, _, $, #, @, ~, ., and ?. The only characters which may be used as the first character of an identifier are letters, .
 
-function getConstAsmName(simpleName, address) {
+function getStaticAsmName(simpleName, address) {
   let addressString = address.split('/').join('$');
-  return `sc_~${addressString}~${simpleName}`;
+  return `sv_~${addressString}~${simpleName}`;
 }
 
 function getFuncAsmName(ctx, func) {

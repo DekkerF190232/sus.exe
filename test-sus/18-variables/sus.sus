@@ -10,7 +10,7 @@ package sus/native/Win {
   func CON(cdecl) _itoa_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) EXT;
 
   # stdout
-  static int32 STD_OUTPUT_HANDLE = -11;
+  const int32 STD_OUTPUT_HANDLE = -11;
   func CON(stdcall) ExitProcess(int32 code) EXT;
   func CON(stdcall) int32 GetStdHandle(int32 handle) EXT;
   func CON(stdcall) boo WriteFile(int32 file, PTR[int8] buffer, int32 length, PTR[int32] written, PTR[ptr] overlapped) EXT;
@@ -47,56 +47,56 @@ package sus/native/Win {
     InstanceHandle instance,
     ptr param) EXT;
 
-  static int32 WS_OVERLAPPED       = @00000000;
-  static int32 WS_POPUP            = @80000000;
-  static int32 WS_CHILD            = @40000000;
-  static int32 WS_MINIMIZE         = @20000000;
-  static int32 WS_VISIBLE          = @10000000;
-  static int32 WS_DISABLED         = @08000000;
-  static int32 WS_CLIPSIBLINGS     = @04000000;
-  static int32 WS_CLIPCHILDREN     = @02000000;
-  static int32 WS_MAXIMIZE         = @01000000;
-  static int32 WS_CAPTION          = @00C00000;
-  static int32 WS_BORDER           = @00800000;
-  static int32 WS_DLGFRAME         = @00400000;
-  static int32 WS_VSCROLL          = @00200000;
-  static int32 WS_HSCROLL          = @00100000;
-  static int32 WS_SYSMENU          = @00080000;
-  static int32 WS_THICKFRAME       = @00040000;
-  static int32 WS_GROUP            = @00020000;
-  static int32 WS_TABSTOP          = @00010000;
-  static int32 WS_MINIMIZEBOX      = @00020000;
-  static int32 WS_MAXIMIZEBOX      = @00010000;
+  const int32 WS_OVERLAPPED       = @00000000;
+  const int32 WS_POPUP            = @80000000;
+  const int32 WS_CHILD            = @40000000;
+  const int32 WS_MINIMIZE         = @20000000;
+  const int32 WS_VISIBLE          = @10000000;
+  const int32 WS_DISABLED         = @08000000;
+  const int32 WS_CLIPSIBLINGS     = @04000000;
+  const int32 WS_CLIPCHILDREN     = @02000000;
+  const int32 WS_MAXIMIZE         = @01000000;
+  const int32 WS_CAPTION          = @00C00000;
+  const int32 WS_BORDER           = @00800000;
+  const int32 WS_DLGFRAME         = @00400000;
+  const int32 WS_VSCROLL          = @00200000;
+  const int32 WS_HSCROLL          = @00100000;
+  const int32 WS_SYSMENU          = @00080000;
+  const int32 WS_THICKFRAME       = @00040000;
+  const int32 WS_GROUP            = @00020000;
+  const int32 WS_TABSTOP          = @00010000;
+  const int32 WS_MINIMIZEBOX      = @00020000;
+  const int32 WS_MAXIMIZEBOX      = @00010000;
 
   func int32 fc_WS_OVERLAPPEDWINDOW() {
     done WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
   }
 
-  static int32 CS_VREDRAW          = @0001;
-  static int32 CS_HREDRAW          = @0002;
-  static int32 CS_DBLCLKS          = @0008;
-  static int32 CS_OWNDC            = @0020;
-  static int32 CS_CLASSDC          = @0040;
-  static int32 CS_PARENTDC         = @0080;
-  static int32 CS_NOCLOSE          = @0200;
-  static int32 CS_SAVEBITS         = @0800;
-  static int32 CS_BYTEALIGNCLIENT  = @1000;
-  static int32 CS_BYTEALIGNWINDOW  = @2000;
-  static int32 CS_GLOBALCLASS      = @4000;
+  const int32 CS_VREDRAW          = @0001;
+  const int32 CS_HREDRAW          = @0002;
+  const int32 CS_DBLCLKS          = @0008;
+  const int32 CS_OWNDC            = @0020;
+  const int32 CS_CLASSDC          = @0040;
+  const int32 CS_PARENTDC         = @0080;
+  const int32 CS_NOCLOSE          = @0200;
+  const int32 CS_SAVEBITS         = @0800;
+  const int32 CS_BYTEALIGNCLIENT  = @1000;
+  const int32 CS_BYTEALIGNWINDOW  = @2000;
+  const int32 CS_GLOBALCLASS      = @4000;
 
-  static int32 SWP_NOSIZE          = @0001;
-  static int32 SWP_NOMOVE          = @0002;
-  static int32 SWP_NOZORDER        = @0004;
-  static int32 SWP_NOREDRAW        = @0008;
-  static int32 SWP_NOACTIVATE      = @0010;
-  static int32 SWP_FRAMECHANGED    = @0020;
-  static int32 SWP_SHOWWINDOW      = @0040;
-  static int32 SWP_HIDEWINDOW      = @0080;
-  static int32 SWP_NOCOPYBITS      = @0100;
-  static int32 SWP_NOOWNERZORDER   = @0200;
-  static int32 SWP_NOSENDCHANGING  = @0400;
+  const int32 SWP_NOSIZE          = @0001;
+  const int32 SWP_NOMOVE          = @0002;
+  const int32 SWP_NOZORDER        = @0004;
+  const int32 SWP_NOREDRAW        = @0008;
+  const int32 SWP_NOACTIVATE      = @0010;
+  const int32 SWP_FRAMECHANGED    = @0020;
+  const int32 SWP_SHOWWINDOW      = @0040;
+  const int32 SWP_HIDEWINDOW      = @0080;
+  const int32 SWP_NOCOPYBITS      = @0100;
+  const int32 SWP_NOOWNERZORDER   = @0200;
+  const int32 SWP_NOSENDCHANGING  = @0400;
  
-  static int32 SW_SHOWNORMAL = 1;
+  const int32 SW_SHOWNORMAL = 1;
 
   struct InstanceHandle (int32 _unused);
   struct WindowHandle (int32 _unused);
@@ -165,11 +165,11 @@ package sus/native/Win {
     );
   }
   
-  static int32 WM_PAINT          = @000f;
-  static int32 WM_SIZE           = @0005;
-  static int32 WM_KEYDOWN        = @0100;
-  static int32 WM_KEYUP          = @0101;
-  static int32 WM_CLOSE          = @0010;
+  const int32 WM_PAINT          = @000f;
+  const int32 WM_SIZE           = @0005;
+  const int32 WM_KEYDOWN        = @0100;
+  const int32 WM_KEYUP          = @0101;
+  const int32 WM_CLOSE          = @0010;
 
   func CON(stdcall) boo GetMessageA(PTR[WindowMessage] message, WindowHandle handle, int32 filterMin, int32 filterMax) EXT;
 
@@ -221,8 +221,8 @@ package sus/native/Win {
     done cast[int8](0);
   }
 
-  static int32 PFD_DRAW_TO_WINDOW          = @00000004;
-  static int32 PFD_SUPPORT_OPENGL          = @00000020;
+  const int32 PFD_DRAW_TO_WINDOW          = @00000004;
+  const int32 PFD_SUPPORT_OPENGL          = @00000020;
 
   func CON(stdcall) int32 ChoosePixelFormat(
     DeviceContextHandle dch,

@@ -1,2 +1,35 @@
 package sus/Gl {
+
+  func CON(stdcall) glViewport(int32 x, int32 y, int32 width, int32 height) EXT;
+  func CON(stdcall) glClear(int32 x, int32 y, int32 width, int32 height) EXT;
+  func CON(stdcall) glClear(int32 mask) EXT;
+  
+  
+  func CON(stdcall) glColor3f(real32 red, real32 green, real32 blue) EXT;
+  func CON(stdcall) glVertex3f(real32 x, real32 y, real32 z) EXT;
+  
+  func CON(stdcall) glEnd() EXT;
+  func CON(stdcall) glBegin(int32 mode) EXT;
+  func CON(stdcall) glFlush() EXT;
+  
+  static int32 GL_ZERO                         = 0;
+  static int32 GL_ONE                          = 1;
+  static int32 GL_SRC_COLOR                    = @0300;
+  static int32 GL_ONE_MINUS_SRC_COLOR          = @0301;
+  static int32 GL_SRC_ALPHA                    = @0302;
+  static int32 GL_ONE_MINUS_SRC_ALPHA          = @0303;
+  static int32 GL_DST_ALPHA                    = @0304;
+  static int32 GL_ONE_MINUS_DST_ALPHA          = @0305;
+  
+  static int32 GL_POINTS                       = @0000;
+  static int32 GL_LINES                        = @0001;
+  static int32 GL_LINE_LOOP                    = @0002;
+  static int32 GL_LINE_STRIP                   = @0003;
+  static int32 GL_TRIANGLES                    = @0004;
+  static int32 GL_TRIANGLE_STRIP               = @0005;
+  static int32 GL_TRIANGLE_FAN                 = @0006;
+  static int32 GL_QUADS                        = @0007;
+  static int32 GL_QUAD_STRIP                   = @0008;
+  static int32 GL_POLYGON                      = @0009;
+
 }

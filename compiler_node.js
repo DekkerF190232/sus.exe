@@ -5,7 +5,7 @@ import process from 'node:process';
 import { EOL } from 'node:os';
 
 const makeUnit = (sourceFile, empty) => ({ sourceFile, empty }); // sourceFile path is relative to source folder
-const makeBuildInfo = (sourceFolder, buildFolder, doShowAlign) => ({ sourceFolder, buildFolder, doShowAlign });
+const makeBuildInfo = (sourceFolder, buildFolder, compileConfig) => ({ sourceFolder, buildFolder, compileConfig });
 
 const EXT_SRC = '.sus';
 const EXT_TREE = '.stj'; // sussy tree json
@@ -38,6 +38,8 @@ const EXT_OBJ = '.sus.obj';
     }
   }
 
+  let compileConfig = compiler.makeCompileConfig(doShowAlign);//...EOL;
+
   if (params.length > 2 || !parsValid) {
     console.log('usage:');
     console.log('  compiler_node.js <folder> [-show-align]');
@@ -52,7 +54,7 @@ const EXT_OBJ = '.sus.obj';
     .map((x) => makeUnit(x.slice(path.join(sourceFolder).length), false));
 
   let buildFolder = '.sus-build';
-  let buildInfo = makeBuildInfo(sourceFolder, buildFolder, doShowAlign);
+  let buildInfo = makeBuildInfo(sourceFolder, buildFolder, compileConfig);
 
   cleanBuild(buildInfo);
   let context = buildContext(buildInfo, units);
@@ -79,7 +81,7 @@ function cleanBuild(buildInfo) {
 function buildContext(buildInfo, units) {
   console.log('Building context');
 
-  let ctx = compiler.doMakeContext(buildInfo.doShowAlign);
+  let ctx = compiler.doMakeContext(buildInfo.compileConfig);
 
   for (const unit of units) {
     let srcPath = path.join(buildInfo.sourceFolder, unit.sourceFile);

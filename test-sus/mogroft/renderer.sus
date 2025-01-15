@@ -2,20 +2,25 @@
 package mogroft/Renderer {
 
   use sus/Gl;
+  use sus/System;
   
   struct RenderState(
     int32 width,
     int32 height
   );
   
-  const RenderState def_RenderState = RenderState(width = 0, height = 0);
+  static RenderState def_RenderState = RenderState(width = 0, height = 0);
   
   func render(PTR[RenderState] this) {
     
   }
   
   func resize(PTR[RenderState] this, int32 width, int32 height) {
-    
+    #System/print(s: STR"size: ");
+    #System/print(i: width);
+    #System/print(s: STR", ");
+    #System/println(i: height);
+    #Gl/glViewPort(x: 0, y: 0, width: width, height: height);
   }
 
 }

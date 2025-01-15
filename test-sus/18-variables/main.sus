@@ -1,0 +1,17 @@
+package Main {
+
+  use sus/System;
+  use sus/native/Win;
+
+  main {
+    System/println(s:STR"starting\n");
+    
+    theFunc(a: 0, b: @11223344);
+    
+    System/println(s:STR"done\n");
+    
+    System/exit(code: 0);
+  }
+
+
+}
