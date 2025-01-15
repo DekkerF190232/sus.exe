@@ -20,9 +20,6 @@
 function _ass(val) {
   if (!val) throw new Error('assertion failed.');
 }
-function _nass(val) {
-  if (val) throw new Error('negative assertion failed.');
-}
 
 function makeParseState(name, text, i, root, n) {
   return { name, text, i, root, n };
@@ -1548,7 +1545,7 @@ function compile(state) {
       case '||':
       case '&&':
         // prettier-ignore
-        return evalBinOp(op, expr, scope, addressScope, allowedLogic, (a, b) => true );
+        return evalBinOp(op, expr, scope, addressScope, allowedLogic, (a, b) => a );
       default:
         throw makeImplErr('unknown op ' + expr.props.op);
     }
@@ -1833,6 +1830,12 @@ function compile(state) {
         else if (typeName === 'int16') r += line('dw    ' + val);
         else if (typeName === 'int8') r += line('db    ' + val);
         else throw makeErr(expr.i, 'can not cast int32 to ' + typeName);
+        break;
+      case 'dec-real':
+        if (typeName === undefined) {
+          // prettier-ignore
+          r += line('dd    ' + convertRealLit(expr.props.value) + ' ; ' + expr.props.value );
+        } else throw makeErr(expr.i, 'can not cast real32 to ' + typeName);
         break;
       case 'boo':
         r += line('db    ' + (expr.props.value === 'yes' ? 1 : 0));
@@ -2779,8 +2782,8 @@ function compile(state) {
       }
       // r += line(`add     esp, ${rootScope.returnInfo.size}`); // left out because esp is overwritten next line
     } else {
-      let returnExpr = ins.kids.filter((x) => x.name === 'expr');
-      if (returnExpr) throw makeErr(ins.i, 'unnecessary return expression!');
+      let returnExpr = ins.kids.find((x) => x.name === 'expr');
+      if (returnExpr) throw makeErr(ins.i, 'unnecessary return expression: ' + JSON.stringify(returnExpr));
     }
 
     for (let i = 0; i < lv; i++) {
@@ -3454,7 +3457,7 @@ function compile(state) {
       // r += line(`mov     ax, [esp]`);
       // r += line(`mov     [esp], eax`);
     } else {
-      throw makeErr(expr.i, 'unknown conversion: ' + wanted + ' -> ' + actual);
+      throw makeErr(expr.i, 'unknown conversion: ' + actual + ' -> ' + wanted);
     }
 
     return r;
@@ -4330,12 +4333,12 @@ function typeBaseName(type) {
 }
 
 function typeToString(type) {
-  if (!type.kind) throw 0;
+  _ass(type.kind);
   switch (type.kind) {
     case 'prim':
       return (
         type.name +
-        (type.args > 0 ? '[' + args.map(typeToString).join(', ') + ']' : '')
+        (type.args && type.args.length > 0 ? '[' + type.args.map(typeToString).join(', ') + ']' : '')
       );
     case 'struct':
       return type.name;
@@ -4748,7 +4751,7 @@ function loadIndexStruct(ctx) {
   }
 
   function calcStructSize(struct, depth = 1000) {
-    if (depth <= 0) throw new Error('probably recursive struct definition');
+    if (depth <= 0) throw new Error('probably recursive struct definition inside ' + struct.name);
     if (struct.size !== null) return;
 
     let packingSize = 4;

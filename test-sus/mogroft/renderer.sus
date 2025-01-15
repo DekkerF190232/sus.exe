@@ -3,6 +3,8 @@ package mogroft/Renderer {
 
   use sus/Gl;
   use sus/System;
+  use sus/Math;
+  use sus/StringStream;
   
   struct RenderState(
     int32 width,
@@ -11,18 +13,182 @@ package mogroft/Renderer {
   
   static RenderState def_RenderState = RenderState(width = 0, height = 0);
   
+  static int32 ticks = 0;
+  
   func render(PTR[RenderState] this) {
+  
+    Gl/glClear(mask: Gl/GL_COLOR_BUFFER_BIT);
+    
+    #color(rgba: @4060a0ff);
+    #drawRec(x: -0.1, y: -0.5, width: 0.2, height: 1.0);
+    #drawRec(x: -0.5, y: -0.1, width: 1.0, height: 0.2);
+    #drawRec(x: -0.5, y: -0.5, width: 1.0, height: 0.2);
+    #drawRec(x: 0.1, y: 0.1, width: 0.2, height: 0.5);
+    
+    drawWorld(this: this);
+    printError(location: STR"After render");
+    
+    # Gl/glEnd();
+    Gl/glFlush();
+  }
+  
+  func drawWorld(PTR[RenderState] this) {
+    perspective(fov: 120.0, aspect: 1.0, near: 1.0, far: 100.0);
+    
+    Gl/glPushMatrix();
+    
+    ticks = ticks + 1 % 300;
+    real32 rotationPercent = cast[real32](ticks) / 300.0;
+    real32 rotationDegrees = rotationPercent * 360.0;
+    Gl/glRotatef(angle: rotationDegrees, x: 0.0, y: 1.0, z: 0.0);
+    
+    color(rgba: @4060a0ff);
+    
+    #Gl/glTranslatef(x: 0.0, y: 0.0, z: -3.5);
+    #Gl/glScalef(x: 0.2, y: 0.2, z: 0.2);
+    drawCube();
+    
+    Gl/glPopMatrix();
+  }
+  
+  func updateProjection(PTR[RenderState] this) {
+    #Gl/glMatrixMode(Gl/GL_PROJECTION);
     
   }
   
+  func perspective(real32 fov, real32 aspect, real32 near, real32 far) {
+    real32 f = 1.0 / Math/tan(x: fov * 0.5 * Math/2PI / 360.0);
+    
+    PTR[real32] matrix = ARR[real32](16);
+    
+    DRF(matrix + (size[real32]() * 0))    = f / aspect;
+    DRF(matrix + (size[real32]() * 1))    = 0.0;
+    DRF(matrix + (size[real32]() * 2))    = 0.0;
+    DRF(matrix + (size[real32]() * 3))    = 0.0;
+    
+    DRF(matrix + (size[real32]() * 4))    = 0.0;
+    DRF(matrix + (size[real32]() * 5))    = f;
+    DRF(matrix + (size[real32]() * 6))    = 0.0;
+    DRF(matrix + (size[real32]() * 7))    = 0.0;
+    
+    DRF(matrix + (size[real32]() * 8))    = 0.0;
+    DRF(matrix + (size[real32]() * 9))    = 0.0;
+    DRF(matrix + (size[real32]() * 10))   = (far + near) / (near - far);
+    DRF(matrix + (size[real32]() * 11))   = (2.0 * far * near) / (near - far);
+    
+    DRF(matrix + (size[real32]() * 12))   = 0.0;
+    DRF(matrix + (size[real32]() * 13))   = 0.0;
+    DRF(matrix + (size[real32]() * 14))   = -1.0;
+    DRF(matrix + (size[real32]() * 15))   = 0.0;
+    
+    printMatrix(matrix: matrix);
+    
+    
+    Gl/glMatrixMode(mode: Gl/GL_PROJECTION);
+    Gl/glLoadIdentity();
+    Gl/glMultMatrixf(matrix: matrix);
+  }
+  
+  func printMatrix(PTR[real32] matrix) {
+        
+    System/println(s: STR"printing 4x4 matrix:");
+    int32 r = 0;
+    while (r < 4) {
+      System/print(s: STR"  ");
+      int32 c = 0;
+      while (c < 4) {
+        PTR[real32] i = matrix + (r * 4 + c * size[real32]());
+        
+        PTR[int8] buffer = ARR[int8](16);
+        StringStream stream = StringStream(buffer = buffer, length = 16, position = 0);
+        
+        StringStream/append(stream: REF(stream), r: DRF(i), digits: 2);
+        
+        int32 maxLength = 8;
+        int32 toPad = maxLength - stream.position;
+        while (toPad > 0) {
+          System/print(s: STR" ");
+          toPad = toPad - 1;
+        }
+        
+        System/print(stream: REF(stream));
+        
+        c = c + 1;
+      }
+      System/println();
+      r = r + 1;
+    }
+    System/println();
+  }
+  
+  # draw 1,1,1-sized cube at 0,0,0
+  func drawCube() {
+    Gl/glBegin(mode: Gl/GL_QUADS);
+    
+    # back face
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0); # left top
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0); # right top
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0); # right bottom
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0); # left bottom
+    
+    # front face
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 1.0); # left top
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 1.0); # right top
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 1.0); # right bottom
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 1.0); # left bottom
+    
+    # left face
+    #Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0); # back top
+    #Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0); # front top
+    #Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0); # front bottom
+    #Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0); # back bottom
+    
+    Gl/glEnd();
+  }
+  
+  func printError(PTR[int8] location) {
+    int32 error = Gl/glGetError();
+    if (error != 0) {
+      System/println(s: STR"### OPENGL ERROR ###############################################################");
+      System/print(s: STR"  ");
+      System/print(s: location);
+      System/print(s: STR": ");
+      System/print(i: error);
+      System/print(s: STR" (");
+      System/print(i_0x: error);
+      System/print(s: STR")\n");
+      System/println(s: STR"################################################################################");
+    }
+  }
+  
   func resize(PTR[RenderState] this, int32 width, int32 height) {
-    #System/print(s: STR"size: ");
-    #System/print(i: width);
-    #System/print(s: STR", ");
-    #System/println(i: height);
     DRF(this).width = width;
     DRF(this).height = height;
     Gl/glViewport(x: 0, y: 0, width: width, height: height);
   }
+  
+  func color(int32 rgba) {
+    int32 r = rgba >> cast[int8](24);
+    int32 g = rgba >> cast[int8](16) & @ff;
+    int32 b = rgba >> cast[int8](8) & @ff;
+    int32 a = rgba & @ff;
+    
+    Gl/glColor4f(
+      r: cast[real32](r) / 255.0,
+      g: cast[real32](g) / 255.0,
+      b: cast[real32](b) / 255.0,
+      a: cast[real32](a) / 255.0
+    );
+  }
+  
+  #func drawRec(real32 x, real32 y, real32 width, real32 height) {
+  #  Gl/glBegin(mode: Gl/GL_QUADS);
+  #  Gl/glVertex3f(x: x, y: y + height, z: 0.0); # left top
+  #  Gl/glVertex3f(x: x + width, y: y + height, z: 0.0); # right top
+  #  Gl/glVertex3f(x: x + width, y: y, z: 0.0); # right bottom
+  #  Gl/glVertex3f(x: x, y: y, z: 0.0); # left bottom
+  #  Gl/glEnd();
+  #}
+  
 
 }

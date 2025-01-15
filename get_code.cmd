@@ -1,5 +1,5 @@
 @echo off
-.sus-build\main.sus.exe
+.sus-build\sus.exe
 echo.
 
 set errorCode=%ERRORLEVEL%

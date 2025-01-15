@@ -1,17 +1,9 @@
 package sus/Gl {
-
-  func CON(stdcall) glViewport(int32 x, int32 y, int32 width, int32 height) EXT;
-  func CON(stdcall) glClear(int32 x, int32 y, int32 width, int32 height) EXT;
-  func CON(stdcall) glClear(int32 mask) EXT;
   
+  # clear bits
+  static int32 GL_COLOR_BUFFER_BIT             = @00004000;
   
-  func CON(stdcall) glColor3f(real32 red, real32 green, real32 blue) EXT;
-  func CON(stdcall) glVertex3f(real32 x, real32 y, real32 z) EXT;
-  
-  func CON(stdcall) glEnd() EXT;
-  func CON(stdcall) glBegin(int32 mode) EXT;
-  func CON(stdcall) glFlush() EXT;
-  
+  # blend modes
   static int32 GL_ZERO                         = 0;
   static int32 GL_ONE                          = 1;
   static int32 GL_SRC_COLOR                    = @0300;
@@ -21,6 +13,7 @@ package sus/Gl {
   static int32 GL_DST_ALPHA                    = @0304;
   static int32 GL_ONE_MINUS_DST_ALPHA          = @0305;
   
+  # glbegin modes
   static int32 GL_POINTS                       = @0000;
   static int32 GL_LINES                        = @0001;
   static int32 GL_LINE_LOOP                    = @0002;
@@ -31,5 +24,39 @@ package sus/Gl {
   static int32 GL_QUADS                        = @0007;
   static int32 GL_QUAD_STRIP                   = @0008;
   static int32 GL_POLYGON                      = @0009;
+  
+  # matrix modes
+  static int32 GL_MODELVIEW                    = @1700;
+  static int32 GL_PROJECTION                   = @1701;
+  static int32 GL_TEXTURE                      = @1702;
+  
+  # erros
+  func CON(stdcall) int32 glGetError() EXT;
+
+  # color
+  func CON(stdcall) glColor4b(int8 r, int8 g, int8 b, int8 a) EXT;
+  func CON(stdcall) glColor3f(real32 r, real32 g, real32 b) EXT;
+  func CON(stdcall) glColor4f(real32 r, real32 g, real32 b, real32 a) EXT;
+    
+  # general rendering
+  func CON(stdcall) glViewport(int32 x, int32 y, int32 width, int32 height) EXT;
+  func CON(stdcall) glClear(int32 x, int32 y, int32 width, int32 height) EXT;
+  func CON(stdcall) glClear(int32 mask) EXT;
+  func CON(stdcall) glFlush() EXT;
+  
+  # matrices
+  func CON(stdcall) glMatrixMode(int32 mode) EXT;
+  func CON(stdcall) glMultMatrixf(PTR[real32] matrix) EXT;
+  func CON(stdcall) glLoadIdentity() EXT;
+  func CON(stdcall) glPushMatrix() EXT;
+  func CON(stdcall) glPopMatrix() EXT;
+  func CON(stdcall) glScalef(real32 x, real32 y, real32 z) EXT;
+  func CON(stdcall) glRotatef(real32 angle, real32 x, real32 y, real32 z) EXT;
+  func CON(stdcall) glTranslatef(real32 x, real32 y, real32 z) EXT;
+  
+  # drawing
+  func CON(stdcall) glVertex3f(real32 x, real32 y, real32 z) EXT;
+  func CON(stdcall) glEnd() EXT;
+  func CON(stdcall) glBegin(int32 mode) EXT;
 
 }

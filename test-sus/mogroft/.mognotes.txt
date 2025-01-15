@@ -1,0 +1,11 @@
+planed features:
+
+  - chunk system:
+
+    - block placing
+    
+    - textures
+    
+    - lighting?
+    
+  - minesweeper

@@ -2,14 +2,14 @@ package Main {
 
   use sus/System;
   use sus/native/Win;
-
-
+  
   main {
+    boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
     System/println(s:STR"Starting mogroft compiled using sus.exe\n");
     
     Window/run();
     
-    System/println(s:STR"Exiting.");
+    System/println(s: STR"Exiting.");
     
     int32 err = Win/GetLastError();
     System/print(s: STR"Last Error: ");
@@ -17,7 +17,7 @@ package Main {
     System/print(s: STR" (0x");
     System/print(i_0x: err);
     System/print(s: STR")\n");
-      
+    
     System/exit(code: 0);
     
   }
@@ -27,8 +27,12 @@ package Main {
 package Window {
   
   use mogroft/Renderer;
+  
   use sus/native/Win;
   use sus/System;
+  
+  static int32 TIMER_ID_WINDOW = 0;
+  static int32 INTERVAL_MS = 10; # 100 fps
 
   struct Window (
     WindowHandle windowHandle,
@@ -40,6 +44,8 @@ package Window {
   static PTR[Window] _window = RTP[PTR[Window]](0);
 
   func run() {
+    int32 _2 = Win/SetThreadDpiAwarenessContext(dpiAwarenessContext: Win/DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+  
     Window window = Window(
       windowHandle=RTP[WindowHandle](0),
       deviceContextHandle=RTP[DeviceContextHandle](0),
@@ -53,23 +59,33 @@ package Window {
     createWindow(this: REF(window));
     
     # show window
-    boo _1 = Win/ShowWindow(handle: window.windowHandle, showCommand: Win/SW_SHOWNORMAL);
-    boo _2 = Win/UpdateWindow(handle: window.windowHandle);
+    boo _3 = Win/ShowWindow(handle: window.windowHandle, showCommand: Win/SW_SHOWNORMAL);
+    boo _4 = Win/UpdateWindow(handle: window.windowHandle);
 
     # create opengl context
     createContext(this: REF(window));
     
     # use context
-    boo _3 = Win/wglMakeCurrent(dch: window.deviceContextHandle, glRenderContextHandle: window.glRenderContextHandle);
-    if (_3 == no) {
+    boo _5 = Win/wglMakeCurrent(dch: window.deviceContextHandle, glRenderContextHandle: window.glRenderContextHandle);
+    if (_5 == no) {
       int32 err = Win/GetLastError();
       errMsg(code: err, message: STR"Error setting window context:");
       System/exit(code: err);
     }
+    
+    startRepaintTimer(this: REF(window));
      
     runMessageLoop(this: REF(window));
   }
-
+  
+  func startRepaintTimer(PTR[Window] this) {
+    int32 _1 = Win/SetTimer(
+      handle: DRF(this).windowHandle,
+      timerId: TIMER_ID_WINDOW,
+      intervalMs: INTERVAL_MS,
+      timerFunc: RTP[funcptr[CON(stdcall) (WindowHandle handle, int32 _unnamed1, int32 _unnamed2, int32 _unnamed3)]](0)
+    );
+  }
   
   func createContext(PTR[Window] this) {
     DRF(this).deviceContextHandle = Win/GetDC(handle: DRF(this).windowHandle);
@@ -134,6 +150,8 @@ package Window {
     if (message == Win/WM_PAINT) {
       PaintStruct ps = Win/new_PaintStruct();
       
+      Renderer/render(this: REF(DRF(_window).renderState));
+      
       DeviceContextHandle _1 = Win/BeginPaint(handle: handle, paintStruct: REF(ps));
       DeviceContextHandle _2 = Win/EndPaint(handle: handle, paintStruct: REF(ps));
       
@@ -145,6 +163,8 @@ package Window {
       Renderer/resize(this: REF(DRF(_window).renderState), width: width, height: height);
       
       done 0;
+    } else if (message == Win/WM_TIMER && (wParam == TIMER_ID_WINDOW)) {
+      boo _1 = Win/InvalidateRect(handle: handle, rectangle: RTP[PTR[Rectangle]](0), erase: yes);
     }
   
     done Win/DefWindowProcA(handle: handle, message:message, wParam: wParam, lParam: lParam);

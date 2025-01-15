@@ -1,4 +1,17 @@
 
+package sus/Math {
+
+  static real32 PI = 3.14159265359;
+  static real32 2PI = 6.28318530718;
+
+  func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
+  func CON(cdecl) real32 tan(real32 x) EXT;
+  func CON(cdecl) real32 sinf(real32 x) EXT;
+  func CON(cdecl) real32 cosf(real32 x) EXT;
+  func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+  
+}
+
 package sus/native/Win {
 
   # math
@@ -23,6 +36,29 @@ package sus/native/Win {
   func CON(stdcall) Sleep(int32 ms) EXT;
 
   # windows
+  
+  struct LargeInteger (
+    int32 low,
+    int32 high
+  );
+  
+  static int32 DPI_AWARENESS_CONTEXT_UNAWARE              = -1;
+  static int32 DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         = -2;
+  static int32 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    = -3;
+  static int32 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
+  static int32 DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED    = -5;
+  
+  func CON(stdcall) int32 SetThreadDpiAwarenessContext(int32 dpiAwarenessContext) EXT;
+  
+  func CON(stdcall) int32 SetTimer(
+    WindowHandle  handle,
+    int32         timerId,
+    int32         intervalMs,
+    funcptr[CON(stdcall) (WindowHandle handle, int32 _unnamed1, int32 _unnamed2, int32 _unnamed3)]
+                  timerFunc
+  ) EXT;
+  
+  func CON(stdcall) boo InvalidateRect(WindowHandle handle, PTR[Rectangle] rectangle, boo erase) EXT;
 
   struct Rectangle (
     int32 left,
@@ -107,7 +143,10 @@ package sus/native/Win {
 
   func PTR[int8] fc_IDI_WINLOGO() { done RTP[PTR[int8]](32517); }
   func PTR[int8] fc_IDC_ARROW() { done RTP[PTR[int8]](32512); }
-
+  
+  static int32 ATTACH_PARENT_PROCESS = -1;
+  func CON(stdcall) boo AttachConsole(int32 processId) EXT;
+  
   func CON(stdcall) IconHandle LoadIconA(InstanceHandle instance, PTR[int8] iconName) EXT;
 
   func CON(stdcall) CursorHandle LoadCursorA(InstanceHandle instance, PTR[int8] cursorName) EXT;
@@ -170,6 +209,7 @@ package sus/native/Win {
   static int32 WM_KEYDOWN        = @0100;
   static int32 WM_KEYUP          = @0101;
   static int32 WM_CLOSE          = @0010;
+  static int32 WM_TIMER          = @0113;
 
   func CON(stdcall) boo GetMessageA(PTR[WindowMessage] message, WindowHandle handle, int32 filterMin, int32 filterMax) EXT;
 
@@ -295,9 +335,149 @@ package sus/native/Win {
 
 }
 
+package sus/Limits {
+  
+  static int32 INT32_MAX = 2147483647;
+  static int32 INT32_MIN = -2147483648;
+  
+}
+
+package sus/Memory {
+  
+  func CON(cdecl) ptr malloc(int32 bytes) EXT;
+  func CON(cdecl) free(ptr pointer) EXT;
+
+}
+
+package sus/StringStream {
+
+  use sus/Limits;
+  use sus/Memory;
+  use sus/System;
+  use sus/native/Win;
+
+  struct StringStream (
+    PTR[int8] buffer,
+    int32 length,
+    int32 position
+  );
+  
+  func StringStream new(int32 length) {
+    done StringStream(
+      buffer = RTP[PTR[int8]](Memory/malloc(bytes: length)),
+      length = length,
+      position = 0
+    );
+  }
+  
+  func append(PTR[StringStream] stream, PTR[int8] s) {
+    while (cast[int32](DRF(s)) != 0) {
+      if (DRF(stream).position >= DRF(stream).length) done;
+      
+      DRF(DRF(stream).buffer + DRF(stream).position) = DRF(s);
+      
+      DRF(stream).position = DRF(stream).position + 1;
+      s = s + 1;
+    }
+    #System/print(s: STR"Appended ");
+    #System/println(i: DRF(stream).position);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i_0x) {
+    append(stream: stream, i: i_0x, radix: 16);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i) {
+    append(stream: stream, i: i, radix: 10);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i, int32 radix) {
+    PTR[int8] buffer = ARR[int8](16);
+    Win/_itoa_s(value: i, buffer: buffer, size: 16, radix: radix);
+    
+    append(stream: stream, s: buffer);
+  }
+  
+  func append(PTR[StringStream] stream, real32 r) {
+    append(stream: stream, r: r, digits: 10);
+  }
+    
+  func append(PTR[StringStream] stream, real32 r, int32 digits) {
+    boo neg = r < 0.0;
+    real32 digitMag = Win/powf(base: 10.0, power: cast[real32](digits));
+
+    if (neg) r = 0.0 - r;
+
+    int32 intPart = cast[int32](r);
+    int32 decPart = cast[int32]((r - cast[real32](intPart)) * digitMag);
+
+    if (neg) append(stream: stream, s: STR"-");
+    append(stream: stream, i: intPart);
+
+    if (digits > 0) {
+      append(stream: stream, s: STR".");
+
+      PTR[int8] buffer = ARR[int8](16);
+      Win/_itoa_s(value: decPart, buffer: buffer, size: 16, radix: 10);
+      int32 nonZeroCount = Win/strnlen(buffer: buffer, size: 16);
+      
+      int32 zeros = digits - nonZeroCount;
+      while (zeros > 0) {
+        append(stream: stream, s: STR"0");
+        zeros = zeros - 1;
+      }
+
+      append(stream:stream, s: buffer);
+    }
+  }
+  
+  #func append(PTR[StringStream] stream, int32 i) {
+  #  int32 zero = cast[int32](DRF(STR"0"));
+  #  
+  #  boo neg = i < 0;
+  #  if (neg) {
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = DRF(STR"-");
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #  }
+  #  if (i == 0) {
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = cast[int8](zero);
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #  }
+  #  while (i > 0) {
+  #    int32 code = zero + (i % 10);
+  #    
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = cast[int8](code);
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #    
+  #    i = i / 10;
+  #  }
+  #}
+  
+}
+
 package sus/System {
 
   use sus/native/Win;
+  use sus/StringStream;
+  
+  func print(PTR[StringStream] stream) {
+    int32 i = 0;
+    boo _r = Win/WriteFile(
+	    file:       Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE),
+	    buffer:     DRF(stream).buffer,
+	    length:     DRF(stream).position,
+	    written:    RTP[PTR[int32]](0),
+	    overlapped: RTP[PTR[ptr]](0)
+	  );
+  }
+  
+  func println(PTR[StringStream] stream) {
+    print(stream: stream);
+    println();
+  }
 
   func sleep(int32 ms) {
     Win/Sleep(ms: ms);
