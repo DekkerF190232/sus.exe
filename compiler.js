@@ -3299,7 +3299,7 @@ function compile(state) {
 
   function getCallInfo(expr, scope, addressScope) {
     let nodeArgs = expr.kids.filter((x) => x.name === 'arg');
-    let paramNames = nodeArgs.map((x) => x.props.name).sort();
+    let paramNames = nodeArgs.map((x) => x.props.name);
     let symbol = expr.props.name;
 
     let callInfo;
@@ -3310,6 +3310,9 @@ function compile(state) {
       let typeFuncPtr = loc.row.type;
       callInfo = makeCallInfoSymbol(loc, typeFuncPtr);
     } else {
+      if (symbol === 'Gl/glViewPort') {
+        console.log('hi');
+      }
       let sig = resolveFuncSig(symbol, paramNames, addressScope);
       if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol);
       let asmName = sig.asmName;
@@ -4777,14 +4780,15 @@ function loadIndexStruct(ctx) {
 
     struct.size = off;
   }
-  if (ctx.compileConfig.doShowAlign) {
-    console.log('SHOWING STRUCT ALIGNMENT');
-    for (const struct of ctx.structs) {
-      calcStructSize(struct);
 
+  if (ctx.compileConfig.doShowAlign) console.log('SHOWING STRUCT ALIGNMENT');
+  for (const struct of ctx.structs) {
+    calcStructSize(struct);
+
+    if (ctx.compileConfig.doShowAlign) {
       // prettier-ignore
-      console.log( struct.name + ' (' + struct.size + ')' + '\n' + 
-        struct.members.map((x) => '  ' + ('' + x.off).padEnd(3, ' ') + ' ' + x.name + ' (' + getSize1(ctx, x.type) + ')' ) .join('\n') );
+      console.log( '  '+ ( struct.name + ' (' + struct.size + ') ').padEnd(60,' ') + struct.unitPath + '\n' + 
+        struct.members.map((x) => '    ' + ('' + x.off).padEnd(3, ' ') + ' ' + x.name + ' (' + getSize1(ctx, x.type) + ')' ) .join('\n') );
     }
   }
 }
@@ -4825,7 +4829,9 @@ function loadIndexFunc(ctx) {
   if (ctx.compileConfig.doShowFunctions) {
     console.log('SHOWING FUNCTIONS:');
     for (const funcSig of ctx.funcSigs) {
-      console.log('  ' + funcSig.asmName);
+      console.log(
+        '  ' + funcSig.asmName.padEnd(60, ' ') + ' ' + funcSig.unitPath
+      );
     }
   }
 }

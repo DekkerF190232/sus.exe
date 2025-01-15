@@ -144,11 +144,6 @@ package Window {
       
       Renderer/resize(this: REF(DRF(_window).renderState), width: width, height: height);
       
-      #System/print(s: STR"size: ");
-      #System/print(i: width);
-      #System/print(s: STR", ");
-      #System/println(i: height);
-
       done 0;
     }
   

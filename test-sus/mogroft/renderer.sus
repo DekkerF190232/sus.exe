@@ -20,7 +20,9 @@ package mogroft/Renderer {
     #System/print(i: width);
     #System/print(s: STR", ");
     #System/println(i: height);
-    #Gl/glViewPort(x: 0, y: 0, width: width, height: height);
+    DRF(this).width = width;
+    DRF(this).height = height;
+    Gl/glViewport(x: 0, y: 0, width: width, height: height);
   }
 
 }

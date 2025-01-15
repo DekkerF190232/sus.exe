@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "main": "compiler_node.js",
   "scripts": {
-    "compile": "node compiler_node.js test-sus/mogroft/ -show-align",
+    "compile": "node compiler_node.js test-sus/mogroft/ -show-func-sigs",
     "start": "npm run compile && echo ================ building  ================ && build-path && cd .sus-build && build && echo ================ executing ================ && main.sus.exe"
   },
   "author": "",

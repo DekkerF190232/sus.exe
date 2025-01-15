@@ -5,7 +5,11 @@ import process from 'node:process';
 import { EOL } from 'node:os';
 
 const makeUnit = (sourceFile, empty) => ({ sourceFile, empty }); // sourceFile path is relative to source folder
-const makeBuildInfo = (sourceFolder, buildFolder, compileConfig) => ({ sourceFolder, buildFolder, compileConfig });
+const makeBuildInfo = (sourceFolder, buildFolder, compileConfig) => ({
+  sourceFolder,
+  buildFolder,
+  compileConfig,
+});
 
 const EXT_SRC = '.sus';
 const EXT_TREE = '.stj'; // sussy tree json
@@ -16,6 +20,7 @@ const EXT_OBJ = '.sus.obj';
   let params = process.argv.slice(2);
 
   let doShowAlign = false;
+  let doShowFuncs = false;
   let sourceFolder = undefined;
   let parsValid = true;
 
@@ -23,6 +28,8 @@ const EXT_OBJ = '.sus.obj';
     if (p.startsWith('-')) {
       if (p === '-show-align') {
         doShowAlign = true;
+      } else if (p === '-show-func-sigs') {
+        doShowFuncs = true;
       } else {
         console.log('error: unknown flag: ' + p);
         parsValid = false;
@@ -38,11 +45,11 @@ const EXT_OBJ = '.sus.obj';
     }
   }
 
-  let compileConfig = compiler.makeCompileConfig(doShowAlign);//...EOL;
+  let compileConfig = compiler.makeCompileConfig(doShowAlign, doShowFuncs); //...EOL;
 
-  if (params.length > 2 || !parsValid) {
+  if (!parsValid) {
     console.log('usage:');
-    console.log('  compiler_node.js <folder> [-show-align]');
+    console.log('  compiler_node.js <folder> [-show-align] [--show-func-sigs]');
     console.log('');
     process.exit(1);
   }
@@ -85,7 +92,9 @@ function buildContext(buildInfo, units) {
 
   for (const unit of units) {
     let srcPath = path.join(buildInfo.sourceFolder, unit.sourceFile);
-    let src = fs.readFileSync(srcPath, { encoding: 'utf-8' }).replaceAll(EOL, '\n');
+    let src = fs
+      .readFileSync(srcPath, { encoding: 'utf-8' })
+      .replaceAll(EOL, '\n');
     compiler.addToContext(ctx, path.resolve(srcPath), src);
 
     console.log('  ' + unit.sourceFile);
@@ -103,7 +112,10 @@ function compile(ctx, buildInfo, units) {
   let mainFound = false;
 
   for (const unit of units) {
-    let fileName = unit.sourceFile.slice(0, unit.sourceFile.length - EXT_SRC.length);
+    let fileName = unit.sourceFile.slice(
+      0,
+      unit.sourceFile.length - EXT_SRC.length
+    );
     if (unit.sourceFile === 'main' + EXT_SRC) mainFound = true;
 
     let binFolder = path.join(buildInfo.buildFolder, 'bin');
@@ -111,14 +123,17 @@ function compile(ctx, buildInfo, units) {
 
     let stjPath = path.join(binFolder, fileName + EXT_TREE);
     let asmPath = path.join(binFolder, fileName + EXT_ASM);
-    let src = fs.readFileSync(srcPath, { encoding: 'utf-8' }).replaceAll('\r', '');
+    let src = fs
+      .readFileSync(srcPath, { encoding: 'utf-8' })
+      .replaceAll('\r', '');
 
     let tree = compiler.doParse(ctx, path.resolve(srcPath), src);
-    
+
     ensureDirectoryExistence(stjPath);
-    fs.writeFileSync(stjPath, JSON.stringify(tree, null, 2), { encoding: 'utf-8' });
-    
-    
+    fs.writeFileSync(stjPath, JSON.stringify(tree, null, 2), {
+      encoding: 'utf-8',
+    });
+
     let isMain = unit.sourceFile === 'main' + EXT_SRC;
     let asm = compiler.doCompile(ctx, path.resolve(srcPath), src, isMain, tree);
 
@@ -134,7 +149,10 @@ function compile(ctx, buildInfo, units) {
   }
 
   if (!mainFound) {
-    throw new Error('could not find ' + path.resolve(path.join(buildInfo.sourceFolder, 'main' + EXT_SRC)));
+    throw new Error(
+      'could not find ' +
+        path.resolve(path.join(buildInfo.sourceFolder, 'main' + EXT_SRC))
+    );
   }
 
   console.log('');
@@ -150,27 +168,38 @@ function genScripts(buildInfo, units, context) {
   for (const unit of units) {
     if (unit.empty) continue;
 
-    let fileName = unit.sourceFile.slice(0, unit.sourceFile.length - EXT_SRC.length);
+    let fileName = unit.sourceFile.slice(
+      0,
+      unit.sourceFile.length - EXT_SRC.length
+    );
 
     let asmPathIn = path.join('bin', fileName + EXT_ASM);
 
     buildBat += 'nasm -f win32 -gcv8 ' + asmPathIn + EOL;
   }
 
-  let strLibs = '"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\OpenGL32.Lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\Gdi32.Lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\User32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\kernel32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\ucrt\\x86\\ucrt.lib"';
+  let strLibs =
+    '"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\OpenGL32.Lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\Gdi32.Lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\User32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x86\\kernel32.lib" "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\ucrt\\x86\\ucrt.lib"';
   let strObjPaths = '';
 
   for (const unit of units) {
     if (unit.empty) continue;
 
-    let fileName = unit.sourceFile.slice(0, unit.sourceFile.length - EXT_SRC.length);
+    let fileName = unit.sourceFile.slice(
+      0,
+      unit.sourceFile.length - EXT_SRC.length
+    );
     let objPathIn = path.join('bin', fileName + EXT_OBJ);
 
     if (strObjPaths.length > 0) strObjPaths += ' ';
     strObjPaths += '"' + objPathIn + '"';
   }
 
-  buildBat += 'link /subsystem:console /nodefaultlib /entry:main /debug /pdb:sus.pdb ' + strObjPaths + ' ' + strLibs;
+  buildBat +=
+    'link /subsystem:console /nodefaultlib /entry:main /debug /pdb:sus.pdb ' +
+    strObjPaths +
+    ' ' +
+    strLibs;
 
   fs.writeFileSync(buildBatPath, buildBat, { encoding: 'utf-8' });
 }
