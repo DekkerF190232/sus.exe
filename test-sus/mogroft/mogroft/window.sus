@@ -1,0 +1,254 @@
+
+package mogroft/Window {
+  
+  use sus/native/Win;
+  use sus/System;
+  
+  static int32 TIMER_ID_WINDOW = 0;
+  static int32 INTERVAL_MS = 10; # 100 fps
+  
+  struct WindowHandler (
+    funcptr[()] render,
+    funcptr[()] init,
+    funcptr[(int32 width, int32 height)] resize,
+    funcptr[(int32 vk)] onKeyDown,
+    funcptr[(int32 vk)] onKeyUp
+  );
+
+  struct WindowState (
+    WindowHandle windowHandle,
+    DeviceContextHandle deviceContextHandle,
+    GlRenderContextHandle glRenderContextHandle,
+    WindowHandler windowHandler
+  );
+
+  static PTR[WindowState] _window = RTP[PTR[WindowState]](0);
+
+  func run(WindowHandler windowHandler) {
+    int32 _2 = Win/SetThreadDpiAwarenessContext(dpiAwarenessContext: Win/DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+  
+    WindowState windowState = WindowState(
+      windowHandle=RTP[WindowHandle](0),
+      deviceContextHandle=RTP[DeviceContextHandle](0),
+      glRenderContextHandle=RTP[GlRenderContextHandle](0),
+      windowHandler = windowHandler
+    );
+    _window = REF(windowState);
+    
+    # make window
+    registerClass();
+    createWindow(this: REF(windowState));
+    
+    # show window
+    boo _3 = Win/ShowWindow(handle: windowState.windowHandle, showCommand: Win/SW_SHOWNORMAL);
+    boo _4 = Win/UpdateWindow(handle: windowState.windowHandle);
+
+    # create opengl context
+    createContext(this: REF(windowState));
+    
+    # use context
+    boo _5 = Win/wglMakeCurrent(dch: windowState.deviceContextHandle, glRenderContextHandle: windowState.glRenderContextHandle);
+    if (_5 == no) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error setting window context:");
+      System/exit(code: err);
+    }
+    
+    startRepaintTimer(this: REF(windowState));
+     
+    runMessageLoop(this: REF(windowState));
+  }
+  
+  func startRepaintTimer(PTR[WindowState] this) {
+    int32 _1 = Win/SetTimer(
+      handle: DRF(this).windowHandle,
+      timerId: TIMER_ID_WINDOW,
+      intervalMs: INTERVAL_MS,
+      timerFunc: RTP[funcptr[CON(stdcall) (WindowHandle handle, int32 _unnamed1, int32 _unnamed2, int32 _unnamed3)]](0)
+    );
+  }
+  
+  func createContext(PTR[WindowState] this) {
+    DRF(this).deviceContextHandle = Win/GetDC(handle: DRF(this).windowHandle);
+    
+    if (RTP[int32](DRF(this).deviceContextHandle) == 0) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error loading icon:");
+      System/exit(code: err);
+    }
+
+    # chose pixel format
+    PixelFormatDescriptor pfd = Win/new_PixelFormatDescriptor();
+    pfd.size        = cast[int16](size[PixelFormatDescriptor]());
+    pfd.version     = cast[int16](1);
+    pfd.flags       = Win/PFD_DRAW_TO_WINDOW | Win/PFD_SUPPORT_OPENGL;
+    pfd.pixelType   = Win/fc_PFD_TYPE_RGBA();
+    pfd.colorBits   = cast[int8](32);
+    pfd.alphaBits   = cast[int8](32);
+    pfd.depthBits   = cast[int8](24);
+    int32 pixelFormat = Win/ChoosePixelFormat(
+      dch: DRF(this).deviceContextHandle,
+      pfd: REF(pfd)
+    );
+    if (pixelFormat == 0) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error choosing pixel format:");
+      System/exit(code: err);
+    }
+    
+    # set pixel format
+    boo _1 = Win/SetPixelFormat(dch: DRF(this).deviceContextHandle, format: pixelFormat, pfd: REF(pfd));
+    if (_1 == no) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error setting pixel format:");
+      System/exit(code: err);
+    }
+    
+    # create context
+    DRF(this).glRenderContextHandle = Win/wglCreateContext(dch: DRF(this).deviceContextHandle);
+    if (RTP[int32](DRF(this).glRenderContextHandle) == 0) {
+      int32 err = Win/GetLastError();
+      errMsg(code: err, message: STR"Error setting pixel format:");
+      System/exit(code: err);
+    }
+  }
+
+  func runMessageLoop(PTR[WindowState] this) {
+    WindowMessage message = Win/new_WindowMessage();
+    
+    while (Win/GetMessageA(
+      message:   REF(message),
+      handle:    DRF(this).windowHandle,
+      filterMin: 0,
+      filterMax: 0
+    )) {
+      boo   _1 = Win/TranslateMessage(message: REF(message));
+      int32 _2 = Win/DispatchMessageA(message: REF(message));
+    }
+  }
+
+  func CON(stdcall) int32 windowProc(WindowHandle handle, int32 message, int32 wParam, int32 lParam) {
+    if (message == Win/WM_PAINT) {
+      PaintStruct ps = Win/new_PaintStruct();
+      
+      #Renderer/render(this: REF(DRF(_window).renderState));
+      
+      funcptr[()] renderFunc = DRF(_window).windowHandler.render;
+      renderFunc();
+      
+      DeviceContextHandle _1 = Win/BeginPaint(handle: handle, paintStruct: REF(ps));
+      DeviceContextHandle _2 = Win/EndPaint(handle: handle, paintStruct: REF(ps));
+      
+      done 0;
+    } else if (message == Win/WM_SIZE) {
+      int32 width = lParam & @ffff;
+      int32 height = lParam >> cast[int8](16) & @ffff;
+      
+      funcptr[(int32 width, int32 height)] resizeFunc = DRF(_window).windowHandler.resize;
+      resizeFunc(width: width, height: height);
+      #Renderer/resize(this: REF(DRF(_window).renderState), width: width, height: height);
+      
+      done 0;
+    } else if (message == Win/WM_TIMER && (wParam == TIMER_ID_WINDOW)) {
+      boo _1 = Win/InvalidateRect(handle: handle, rectangle: RTP[PTR[Rectangle]](0), erase: yes);
+    } else if (message == Win/WM_KEYFIRST) {
+      
+    }
+  
+    done Win/DefWindowProcA(handle: handle, message:message, wParam: wParam, lParam: lParam);
+  }
+
+  func registerClass() {
+    int32 err = 0;
+
+    Win/SetLastError(code:0);
+
+    InstanceHandle instance = RTP[InstanceHandle](0);
+
+    # load icon
+    IconHandle icon = Win/LoadIconA(instance: instance, iconName: Win/fc_IDI_WINLOGO());
+    err = Win/GetLastError();
+    if (err != 0) {
+      errMsg(code: err, message: STR"Error loading icon: ");
+      System/exit(code: err);
+    }
+
+    CursorHandle cursor = Win/LoadCursorA(instance: instance, cursorName: Win/fc_IDC_ARROW());
+    err = Win/GetLastError();
+    if (err != 0) {
+      errMsg(code: err, message: STR"Error loading icon: ");
+      System/exit(code: err);
+    }
+
+    WindowClassExtendedAscii windowClass = WindowClassExtendedAscii(
+      cbSize     = size[WindowClassExtendedAscii](),
+      style      = Win/CS_OWNDC | Win/CS_HREDRAW | Win/CS_VREDRAW | Win/CS_DBLCLKS,
+      windowProc = funcref(windowProc),
+      cbClsExt = 0,
+      cbWndExt = 0,
+      instance   = instance,
+      icon       = icon,
+      cursor     = cursor,
+      background = RTP[BrushHandle](0),
+      menuName   = RTP[PTR[int8]](0),
+      className  = STR"Mogroft",
+      iconSmall  = RTP[IconHandle](0)
+    );
+
+    int32 _ignored = cast[int32](Win/RegisterClassExA(windowClass: REF(windowClass)));
+    err = Win/GetLastError();
+    if (err != 0) {
+      errMsg(code: err, message: STR"Error registering class: ");
+      System/exit(code: err);
+    }
+  }
+
+  func createWindow(PTR[WindowState] this) {
+    int32 style = Win/fc_WS_OVERLAPPEDWINDOW()|Win/WS_CLIPSIBLINGS|Win/WS_CLIPCHILDREN;
+    
+    Rectangle rectangle = Rectangle(
+      left = 100,
+      top = 100,
+      right = 600,
+      bottom = 600
+    );
+
+    boo res = Win/AdjustWindowRect(
+      rectangle: REF(rectangle),
+      style:     style, menu: no
+    );
+
+    DRF(this).windowHandle = Win/CreateWindowExA(
+      extendedStyle: 0,
+      className:     STR"Mogroft",
+      windowName:    STR"Mogroft sus.exe",
+      style:         style,
+      x:             0,
+      y:             0,
+      width:         500,
+      height:        500,
+      parentHandle:  RTP[WindowHandle](0),
+      menu:          RTP[MenuHandle](0),
+      instance:      RTP[InstanceHandle](0),
+      param:         RTP[ptr](0)
+    );
+
+    if (RTP[int32](DRF(this).windowHandle) == 0) {
+      int32 code = Win/GetLastError();
+      errMsg(code: code, message: STR"Failed to create window. GetLastError: ");
+      System/exit(code: code);
+    }
+
+  }
+
+  func errMsg(int32 code, PTR[int8] message) {
+    System/print(s: message);
+    System/print(s: STR" ");
+
+    System/print(i: code);
+    System/print(s: STR" = 0x");
+
+    System/println(i_0x: code);
+  }
+
+}

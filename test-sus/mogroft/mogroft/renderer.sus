@@ -6,16 +6,18 @@ package mogroft/Renderer {
   use sus/Math;
   use sus/StringStream;
   
-  struct RenderState(
+  struct RendererState (
     int32 width,
     int32 height
   );
   
-  static RenderState def_RenderState = RenderState(width = 0, height = 0);
+  func RendererState new_RendererState() {
+    done RendererState(width = 0, height = 0);
+  }
   
   static int32 ticks = 0;
   
-  func render(PTR[RenderState] this) {
+  func render(PTR[RendererState] this) {
   
     Gl/glClear(mask: Gl/GL_COLOR_BUFFER_BIT);
     
@@ -32,10 +34,15 @@ package mogroft/Renderer {
     Gl/glFlush();
   }
   
-  func drawWorld(PTR[RenderState] this) {
-    perspective(fov: 120.0, aspect: 4.0/3.0, near: 1.0, far: 100.0);
+  func drawWorld(PTR[RendererState] this) {
+    real32 aspect = cast[real32](DRF(this).width) / cast[real32](DRF(this).height);
+    perspective(fov: 90.0, aspect: aspect, near: 1.0, far: 1000.0);
     
     Gl/glPushMatrix();
+    
+    Gl/glRotatef(angle: 0.8, x: 1.0, y: 0.0, z: 0.0);
+    
+    Gl/glTranslatef(x: 0.0, y: -2.0, z: -100.0);
     
     ticks = ticks + 1 % 300;
     real32 rotationPercent = cast[real32](ticks) / 300.0;
@@ -44,14 +51,14 @@ package mogroft/Renderer {
     
     color(rgba: @4060a0ff);
     
-    #Gl/glTranslatef(x: 0.0, y: 0.0, z: -3.5);
-    #Gl/glScalef(x: 0.2, y: 0.2, z: 0.2);
+    #
+    Gl/glScalef(x: 0.2, y: 0.2, z: 0.2);
     drawCube();
     
     Gl/glPopMatrix();
   }
   
-  func updateProjection(PTR[RenderState] this) {
+  func updateProjection(PTR[RendererState] this) {
     #Gl/glMatrixMode(Gl/GL_PROJECTION);
     
   }
@@ -81,44 +88,13 @@ package mogroft/Renderer {
     DRF(matrix + (size[real32]() * 14))   = -1.0;
     DRF(matrix + (size[real32]() * 15))   = 0.0;
     
-    printMatrix(matrix: matrix);
-    
+    #printMatrix(matrix: matrix);
     
     Gl/glMatrixMode(mode: Gl/GL_PROJECTION);
     Gl/glLoadIdentity();
     Gl/glMultMatrixf(matrix: matrix);
-  }
-  
-  func printMatrix(PTR[real32] matrix) {
-        
-    System/println(s: STR"printing 4x4 matrix:");
-    int32 r = 0;
-    while (r < 4) {
-      System/print(s: STR"  ");
-      int32 c = 0;
-      while (c < 4) {
-        PTR[real32] i = matrix + (r * 4 + c * size[real32]());
-        
-        #PTR[int8] buffer = ARR[int8](16);
-        #StringStream stream = StringStream(buffer = buffer, length = 16, position = 0);
-        #StringStream/append(stream: REF(stream), r: DRF(i), digits: 2);
-        #int32 maxLength = 8;
-        #int32 toPad = maxLength - stream.position;
-        #while (toPad > 0) {
-        #  System/print(s: STR" ");
-        #  toPad = toPad - 1;
-        #}
-        #System/print(stream: REF(stream));
-        
-        System/print(r: DRF(i));
-        System/print(s: STR"   ");
-        
-        c = c + 1;
-      }
-      System/println();
-      r = r + 1;
-    }
-    System/println();
+    
+    Gl/glMatrixMode(mode: Gl/GL_MODELVIEW);
   }
   
   # draw 1,1,1-sized cube at 0,0,0
@@ -161,7 +137,7 @@ package mogroft/Renderer {
     }
   }
   
-  func resize(PTR[RenderState] this, int32 width, int32 height) {
+  func resize(PTR[RendererState] this, int32 width, int32 height) {
     DRF(this).width = width;
     DRF(this).height = height;
     Gl/glViewport(x: 0, y: 0, width: width, height: height);
@@ -179,6 +155,36 @@ package mogroft/Renderer {
       b: cast[real32](b) / 255.0,
       a: cast[real32](a) / 255.0
     );
+  }
+  
+  func printMatrix(PTR[real32] matrix) {
+        
+    System/println(s: STR"4x4 Matrix:");
+    int32 r = 0;
+    while (r < 4) {
+      int32 c = 0;
+      while (c < 4) {
+        PTR[real32] i = matrix + (r * 4 + c * size[real32]());
+        
+        PTR[int8] buffer = ARR[int8](24);
+        StringStream stream = StringStream(buffer = buffer, length = 16, position = 0);
+        StringStream/append(stream: REF(stream), r: DRF(i), digits: 2);
+        int32 maxLength = 8;
+        int32 toPad = maxLength - stream.position;
+        while (toPad > 0) {
+          System/print(s: STR" ");
+          toPad = toPad - 1;
+        }
+        System/print(stream: REF(stream));
+        
+        System/print(s: STR"   ");
+        
+        c = c + 1;
+      }
+      System/println();
+      r = r + 1;
+    }
+    System/println();
   }
   
   #func drawRec(real32 x, real32 y, real32 width, real32 height) {

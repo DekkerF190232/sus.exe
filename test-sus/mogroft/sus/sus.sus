@@ -206,6 +206,7 @@ package sus/native/Win {
   
   static int32 WM_PAINT          = @000f;
   static int32 WM_SIZE           = @0005;
+  static int32 WM_KEYFIRST       = @0100;
   static int32 WM_KEYDOWN        = @0100;
   static int32 WM_KEYUP          = @0101;
   static int32 WM_CLOSE          = @0010;

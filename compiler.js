@@ -2700,7 +2700,7 @@ function compile(state) {
           rootScope.returnInfo.off
         )}]`
       );
-      r += compileCopy4('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
+      r += compileCopy4('esp', 0, 'edx', 0, rootScope.returnInfo.size);
       r += line(`mov     eax, edx`);
     } else {
       if (rootScope.returnInfo.size === 8) r += line('pop     edx');
@@ -2734,7 +2734,7 @@ function compile(state) {
           rootScope.returnInfo.off
         )}]`
       );
-      r += compileCopy4('esp', 0, 'edx', 0, rootScope.returnInfo.size, false);
+      r += compileCopy4('esp', 0, 'edx', 0, rootScope.returnInfo.size);
       r += line(`mov     eax, edx`);
     } else {
       if (rootScope.returnInfo.size === 8) r += line('pop     edx');
@@ -2941,7 +2941,7 @@ function compile(state) {
         r += line(`pop     edx`);
 
         let byteSize = evalSize1(exprType);
-        r += compileCopy1('esp', 0, 'edx', 0, byteSize, true);
+        r += compileCopy1('esp', 0, 'edx', 0, byteSize);
         r += line(`add     esp, ${byteSize}`);
 
         r += line('; }');
@@ -2990,7 +2990,7 @@ function compile(state) {
         r += compileExpr(expr, scope, addressScope);
         r += line(`mov     edx, ${asmName}`);
         let off = chain.off;
-        r += compileCopy1('esp', 0, 'edx', off, memberSizeBytes, true);
+        r += compileCopy1('esp', 0, 'edx', off, memberSizeBytes);
         r += line(`add     esp, ${memberSizeBytes}`);
         r += line();
       } else {
@@ -3005,7 +3005,7 @@ function compile(state) {
 
         let off = symRow.off + chain.off;
 
-        r += compileCopy1('esp', 0, 'ebp', off, memberSizeBytes, true);
+        r += compileCopy1('esp', 0, 'ebp', off, memberSizeBytes);
         r += line(`add     esp, ${memberSizeBytes}`);
 
         r += line();
@@ -3020,7 +3020,7 @@ function compile(state) {
       r += line(`pop     edx`);
 
       let off = chain.off;
-      r += compileCopy1('esp', 0, 'edx', off, memberSizeBytes, true);
+      r += compileCopy1('esp', 0, 'edx', off, memberSizeBytes);
       r += line(`add     esp, ${memberSizeBytes}`);
 
       r += line();
@@ -3051,7 +3051,7 @@ function compile(state) {
       r += compileExpr(expr, scope, addressScope);
       r += line(`mov     edx, ${asmName}`);
       let byteSize = evalSize1(static_.type);
-      r += compileCopy1('esp', 0, 'edx', 0, byteSize, true);
+      r += compileCopy1('esp', 0, 'edx', 0, byteSize);
       r += line(`add     esp, ${byteSize}`);
       return r;
     }
@@ -3069,7 +3069,7 @@ function compile(state) {
     // r += line('pop     eax');
     // r += line(`mov     [${symRes.register}${getOffStr(row.off)}], eax`);
 
-    r += compileCopy4('esp', 0, symRes.register, symRow.off, byteSize, true);
+    r += compileCopy4('esp', 0, symRes.register, symRow.off, byteSize);
     r += line(`add     esp, ${byteSize}`);
 
     r += line();
@@ -3499,7 +3499,7 @@ function compile(state) {
       r += line(`push    dword [edx]`);
     } else {
       r += line(`sub     esp, ${typeSize}`);
-      r += compileCopy4('edx', 0, 'esp', 0, typeSize, false);
+      r += compileCopy4('edx', 0, 'esp', 0, typeSize);
     }
 
     // r += line(`mov     edx, [edx]`);
@@ -3620,8 +3620,8 @@ function compile(state) {
     if (sizeBytes % 4 !== 0) throw makeImplErr('cannot push unaligned bytes');
     let r = '';
     let sizeStack = sizeBytes / 4;
-    for (let i = 0; i < sizeStack; i++) {
-      r += line(`push dword [${register}${getOffStr(offset + i * 4)}]`);
+    for (let i = sizeStack - 1; i >= 0; i--) {
+      r += line(`push    dword [${register}${getOffStr(offset + i * 4)}]`);
     }
     return r;
   }
@@ -3798,15 +3798,15 @@ function compile(state) {
             'can not find initialization for member ' + member.name
           );
 
-        let expr = init.kids.find((x) => x.name === 'expr');
+        let exprInner = init.kids.find((x) => x.name === 'expr');
         let type = member.type;
 
-        checkType(expr, scope, addressScope, type);
+        checkType(exprInner, scope, addressScope, type);
 
         // let memberSize = evalSize1(type);
         let memberSize = evalSize4(type);
         r += line(`; ${member.name} =`);
-        r += compileExpr(expr, scope, addressScope);
+        r += compileExpr(exprInner, scope, addressScope);
         r += compileCopy4('esp', 0, 'esp', memberSize + member.off, memberSize);
         r += line(`add     esp, ${memberSize}`);
       }
@@ -4148,16 +4148,17 @@ function compile(state) {
         let structRow = findStructByAddress(state.ctx, type.name);
         if (!structRow)
           throw makeErr(exprSym.i, 'struct ' + type.name + ' not found');
-        if (structRow.size % 4 !== 0)
-          throw makeImplErr('struct needs to be 4-byte aligned');
-
+        // if (structRow.size % 4 !== 0)
+        //   throw makeImplErr('struct needs to be 4-byte aligned');
+        let structSizeAligned = structRow.size + (4 - structRow.size % 4) % 4; // new
         asm += line(`; expr struct ${structRow.name} symbol: ${symbol} {`);
-        let size = structRow.size / 4;
-        for (let i = 0; i < size; i++) {
-          asm += line(
-            `push    dword [${symRes.register}${getOffStr(row.off + i * 4)}]`
-          );
-        }
+        asm += compilePush(symRes.register, row.off, structSizeAligned); // new
+        // let size = structRow.size / 4;
+        // for (let i = 0; i < size; i++) {
+        //   asm += line(
+        //     `push    dword [${symRes.register}${getOffStr(row.off + i * 4)}]`
+        //   );
+        // }
         asm += line('; }');
       } else {
         _ass(false);

@@ -1,0 +1,57 @@
+package mogroft/Mogroft {
+
+  use sus/System;
+  
+  use mogroft/Window;
+  use mogroft/Renderer;
+
+  struct MogroftState (
+    RendererState rendererState
+  );
+  
+  static PTR[MogroftState] _mogroft = RTP[PTR[MogroftState]](0);
+  
+  func runMogroft() {
+    MogroftState theInst = MogroftState(
+      rendererState = Renderer/new_RendererState()
+    );
+    _mogroft = REF(theInst);
+  
+    #funcptr[()] render,
+    #funcptr[()] init,
+    #funcptr[(int32 vk)] onKeyDown,
+    #funcptr[(int32 vk)] onKeyUp
+    Window/run(windowHandler: WindowHandler(
+      render = funcref(render),
+      init = funcref(init),
+      resize = funcref(resize),
+      onKeyDown = funcref(onKeyDown),
+      onKeyUp = funcref(onKeyUp)
+    ));
+  }
+  
+  func init() {
+    
+  }
+  
+  func render() {
+    #System/println(s: STR"render!");
+    Renderer/render(this: REF(DRF(_mogroft).rendererState));
+  }
+  
+  func resize(int32 width, int32 height) {
+    Renderer/resize(this: REF(DRF(_mogroft).rendererState), width: width, height: height);
+    System/print(s: STR"resize: ");
+    System/print(i: width);
+    System/print(s: STR" ");
+    System/println(i: height);
+  }
+  
+  func onKeyDown(int32 vk) {
+  }
+  
+  func onKeyUp(int32 vk) {
+  }
+  
+  
+}
