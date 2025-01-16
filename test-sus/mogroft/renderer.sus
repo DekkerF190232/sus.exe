@@ -33,7 +33,7 @@ package mogroft/Renderer {
   }
   
   func drawWorld(PTR[RenderState] this) {
-    perspective(fov: 120.0, aspect: 1.0, near: 1.0, far: 100.0);
+    perspective(fov: 120.0, aspect: 4.0/3.0, near: 1.0, far: 100.0);
     
     Gl/glPushMatrix();
     
@@ -99,19 +99,19 @@ package mogroft/Renderer {
       while (c < 4) {
         PTR[real32] i = matrix + (r * 4 + c * size[real32]());
         
-        PTR[int8] buffer = ARR[int8](16);
-        StringStream stream = StringStream(buffer = buffer, length = 16, position = 0);
+        #PTR[int8] buffer = ARR[int8](16);
+        #StringStream stream = StringStream(buffer = buffer, length = 16, position = 0);
+        #StringStream/append(stream: REF(stream), r: DRF(i), digits: 2);
+        #int32 maxLength = 8;
+        #int32 toPad = maxLength - stream.position;
+        #while (toPad > 0) {
+        #  System/print(s: STR" ");
+        #  toPad = toPad - 1;
+        #}
+        #System/print(stream: REF(stream));
         
-        StringStream/append(stream: REF(stream), r: DRF(i), digits: 2);
-        
-        int32 maxLength = 8;
-        int32 toPad = maxLength - stream.position;
-        while (toPad > 0) {
-          System/print(s: STR" ");
-          toPad = toPad - 1;
-        }
-        
-        System/print(stream: REF(stream));
+        System/print(r: DRF(i));
+        System/print(s: STR"   ");
         
         c = c + 1;
       }

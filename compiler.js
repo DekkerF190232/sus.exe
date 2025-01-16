@@ -3924,9 +3924,9 @@ function compile(state) {
     let a = exprOp.kids[0];
     let b = exprOp.kids[1];
     let r = '';
-    r += line(`xor     eax, eax`);
     r += compileExpr(a, scope, addressScope);
     r += compileExpr(b, scope, addressScope);
+    r += line(`xor     eax, eax`);
     r += line(`finit`);
     r += line(`fld     dword [esp]`);
     r += line(`fld     dword [esp + 4]`);

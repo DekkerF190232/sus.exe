@@ -1,0 +1,18 @@
+
+package Main {
+
+  use sus/native/Win;
+  use sus/System;
+
+  main {
+    boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+    System/println(s: STR"testing...");
+    #System/print(b: -123.3 > 0.0); # WAT
+    #System/print(b: -123.0 < 0.0); # WAT
+    System/print(r: -123.05, digits: 2);
+    System/println();
+    System/exit(code: 0);
+  }
+
+
+}

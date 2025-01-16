@@ -1,0 +1,579 @@
+
+package sus/Math {
+
+  static real32 PI = 3.14159265359;
+  static real32 2PI = 6.28318530718;
+
+  func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
+  func CON(cdecl) real32 tan(real32 x) EXT;
+  func CON(cdecl) real32 sinf(real32 x) EXT;
+  func CON(cdecl) real32 cosf(real32 x) EXT;
+  func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+  
+}
+
+package sus/native/Win {
+
+  # math
+  func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
+  func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+
+  # strings
+  func CON(cdecl) int32 strnlen(PTR[int8] buffer, int32 size) EXT;
+  func CON(cdecl) _itoa_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) EXT;
+
+  # stdout
+  static int32 STD_OUTPUT_HANDLE = -11;
+  func CON(stdcall) ExitProcess(int32 code) EXT;
+  func CON(stdcall) int32 GetStdHandle(int32 handle) EXT;
+  func CON(stdcall) boo WriteFile(int32 file, PTR[int8] buffer, int32 length, PTR[int32] written, PTR[ptr] overlapped) EXT;
+
+  # errors
+  func CON(stdcall) SetLastError(int32 code) EXT;
+  func CON(stdcall) int32 GetLastError() EXT;
+
+  # threads
+  func CON(stdcall) Sleep(int32 ms) EXT;
+
+  # windows
+  
+  struct LargeInteger (
+    int32 low,
+    int32 high
+  );
+  
+  static int32 DPI_AWARENESS_CONTEXT_UNAWARE              = -1;
+  static int32 DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         = -2;
+  static int32 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    = -3;
+  static int32 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
+  static int32 DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED    = -5;
+  
+  func CON(stdcall) int32 SetThreadDpiAwarenessContext(int32 dpiAwarenessContext) EXT;
+  
+  func CON(stdcall) int32 SetTimer(
+    WindowHandle  handle,
+    int32         timerId,
+    int32         intervalMs,
+    funcptr[CON(stdcall) (WindowHandle handle, int32 _unnamed1, int32 _unnamed2, int32 _unnamed3)]
+                  timerFunc
+  ) EXT;
+  
+  func CON(stdcall) boo InvalidateRect(WindowHandle handle, PTR[Rectangle] rectangle, boo erase) EXT;
+
+  struct Rectangle (
+    int32 left,
+    int32 top,
+    int32 right,
+    int32 bottom
+  );
+
+  func CON(stdcall) boo AdjustWindowRect(PTR[Rectangle] rectangle, int32 style, boo menu) EXT;
+
+  func CON(stdcall) WindowHandle CreateWindowExA(
+    int32 extendedStyle,
+    PTR[int8] className,
+    PTR[int8] windowName,
+    int32 style,
+    int32 x,
+    int32 y,
+    int32 width,
+    int32 height,
+    WindowHandle parentHandle,
+    MenuHandle menu,
+    InstanceHandle instance,
+    ptr param) EXT;
+
+  static int32 WS_OVERLAPPED       = @00000000;
+  static int32 WS_POPUP            = @80000000;
+  static int32 WS_CHILD            = @40000000;
+  static int32 WS_MINIMIZE         = @20000000;
+  static int32 WS_VISIBLE          = @10000000;
+  static int32 WS_DISABLED         = @08000000;
+  static int32 WS_CLIPSIBLINGS     = @04000000;
+  static int32 WS_CLIPCHILDREN     = @02000000;
+  static int32 WS_MAXIMIZE         = @01000000;
+  static int32 WS_CAPTION          = @00C00000;
+  static int32 WS_BORDER           = @00800000;
+  static int32 WS_DLGFRAME         = @00400000;
+  static int32 WS_VSCROLL          = @00200000;
+  static int32 WS_HSCROLL          = @00100000;
+  static int32 WS_SYSMENU          = @00080000;
+  static int32 WS_THICKFRAME       = @00040000;
+  static int32 WS_GROUP            = @00020000;
+  static int32 WS_TABSTOP          = @00010000;
+  static int32 WS_MINIMIZEBOX      = @00020000;
+  static int32 WS_MAXIMIZEBOX      = @00010000;
+
+  func int32 fc_WS_OVERLAPPEDWINDOW() {
+    done WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+  }
+
+  static int32 CS_VREDRAW          = @0001;
+  static int32 CS_HREDRAW          = @0002;
+  static int32 CS_DBLCLKS          = @0008;
+  static int32 CS_OWNDC            = @0020;
+  static int32 CS_CLASSDC          = @0040;
+  static int32 CS_PARENTDC         = @0080;
+  static int32 CS_NOCLOSE          = @0200;
+  static int32 CS_SAVEBITS         = @0800;
+  static int32 CS_BYTEALIGNCLIENT  = @1000;
+  static int32 CS_BYTEALIGNWINDOW  = @2000;
+  static int32 CS_GLOBALCLASS      = @4000;
+
+  static int32 SWP_NOSIZE          = @0001;
+  static int32 SWP_NOMOVE          = @0002;
+  static int32 SWP_NOZORDER        = @0004;
+  static int32 SWP_NOREDRAW        = @0008;
+  static int32 SWP_NOACTIVATE      = @0010;
+  static int32 SWP_FRAMECHANGED    = @0020;
+  static int32 SWP_SHOWWINDOW      = @0040;
+  static int32 SWP_HIDEWINDOW      = @0080;
+  static int32 SWP_NOCOPYBITS      = @0100;
+  static int32 SWP_NOOWNERZORDER   = @0200;
+  static int32 SWP_NOSENDCHANGING  = @0400;
+ 
+  static int32 SW_SHOWNORMAL = 1;
+
+  struct InstanceHandle (int32 _unused);
+  struct WindowHandle (int32 _unused);
+  struct MenuHandle (int32 _unused);
+  struct IconHandle (int32 _unused);
+  struct CursorHandle (int32 _unused);
+  struct BrushHandle (int32 _unused);
+
+  func PTR[int8] fc_IDI_WINLOGO() { done RTP[PTR[int8]](32517); }
+  func PTR[int8] fc_IDC_ARROW() { done RTP[PTR[int8]](32512); }
+  
+  static int32 ATTACH_PARENT_PROCESS = -1;
+  func CON(stdcall) boo AttachConsole(int32 processId) EXT;
+  
+  func CON(stdcall) IconHandle LoadIconA(InstanceHandle instance, PTR[int8] iconName) EXT;
+
+  func CON(stdcall) CursorHandle LoadCursorA(InstanceHandle instance, PTR[int8] cursorName) EXT;
+
+  func CON(stdcall) int32 DefWindowProcA(WindowHandle handle, int32 message, int32 wParam, int32 lParam) EXT;
+
+  struct WindowClassExtendedAscii (
+    int32 cbSize,
+    int32 style,
+    funcptr[CON(stdcall) int32 (WindowHandle handle, int32 message, int32 wParam, int32 lParam)] 
+         windowProc,
+    int32 cbClsExt,
+    int32 cbWndExt,
+    InstanceHandle instance,
+    IconHandle icon,
+    CursorHandle cursor,
+    BrushHandle background,
+    PTR[int8] menuName,
+    PTR[int8] className,
+    IconHandle iconSmall
+  );
+  func CON(stdcall) boo ShowWindow(WindowHandle handle, int32 showCommand) EXT;
+  func CON(stdcall) int16 RegisterClassExA(PTR[WindowClassExtendedAscii] windowClass) EXT;
+
+  func CON(stdcall) boo SetWindowPos(
+      WindowHandle handle,
+      WindowHandle handleInsertAfter,
+      int32 x,
+      int32 y,
+      int32 cx,
+      int32 cy,
+      int32 flags) EXT;
+
+  struct Point (
+    int32 x,
+    int32 y
+  );
+
+  struct WindowMessage (
+    WindowHandle handle,
+    int32 message,
+    int32 wParam,
+    int32 lParam,
+    int32 time,
+    Point point
+  );
+  func WindowMessage new_WindowMessage() {
+    done WindowMessage(
+      handle = RTP[WindowHandle](0),
+      message = 0,
+      wParam = 0,
+      lParam = 0,
+      time = 0,
+      point = Point(x = 0, y = 0)
+    );
+  }
+  
+  static int32 WM_PAINT          = @000f;
+  static int32 WM_SIZE           = @0005;
+  static int32 WM_KEYDOWN        = @0100;
+  static int32 WM_KEYUP          = @0101;
+  static int32 WM_CLOSE          = @0010;
+  static int32 WM_TIMER          = @0113;
+
+  func CON(stdcall) boo GetMessageA(PTR[WindowMessage] message, WindowHandle handle, int32 filterMin, int32 filterMax) EXT;
+
+  func CON(stdcall) boo UpdateWindow(WindowHandle handle) EXT;
+  func CON(stdcall) boo TranslateMessage(PTR[WindowMessage] message) EXT;
+  func CON(stdcall) int32 DispatchMessageA(PTR[WindowMessage] message) EXT;
+  
+  struct GlRenderContextHandle (ptr _unused);
+  
+  func CON(stdcall) GlRenderContextHandle wglCreateContext(DeviceContextHandle dch) EXT;
+  func CON(stdcall) boo wglMakeCurrent(DeviceContextHandle dch, GlRenderContextHandle glRenderContextHandle) EXT;
+  
+  func CON(stdcall) boo SetPixelFormat(DeviceContextHandle dch, int32 format, PTR[PixelFormatDescriptor] pfd) EXT;
+  
+  struct DeviceContextHandle(ptr _unused);
+
+  func CON(stdcall) DeviceContextHandle GetDC(WindowHandle handle) EXT;
+
+  struct PixelFormatDescriptor (
+    int16 size,
+    int16 version,
+    int32 flags,
+    int8 pixelType,
+    int8 colorBits,
+    int8 redBits,
+    int8 redShift,
+    int8 greenBits,
+    int8 greenShift,
+    int8 blueBits,
+    int8 blueShift,
+    int8 alphaBits,
+    int8 alphaShift,
+    int8 accumBits,
+    int8 accumRedBits,
+    int8 accumGreenBits,
+    int8 accumBlueBits,
+    int8 accumAlphaBits,
+    int8 depthBits,
+    int8 stencilBits,
+    int8 auxBuffers,
+    int8 layerType,
+    int8 reserved,
+    int32 layerMask,
+    int32 visibleMask,
+    int32 damageMask
+  );
+
+  func int8 fc_PFD_TYPE_RGBA() {
+    done cast[int8](0);
+  }
+
+  static int32 PFD_DRAW_TO_WINDOW          = @00000004;
+  static int32 PFD_SUPPORT_OPENGL          = @00000020;
+
+  func CON(stdcall) int32 ChoosePixelFormat(
+    DeviceContextHandle dch,
+    PTR[PixelFormatDescriptor] pfd
+  ) EXT;
+
+
+  func PixelFormatDescriptor new_PixelFormatDescriptor() {
+    done PixelFormatDescriptor (
+      size = cast[int16](0),
+      version = cast[int16](0),
+      flags = 0,
+      pixelType = cast[int8](0),
+      colorBits = cast[int8](0),
+      redBits = cast[int8](0),
+      redShift = cast[int8](0),
+      greenBits = cast[int8](0),
+      greenShift = cast[int8](0),
+      blueBits = cast[int8](0),
+      blueShift = cast[int8](0),
+      alphaBits = cast[int8](0),
+      alphaShift = cast[int8](0),
+      accumBits = cast[int8](0),
+      accumRedBits = cast[int8](0),
+      accumGreenBits = cast[int8](0),
+      accumBlueBits = cast[int8](0),
+      accumAlphaBits = cast[int8](0),
+      depthBits = cast[int8](0),
+      stencilBits = cast[int8](0),
+      auxBuffers = cast[int8](0),
+      layerType = cast[int8](0),
+      reserved = cast[int8](0),
+      layerMask = 0,
+      visibleMask = 0,
+      damageMask = 0
+    );
+  }
+
+  struct PaintStruct (
+    DeviceContextHandle dch,
+    boo erase,
+    Rectangle rectangle,
+    boo restore,
+    array[int8, 3] _padding1,
+    boo incUpdate,
+    array[int8, 3] _padding2,
+    array[int8, 32] rgbReserved
+  );
+  
+  func PaintStruct new_PaintStruct() {
+    done PaintStruct (
+      dch=RTP[DeviceContextHandle](0),
+      erase=no,
+      rectangle=Rectangle(
+        left=0,
+        top=0,
+        right=0,
+        bottom=0
+      ),
+      restore = no,
+      _padding1 = array[int8,3](cast[int8](0)),
+      incUpdate = no,
+      _padding2 = array[int8, 3](cast[int8](0)),
+      rgbReserved = array[int8, 32](cast[int8](0))
+    );
+  }
+  
+  func CON(stdcall) DeviceContextHandle BeginPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
+  func CON(stdcall) DeviceContextHandle EndPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
+
+}
+
+package sus/Limits {
+  
+  static int32 INT32_MAX = 2147483647;
+  static int32 INT32_MIN = -2147483648;
+  
+}
+
+package sus/Memory {
+  
+  func CON(cdecl) ptr malloc(int32 bytes) EXT;
+  func CON(cdecl) free(ptr pointer) EXT;
+
+}
+
+package sus/StringStream {
+
+  use sus/Limits;
+  use sus/Memory;
+  use sus/System;
+  use sus/native/Win;
+
+  struct StringStream (
+    PTR[int8] buffer,
+    int32 length,
+    int32 position
+  );
+  
+  func StringStream new(int32 length) {
+    done StringStream(
+      buffer = RTP[PTR[int8]](Memory/malloc(bytes: length)),
+      length = length,
+      position = 0
+    );
+  }
+  
+  func append(PTR[StringStream] stream, PTR[int8] s) {
+    while (cast[int32](DRF(s)) != 0) {
+      if (DRF(stream).position >= DRF(stream).length) done;
+      
+      DRF(DRF(stream).buffer + DRF(stream).position) = DRF(s);
+      
+      DRF(stream).position = DRF(stream).position + 1;
+      s = s + 1;
+    }
+    #System/print(s: STR"Appended ");
+    #System/println(i: DRF(stream).position);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i_0x) {
+    append(stream: stream, i: i_0x, radix: 16);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i) {
+    append(stream: stream, i: i, radix: 10);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i, int32 radix) {
+    PTR[int8] buffer = ARR[int8](16);
+    Win/_itoa_s(value: i, buffer: buffer, size: 16, radix: radix);
+    
+    append(stream: stream, s: buffer);
+  }
+  
+  func append(PTR[StringStream] stream, real32 r) {
+    append(stream: stream, r: r, digits: 10);
+  }
+    
+  func append(PTR[StringStream] stream, real32 r, int32 digits) {
+    boo neg = r < 0.0;
+    real32 digitMag = Win/powf(base: 10.0, power: cast[real32](digits));
+
+    if (neg) r = 0.0 - r;
+
+    int32 intPart = cast[int32](r);
+    int32 decPart = cast[int32]((r - cast[real32](intPart)) * digitMag);
+
+    if (neg) append(stream: stream, s: STR"-");
+    append(stream: stream, i: intPart);
+
+    if (digits > 0) {
+      append(stream: stream, s: STR".");
+
+      PTR[int8] buffer = ARR[int8](16);
+      Win/_itoa_s(value: decPart, buffer: buffer, size: 16, radix: 10);
+      int32 nonZeroCount = Win/strnlen(buffer: buffer, size: 16);
+      
+      int32 zeros = digits - nonZeroCount;
+      while (zeros > 0) {
+        append(stream: stream, s: STR"0");
+        zeros = zeros - 1;
+      }
+
+      append(stream:stream, s: buffer);
+    }
+  }
+  
+  #func append(PTR[StringStream] stream, int32 i) {
+  #  int32 zero = cast[int32](DRF(STR"0"));
+  #  
+  #  boo neg = i < 0;
+  #  if (neg) {
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = DRF(STR"-");
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #  }
+  #  if (i == 0) {
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = cast[int8](zero);
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #  }
+  #  while (i > 0) {
+  #    int32 code = zero + (i % 10);
+  #    
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = cast[int8](code);
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #    
+  #    i = i / 10;
+  #  }
+  #}
+  
+}
+
+package sus/System {
+
+  use sus/native/Win;
+  use sus/StringStream;
+  
+  func print(PTR[StringStream] stream) {
+    int32 i = 0;
+    boo _r = Win/WriteFile(
+	    file:       Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE),
+	    buffer:     DRF(stream).buffer,
+	    length:     DRF(stream).position,
+	    written:    RTP[PTR[int32]](0),
+	    overlapped: RTP[PTR[ptr]](0)
+	  );
+  }
+  
+  func println(PTR[StringStream] stream) {
+    print(stream: stream);
+    println();
+  }
+
+  func sleep(int32 ms) {
+    Win/Sleep(ms: ms);
+  }
+
+  func exit(int32 code) {
+    Win/ExitProcess(code: code);
+  }
+
+  func print(PTR[int8] s) {
+    print(s: s, length: Win/strnlen(buffer: s, size: 2147483647));
+  }
+
+  func print(PTR[int8] s, int32 length) {
+    boo _r = Win/WriteFile(
+	    file:       Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE),
+	    buffer:     s,
+	    length:     length,
+	    written:    RTP[PTR[int32]](0),
+	    overlapped: RTP[PTR[ptr]](0)
+	  );
+  }
+
+  func print(real32 r) {
+    print(r: r, digits: 2);
+  }
+
+  func print(real32 r, int32 digits) {
+    boo neg = r < 0.0;
+
+    real32 digitMag = Win/powf(base: 10.0, power: cast[real32](digits));
+
+    if (neg) r = 0.0 - r;
+
+    int32 intPart = cast[int32](r);
+    int32 decPart = cast[int32]((r - cast[real32](intPart)) * digitMag);
+
+    if (neg) print(s: STR"-");
+    print(i: intPart);
+
+    if (digits > 0) {
+      print(s: STR".");
+
+      PTR[int8] buffer = ARR[int8](16);
+      Win/_itoa_s(value: decPart, buffer: buffer, size: 16, radix: 10);
+      int32 nonZeroCount = Win/strnlen(buffer: buffer, size: 16);
+      
+      int32 zeros = digits - nonZeroCount;
+      while (zeros > 0) {
+        print(s: STR"0");
+        zeros = zeros - 1;
+      }
+
+      print(s: buffer);
+    }
+  }
+
+  func print(int32 i) {
+    PTR[int8] buffer = ARR[int8](16);
+    Win/_itoa_s(value: i, buffer: buffer, size: 16, radix: 10);
+    print(s: buffer);
+  }
+
+  func print(boo b) {
+    if (b) print(s:STR"1");
+    else print(s:STR"0");
+  }
+
+  func println(boo b) {
+    if (b) print(s:STR"1\n");
+    else print(s:STR"0\n");
+  }
+
+  func print(int32 i_0x) {
+    PTR[int8] buffer = ARR[int8](16);
+    Win/_itoa_s(value: i_0x, buffer: buffer, size: 16, radix: 16);
+    print(s: buffer);
+  }
+
+  func println(int32 i_0x) {
+    print(i_0x: i_0x);
+    println();
+  }
+
+  func println(int32 i) {
+    print(i: i);
+    println();
+  }
+
+  func println(PTR[int8] s) {
+    print(s: s);
+    println();
+  }
+
+  func println() {
+    print(s: STR"\n");
+  }
+
+}
