@@ -1763,8 +1763,10 @@ function compile(state) {
       r += compileStaticExprReinterpret(expr, addressScope);
     } else if (expr.name === 'expr-ctr') {
       r += compileStaticExprCtr(expr, addressScope);
+    } else if (expr.name === 'expr-array') {
+      r += compileStaticExprArray(expr, addressScope);
     } else {
-      throw makeImplErr('not a valid static init ' + expr.name);
+      throw makeImplErr('not a valid static init expression. allowed: literals, casts, reinterprets, constructors, arrays' + expr.name);
     }
 
     return r;
@@ -1792,26 +1794,13 @@ function compile(state) {
     let sizeWanted = evalSize1(wantedType);
 
     if (sizeWanted != exprSize) {
-      throw makeErr(
-        expr.i,
-        'expected size ' +
-          sizeWanted +
-          ' (' +
-          wanted +
-          ') expr but got size ' +
-          exprSize +
-          ' (' +
-          typeToString(exprType) +
-          ')'
-      );
+      // prettier-ignore
+      throw makeErr(expr.i, 'expected size ' + sizeWanted + ' (' + wanted + ') expr but got size ' + exprSize + ' (' + typeToString(exprType) + ')');
     }
 
     if (kid.name === 'expr') kid = kid.kids[0];
-    if (kid.name === 'expr-lit') {
-      return compileStaticExprLit(kid, addressScope);
-    } else {
-      throw makeErr(expr.i, 'not a literal: ' + kid.name);
-    }
+    
+    return compileStaticExpr(kid, addressScope);
   }
 
   function compileStaticExprLit(expr, addressScope, typeName = undefined) {
@@ -1848,6 +1837,30 @@ function compile(state) {
       default:
         throw makeImplErr('unknown literal type: ' + expr.props.litType);
     }
+    return r;
+  }
+
+  function compileStaticExprArray(expr, addressScope) {
+    let r = '';
+    r += line('; array (');
+
+    indented(() => {
+      let elType = getActualType(expr.kids[0]);
+      let arrayLength = expr.props.size;
+      _ass(arrayLength);
+
+      let templateExpr = expr.kids[1];
+      checkType(templateExpr, null, addressScope, elType);
+
+      let exprStr = compileStaticExpr(templateExpr, addressScope);
+      for (let i = 0; i < arrayLength; i++) {
+        // r += line('; ' + i);
+        r += line(exprStr);
+      }
+    });
+
+    r += line(`; )`);
+
     return r;
   }
 
@@ -3296,8 +3309,19 @@ function compile(state) {
     return { kind: 'asm-name', asmName, typeFuncPtr };
   }
 
-  function makeCallInfoSymbol(loc, typeFuncPtr) {
-    return { kind: 'symbol', loc, typeFuncPtr };
+  function makeCallInfoSymbol(symbol, loc, typeFuncPtr) {
+    return { kind: 'symbol', symbol, loc, typeFuncPtr };
+  }
+
+  function getCallInfoFuncName(callInfo) {
+    switch (callInfo.kind) {
+      case 'asm-name':
+        return callInfo.asmName;
+      case 'symbol':
+        return 'funcptr symbol ' + callInfo.symbol;
+      default:
+        throw makeImplErr();
+    }
   }
 
   function getCallInfo(expr, scope, addressScope) {
@@ -3311,7 +3335,7 @@ function compile(state) {
 
     if (loc) {
       let typeFuncPtr = loc.row.type;
-      callInfo = makeCallInfoSymbol(loc, typeFuncPtr);
+      callInfo = makeCallInfoSymbol(symbol, loc, typeFuncPtr);
     } else {
       if (symbol === 'Gl/glViewPort') {
         console.log('hi');
@@ -3365,7 +3389,7 @@ function compile(state) {
     r += line('; call expression ==================== (');
 
     if (params.length < nodeArgs.length)
-      throw makeErr(expr.i, 'to many arguments for ' + func.props.name);
+      throw makeErr(expr.i, 'to many arguments for ' + getCallInfoFuncName(callInfo));
 
     // reserve return value
     if (callInfo.typeFuncPtr.returnType) {
@@ -4148,24 +4172,21 @@ function compile(state) {
         let structRow = findStructByAddress(state.ctx, type.name);
         if (!structRow)
           throw makeErr(exprSym.i, 'struct ' + type.name + ' not found');
-        // if (structRow.size % 4 !== 0)
-        //   throw makeImplErr('struct needs to be 4-byte aligned');
         let structSizeAligned = structRow.size + (4 - structRow.size % 4) % 4; // new
         asm += line(`; expr struct ${structRow.name} symbol: ${symbol} {`);
-        asm += compilePush(symRes.register, row.off, structSizeAligned); // new
-        // let size = structRow.size / 4;
-        // for (let i = 0; i < size; i++) {
-        //   asm += line(
-        //     `push    dword [${symRes.register}${getOffStr(row.off + i * 4)}]`
-        //   );
-        // }
+        asm += compilePush(symRes.register, row.off, structSizeAligned);
+        asm += line('; }');
+      } else if (type.kind === 'array') {
+        let size = evalSize4(type.type);
+        asm += line(`; array ${typeToString(type)} symbol: ${symbol} {`);
+        asm += compilePush(symRes.register, row.off, size);
         asm += line('; }');
       } else {
         _ass(false);
       }
     } else {
       let static_ = resolveStatic(state.ctx, addressScope, symbol);
-      if (!static_) throw makeErr(expr.i, 'can not find symbol ' + symbol);
+      if (!static_) throw makeErr(exprSym.i, 'can not find symbol ' + symbol);
 
       let asmName = getStaticAsmName(
         static_.simpleName,

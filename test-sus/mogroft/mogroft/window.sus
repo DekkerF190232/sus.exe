@@ -3,6 +3,7 @@ package mogroft/Window {
   
   use sus/native/Win;
   use sus/System;
+  use sus/Gl;
   
   static int32 TIMER_ID_WINDOW = 0;
   static int32 INTERVAL_MS = 10; # 100 fps
@@ -12,7 +13,8 @@ package mogroft/Window {
     funcptr[()] init,
     funcptr[(int32 width, int32 height)] resize,
     funcptr[(int32 vk)] onKeyDown,
-    funcptr[(int32 vk)] onKeyUp
+    funcptr[(int32 vk)] onKeyUp,
+    funcptr[()] onLooseFocus
   );
 
   struct WindowState (
@@ -23,6 +25,7 @@ package mogroft/Window {
   );
 
   static PTR[WindowState] _window = RTP[PTR[WindowState]](0);
+  static boo initialized = no;
 
   func run(WindowHandler windowHandler) {
     int32 _2 = Win/SetThreadDpiAwarenessContext(dpiAwarenessContext: Win/DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -47,13 +50,17 @@ package mogroft/Window {
     createContext(this: REF(windowState));
     
     # use context
-    boo _5 = Win/wglMakeCurrent(dch: windowState.deviceContextHandle, glRenderContextHandle: windowState.glRenderContextHandle);
+    boo _5 = Win/wglMakeCurrent(dch: DRF(_window).deviceContextHandle, glRenderContextHandle:  DRF(_window).glRenderContextHandle);
     if (_5 == no) {
       int32 err = Win/GetLastError();
       errMsg(code: err, message: STR"Error setting window context:");
       System/exit(code: err);
     }
-    
+
+    funcptr[()] initFunc = DRF(_window).windowHandler.init;
+    initFunc();
+    initialized = yes;
+
     startRepaintTimer(this: REF(windowState));
      
     runMessageLoop(this: REF(windowState));
@@ -128,10 +135,14 @@ package mogroft/Window {
   }
 
   func CON(stdcall) int32 windowProc(WindowHandle handle, int32 message, int32 wParam, int32 lParam) {
-    if (message == Win/WM_PAINT) {
+    if (message == Win/WM_CREATE) {
+      #int32 error = -1;
+      #while (error != 0) error = Gl/glGetError();
+
+    } else if (message == Win/WM_PAINT) {
+      if (initialized == no) done 0;
+
       PaintStruct ps = Win/new_PaintStruct();
-      
-      #Renderer/render(this: REF(DRF(_window).renderState));
       
       funcptr[()] renderFunc = DRF(_window).windowHandler.render;
       renderFunc();
@@ -141,18 +152,29 @@ package mogroft/Window {
       
       done 0;
     } else if (message == Win/WM_SIZE) {
+
       int32 width = lParam & @ffff;
       int32 height = lParam >> cast[int8](16) & @ffff;
       
       funcptr[(int32 width, int32 height)] resizeFunc = DRF(_window).windowHandler.resize;
       resizeFunc(width: width, height: height);
-      #Renderer/resize(this: REF(DRF(_window).renderState), width: width, height: height);
       
       done 0;
     } else if (message == Win/WM_TIMER && (wParam == TIMER_ID_WINDOW)) {
       boo _1 = Win/InvalidateRect(handle: handle, rectangle: RTP[PTR[Rectangle]](0), erase: yes);
-    } else if (message == Win/WM_KEYFIRST) {
+    } else if (message == Win/WM_KEYDOWN) {
+      int32 vk = wParam;
       
+      funcptr[(int32 vk)] onKeyDownFunc = DRF(_window).windowHandler.onKeyDown;
+      onKeyDownFunc(vk: vk);
+    } else if (message == Win/WM_KEYUP) {
+      int32 vk = wParam;
+      
+      funcptr[(int32 vk)] onKeyUpFunc = DRF(_window).windowHandler.onKeyUp;
+      onKeyUpFunc(vk: vk);
+    } else if (message == Win/WM_KILLFOCUS) {
+      funcptr[()] onLooseFocusFunc = DRF(_window).windowHandler.onLooseFocus;
+      onLooseFocusFunc();
     }
   
     done Win/DefWindowProcA(handle: handle, message:message, wParam: wParam, lParam: lParam);

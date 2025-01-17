@@ -6,6 +6,10 @@ package mogroft/Renderer {
   use sus/Math;
   use sus/StringStream;
   
+  use mogroft/Texture;
+  use mogroft/Mogroft;
+  use mogroft/world/World;
+  
   struct RendererState (
     int32 width,
     int32 height
@@ -16,10 +20,15 @@ package mogroft/Renderer {
   }
   
   static int32 ticks = 0;
+
+  func init() {
+  }
   
-  func render(PTR[RendererState] this) {
-  
-    Gl/glClear(mask: Gl/GL_COLOR_BUFFER_BIT);
+  func render(PTR[RendererState] this, real32 dt) {
+    Gl/glClear(mask: Gl/GL_COLOR_BUFFER_BIT | Gl/GL_DEPTH_BUFFER_BIT);
+
+    Gl/glEnable(cap: Gl/GL_BLEND);
+    Gl/glBlendFunc(sfactor: Gl/GL_SRC_ALPHA, dfactor: Gl/GL_ONE_MINUS_SRC_ALPHA);
     
     #color(rgba: @4060a0ff);
     #drawRec(x: -0.1, y: -0.5, width: 0.2, height: 1.0);
@@ -28,7 +37,7 @@ package mogroft/Renderer {
     #drawRec(x: 0.1, y: 0.1, width: 0.2, height: 0.5);
     
     drawWorld(this: this);
-    printError(location: STR"After render");
+    Gl/printError(location: STR"After render");
     
     # Gl/glEnd();
     Gl/glFlush();
@@ -36,34 +45,34 @@ package mogroft/Renderer {
   
   func drawWorld(PTR[RendererState] this) {
     real32 aspect = cast[real32](DRF(this).width) / cast[real32](DRF(this).height);
-    perspective(fov: 90.0, aspect: aspect, near: 1.0, far: 1000.0);
+    setWorldPerspective(fov: 90.0, aspect: aspect, near: 30.0, far: 100.0);
     
     Gl/glPushMatrix();
     
-    Gl/glRotatef(angle: 0.8, x: 1.0, y: 0.0, z: 0.0);
+    setWorldCamera(this: this);
     
-    Gl/glTranslatef(x: 0.0, y: -2.0, z: -100.0);
+    #Gl/glRotatef(angle: 0.8, x: 1.0, y: 0.0, z: 0.0);
+    #Gl/glTranslatef(x: 0.0, y: -2.0, z: -100.0);
     
     ticks = ticks + 1 % 300;
     real32 rotationPercent = cast[real32](ticks) / 300.0;
     real32 rotationDegrees = rotationPercent * 360.0;
     Gl/glRotatef(angle: rotationDegrees, x: 0.0, y: 1.0, z: 0.0);
     
-    color(rgba: @4060a0ff);
-    
-    #
-    Gl/glScalef(x: 0.2, y: 0.2, z: 0.2);
+    #Gl/glScalef(x: 0.5, y: 0.5, z: 0.5);
     drawCube();
     
     Gl/glPopMatrix();
   }
   
-  func updateProjection(PTR[RendererState] this) {
-    #Gl/glMatrixMode(Gl/GL_PROJECTION);
-    
+  func setWorldCamera(PTR[RendererState] this) {
+    PTR[WorldState] world = REF(DRF(Mogroft/_mogroft).worldState);
+    #DRF(world).player.position.z;        
+
+    Gl/glTranslatef(x: 0.0 - DRF(world).player.position.x, y: 0.0 - DRF(world).player.position.y, z: 0.0 - DRF(world).player.position.z);
   }
   
-  func perspective(real32 fov, real32 aspect, real32 near, real32 far) {
+  func setWorldPerspective(real32 fov, real32 aspect, real32 near, real32 far) {
     real32 f = 1.0 / Math/tan(x: fov * 0.5 * Math/2PI / 360.0);
     
     PTR[real32] matrix = ARR[real32](16);
@@ -99,42 +108,46 @@ package mogroft/Renderer {
   
   # draw 1,1,1-sized cube at 0,0,0
   func drawCube() {
+    color(rgba: @ffffffff);
+    
+    Gl/glEnable(cap: Gl/GL_TEXTURE_2D);
+    Gl/glEnable(cap: Gl/GL_DEPTH_TEST);
+    Gl/glBindTexture(target: Gl/GL_TEXTURE_2D, texture: Texture/txTile1);
+  
     Gl/glBegin(mode: Gl/GL_QUADS);
     
-    # back face
-    Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0); # left top
-    Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0); # right top
-    Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0); # right bottom
-    Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0); # left bottom
+    # order front
+    #
+    #   0--3
+    #   |  | 
+    #   1--2
     
     # front face
+    Gl/glTexCoord2f(u: 0.0, v: 1.0);
     Gl/glVertex3f(x: 0.0, y: 1.0, z: 1.0); # left top
-    Gl/glVertex3f(x: 1.0, y: 1.0, z: 1.0); # right top
-    Gl/glVertex3f(x: 1.0, y: 0.0, z: 1.0); # right bottom
+    Gl/glTexCoord2f(u: 0.0, v: 0.0);
     Gl/glVertex3f(x: 0.0, y: 0.0, z: 1.0); # left bottom
+    Gl/glTexCoord2f(u: 1.0, v: 0.0);
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 1.0); # right bottom
+    Gl/glTexCoord2f(u: 1.0, v: 1.0);
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 1.0); # right top
     
-    # left face
-    #Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0); # back top
-    #Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0); # front top
-    #Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0); # front bottom
-    #Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0); # back bottom
+    # order front
+    #
+    #   3--0
+    #   |  | 
+    #   2--1
+    
+    # back face
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0); # right top
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0); # right bottom
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0); # left bottom
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0); # left top
     
     Gl/glEnd();
-  }
-  
-  func printError(PTR[int8] location) {
-    int32 error = Gl/glGetError();
-    if (error != 0) {
-      System/println(s: STR"### OPENGL ERROR ###############################################################");
-      System/print(s: STR"  ");
-      System/print(s: location);
-      System/print(s: STR": ");
-      System/print(i: error);
-      System/print(s: STR" (");
-      System/print(i_0x: error);
-      System/print(s: STR")\n");
-      System/println(s: STR"################################################################################");
-    }
+    
+    Gl/glDisable(cap: Gl/GL_DEPTH_TEST);
+    Gl/glDisable(cap: Gl/GL_TEXTURE_2D);
   }
   
   func resize(PTR[RendererState] this, int32 width, int32 height) {
@@ -144,7 +157,7 @@ package mogroft/Renderer {
   }
   
   func color(int32 rgba) {
-    int32 r = rgba >> cast[int8](24);
+    int32 r = rgba >> cast[int8](24) & @ff;
     int32 g = rgba >> cast[int8](16) & @ff;
     int32 b = rgba >> cast[int8](8) & @ff;
     int32 a = rgba & @ff;
@@ -158,7 +171,6 @@ package mogroft/Renderer {
   }
   
   func printMatrix(PTR[real32] matrix) {
-        
     System/println(s: STR"4x4 Matrix:");
     int32 r = 0;
     while (r < 4) {
@@ -167,7 +179,7 @@ package mogroft/Renderer {
         PTR[real32] i = matrix + (r * 4 + c * size[real32]());
         
         PTR[int8] buffer = ARR[int8](24);
-        StringStream stream = StringStream(buffer = buffer, length = 16, position = 0);
+        StringStream stream = StringStream(buffer = buffer, length = 24, position = 0);
         StringStream/append(stream: REF(stream), r: DRF(i), digits: 2);
         int32 maxLength = 8;
         int32 toPad = maxLength - stream.position;

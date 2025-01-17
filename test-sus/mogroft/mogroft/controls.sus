@@ -1,0 +1,159 @@
+package mogroft/Controls {
+
+  use sus/System;
+  use sus/native/Win;
+  use mogroft/world/World;
+  use mogroft/Mogroft;
+  use mogroft/InputHandlerFly;
+  
+  # KEY BUFFER ==================================================== [
+  
+  static int32 KEY_BUFFER_SIZE = 128;
+  static array[int32, 128] keyArray = array[int32, 128](0);
+  static PTR[int32] keyBuffer = RTP[PTR[int32]](0);
+  static int32 keysDown = 0;
+  
+  func int32 findDownKeyIndex(int32 vk) {
+    int32 i = keysDown;
+    while (i > 0) {
+      i = i - 1;
+      PTR[int32] item = keyBuffer + (i * size[int32]());
+      if (DRF(item) == vk) done i;
+    }
+    done -1;
+  }
+  
+  func boo isDown(int32 vk) {
+    done findDownKeyIndex(vk: vk) != -1;
+  }
+  
+  # ] KEY BUFFER
+
+  struct InputHandler (
+    funcptr[(real32 dt)] tick,
+    funcptr[(int32 vk)] press,
+    funcptr[(int32 vk)] release,
+    funcptr[()] looseFocus
+  );
+  
+  static InputHandler inputHandler = RTP[InputHandler](array[int32, 4](0));
+  func init() {
+    keyBuffer = RTP[PTR[int32]](REF(keyArray));
+
+    inputHandler = InputHandlerFly/createInputHandler();
+  }
+  
+  func tick(real32 dt) {
+    funcptr[(real32 dt)] tickFunc = inputHandler.tick;
+    tickFunc(dt: dt);
+  }
+
+  func onKeyDownInitial(int32 vk) {
+  
+  }
+
+  func onKeyDown(int32 vk) {
+    # add down key
+    int32 index = findDownKeyIndex(vk: vk);
+    if ((index == -1) && (keysDown <= KEY_BUFFER_SIZE)) {
+      onKeyDownInitial(vk: vk);
+      DRF(keyBuffer + (keysDown * size[int32]())) = vk;
+      keysDown = keysDown + 1;
+    }
+    
+    #System/print(s: STR"DOWN");
+    #System/println(i: vk);
+    #printBuff();
+  }
+  
+  func onKeyUp(int32 vk) {
+    # remove down key
+    int32 index = findDownKeyIndex(vk: vk);
+    if (index != -1) {
+      int32 i = index;
+      while (i < (keysDown - 1)) {
+        PTR[int32] current = keyBuffer + (i * size[int32]());
+        PTR[int32] next = current + size[int32]();
+        DRF(current) = DRF(next);
+        i = i + 1;
+      }
+      keysDown = keysDown - 1;
+    }
+    
+    #System/print(s: STR"  up");
+    #System/println(i: vk);
+    #System/println();
+    #printBuff();
+  }
+  
+  func onLooseFocus() {
+    keysDown = 0;
+  }
+  
+  #func printBuff() {
+  #  int32 i = keysDown;
+  #  System/println(s: STR"down keys:");
+  #  while (i > 0) {
+  #    i = i - 1;
+  #    PTR[int32] current = keyBuffer + (i * size[int32]());
+  #    System/print(s: STR" ");
+  #    System/print(i: DRF(current));
+  #  }
+  #  System/println();
+  #}
+
+}
+
+package mogroft/InputHandlerFly {
+
+  use mogroft/Controls;
+  use sus/System;
+  use sus/native/Win;
+  use mogroft/world/World;
+  use mogroft/Mogroft;
+
+  func InputHandler createInputHandler() {
+    done InputHandler(
+      tick = funcref(tick),
+      press = funcref(press),
+      release = funcref(release),
+      looseFocus = funcref(looseFocus)
+    );
+  }
+
+  func tick(real32 dt) {
+  
+    # 'WASD'.split('').map(x => x.charCodeAt(0).toString(16))
+    # Array(4) [ "57", "41", "53", "44" ]
+    int32 vkW = @57; # also could use DRF(STR"A")
+    int32 vkA = @41;
+    int32 vkS = @53;
+    int32 vkD = @44;
+    
+    real32 forward = 0.0;
+    real32 sideways = 0.0;
+    real32 up = 0.0;
+    if (Controls/isDown(vk: vkW)) forward  = forward  - 1.0;
+    if (Controls/isDown(vk: vkS)) forward  = forward  + 1.0;
+    if (Controls/isDown(vk: vkD)) sideways = sideways + 1.0;
+    if (Controls/isDown(vk: vkA)) sideways = sideways - 1.0;
+    if (Controls/isDown(vk: Win/VK_SHIFT)) up = up - 1.0;
+    if (Controls/isDown(vk: Win/VK_SPACE)) up = up + 1.0;
+    
+    real32 accX = sideways;
+    real32 accZ = 0.0 - forward;
+    
+    PTR[WorldState] world = REF(DRF(Mogroft/_mogroft).worldState);
+    
+    real32 speed = 10.0;
+    
+    DRF(world).player.position.z = DRF(world).player.position.z + (dt * speed * forward);
+    DRF(world).player.position.y = DRF(world).player.position.y + (dt * speed * up);
+    DRF(world).player.position.x = DRF(world).player.position.x + (dt * speed * sideways);
+
+  }
+  func press(int32 vk) {}
+  func release(int32 vk) {}
+  func looseFocus() {}
+  
+}

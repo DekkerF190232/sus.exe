@@ -4,53 +4,65 @@ package mogroft/Mogroft {
   
   use mogroft/Window;
   use mogroft/Renderer;
+  use mogroft/Controls;
+  use mogroft/Texture;
+  use mogroft/world/World;
 
   struct MogroftState (
-    RendererState rendererState
+    RendererState rendererState,
+    WorldState worldState
   );
   
   static PTR[MogroftState] _mogroft = RTP[PTR[MogroftState]](0);
   
   func runMogroft() {
     MogroftState theInst = MogroftState(
-      rendererState = Renderer/new_RendererState()
+      rendererState = Renderer/new_RendererState(),
+      worldState = World/new_World()
     );
     _mogroft = REF(theInst);
   
-    #funcptr[()] render,
-    #funcptr[()] init,
-    #funcptr[(int32 vk)] onKeyDown,
-    #funcptr[(int32 vk)] onKeyUp
     Window/run(windowHandler: WindowHandler(
       render = funcref(render),
       init = funcref(init),
       resize = funcref(resize),
       onKeyDown = funcref(onKeyDown),
-      onKeyUp = funcref(onKeyUp)
+      onKeyUp = funcref(onKeyUp),
+      onLooseFocus = funcref(onLooseFocus)
     ));
   }
   
   func init() {
-    
+    Controls/init();
+    Renderer/init();
+    Texture/init();
   }
   
   func render() {
-    #System/println(s: STR"render!");
-    Renderer/render(this: REF(DRF(_mogroft).rendererState));
+    real32 dt = 1.0 / 100.0; # just assume it's 100 fps lel
+    
+    Renderer/render(this: REF(DRF(_mogroft).rendererState), dt: dt);
+    tick(dt: dt);
+  }
+  
+  func tick(real32 dt) {
+    Controls/tick(dt: dt);
   }
   
   func resize(int32 width, int32 height) {
     Renderer/resize(this: REF(DRF(_mogroft).rendererState), width: width, height: height);
-    System/print(s: STR"resize: ");
-    System/print(i: width);
-    System/print(s: STR" ");
-    System/println(i: height);
   }
   
   func onKeyDown(int32 vk) {
+    Controls/onKeyDown(vk: vk);
   }
   
   func onKeyUp(int32 vk) {
+    Controls/onKeyUp(vk: vk);
+  }
+  
+  func onLooseFocus() {
+    Controls/onLooseFocus();
   }
   
   

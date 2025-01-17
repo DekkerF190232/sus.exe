@@ -5,20 +5,20 @@ package Main {
   
   main {
     boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
-    System/println(s:STR"Starting mogroft compiled using sus.exe\n");
+    System/println(s:STR"Starting mogroft written in sus.exe\n");
     
     mogroft/Mogroft/runMogroft();
     
-    System/println(s: STR"Exiting.");
-    
-    int32 err = Win/GetLastError();
-    System/print(s: STR"Last Error: ");
-    System/print(i: err);
-    System/print(s: STR" (0x");
-    System/print(i_0x: err);
-    System/print(s: STR")\n");
-    
-    System/exit(code: err);
+    System/println(s: STR"Closing normally.");
+    #int32 err = Win/GetLastError();
+    #System/print(s: STR"Last Error: ");
+    #System/print(i: err);
+    #System/print(s: STR" (0x");
+    #System/print(i_0x: err);
+    #System/print(s: STR")\n");
+    #System/exit(code: err);
+
+    System/exit(code: 0);
     
   }
 

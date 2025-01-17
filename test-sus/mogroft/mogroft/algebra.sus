@@ -1,0 +1,13 @@
+package mogroft/algebra/Vec3 {
+  
+  struct Vec3 (
+    real32 x,
+    real32 y,
+    real32 z
+  );
+  
+  func Vec3 new_Vec3() {
+    done Vec3(x = 0.0, y = 0.0, z = 0.0);
+  }
+  
+}

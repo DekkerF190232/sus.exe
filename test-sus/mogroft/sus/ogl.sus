@@ -1,7 +1,10 @@
 package sus/Gl {
   
+  use sus/System;
+
   # clear bits
   static int32 GL_COLOR_BUFFER_BIT             = @00004000;
+  static int32 GL_DEPTH_BUFFER_BIT             = @00000100;
   
   # blend modes
   static int32 GL_ZERO                         = 0;
@@ -30,6 +33,47 @@ package sus/Gl {
   static int32 GL_PROJECTION                   = @1701;
   static int32 GL_TEXTURE                      = @1702;
   
+  # targets
+  static int32 GL_TEXTURE_2D                   = @0DE1;
+  static int32 GL_DEPTH_TEST                   = @0B71;
+  static int32 GL_BLEND                        = @0BE2;
+  
+  # formats
+  static int32 GL_RGBA                         = @1908;
+  
+  # data types
+  static int32 GL_BYTE                         = @1400;
+  static int32 GL_UNSIGNED_BYTE                = @1401;
+  static int32 GL_SHORT                        = @1402;
+  static int32 GL_UNSIGNED_SHORT               = @1403;
+  static int32 GL_INT                          = @1404;
+  static int32 GL_UNSIGNED_INT                 = @1405;
+  static int32 GL_FLOAT                        = @1406;
+  static int32 GL_2_BYTES                      = @1407;
+  static int32 GL_3_BYTES                      = @1408;
+  static int32 GL_4_BYTES                      = @1409;
+  static int32 GL_DOUBLE                       = @140A;
+  
+  # texture mag filter
+  static int32 GL_NEAREST                      = @2600;
+  static int32 GL_LINEAR                       = @2601;
+
+  # texture min filter
+  static int32 GL_NEAREST_MIPMAP_NEAREST       = @2700;
+  static int32 GL_LINEAR_MIPMAP_NEAREST        = @2701;
+  static int32 GL_NEAREST_MIPMAP_LINEAR        = @2702;
+  static int32 GL_LINEAR_MIPMAP_LINEAR         = @2703;
+
+  # texture parameter names
+  static int32 GL_TEXTURE_MAG_FILTER           = @2800;
+  static int32 GL_TEXTURE_MIN_FILTER           = @2801;
+  static int32 GL_TEXTURE_WRAP_S               = @2802;
+  static int32 GL_TEXTURE_WRAP_T               = @2803;
+  
+  # texture wrap mode
+  static int32 GL_CLAMP                        = @2900;
+  static int32 GL_REPEAT                       = @2901;
+    
   # erros
   func CON(stdcall) int32 glGetError() EXT;
 
@@ -37,12 +81,32 @@ package sus/Gl {
   func CON(stdcall) glColor4b(int8 r, int8 g, int8 b, int8 a) EXT;
   func CON(stdcall) glColor3f(real32 r, real32 g, real32 b) EXT;
   func CON(stdcall) glColor4f(real32 r, real32 g, real32 b, real32 a) EXT;
+  
+  # texture loading / binding
+  func CON(stdcall) glTexParameteri(int32 target, int32 pname, int32 param) EXT;
+  func CON(stdcall) glTexImage2D (
+    int32 target,
+    int32 level,
+    int32 internalFormat,
+    int32 width,
+    int32 height,
+    int32 border,
+    int32 format,
+    int32 type,
+    PTR[int8] pixels) EXT;
+  func CON(stdcall) glBindTexture(int32 target, int32 texture) EXT;
+  func CON(stdcall) glGenTextures(int32 n, PTR[int32] textures) EXT;
     
   # general rendering
   func CON(stdcall) glViewport(int32 x, int32 y, int32 width, int32 height) EXT;
   func CON(stdcall) glClear(int32 x, int32 y, int32 width, int32 height) EXT;
   func CON(stdcall) glClear(int32 mask) EXT;
   func CON(stdcall) glFlush() EXT;
+  
+  # render state
+  func CON(stdcall) glEnable(int32 cap) EXT;
+  func CON(stdcall) glDisable(int32 cap) EXT;
+  func CON(stdcall) glBlendFunc(int32 sfactor, int32 dfactor) EXT;
   
   # matrices
   func CON(stdcall) glMatrixMode(int32 mode) EXT;
@@ -56,7 +120,23 @@ package sus/Gl {
   
   # drawing
   func CON(stdcall) glVertex3f(real32 x, real32 y, real32 z) EXT;
+  func CON(stdcall) glTexCoord2f(real32 u, real32 v) EXT;
   func CON(stdcall) glEnd() EXT;
   func CON(stdcall) glBegin(int32 mode) EXT;
+  
+  func printError(PTR[int8] location) {
+    int32 error = Gl/glGetError();
+    if (error != 0) {
+      System/println(s: STR"### OPENGL ERROR ###############################################################");
+      System/print(s: STR"  ");
+      System/print(s: location);
+      System/print(s: STR": ");
+      System/print(i: error);
+      System/print(s: STR" (");
+      System/print(i_0x: error);
+      System/print(s: STR")\n");
+      System/println(s: STR"################################################################################");
+    }
+  }
 
 }

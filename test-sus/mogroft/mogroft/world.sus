@@ -1,0 +1,36 @@
+
+package mogroft/world/World {
+
+  use mogroft/world/Player;
+  use mogroft/algebra/Vec3;
+
+  struct WorldState (
+    PlayerState player
+  );
+  
+  func WorldState new_World() {
+    WorldState world = WorldState(player=Player/new_Player());
+    _init(world: REF(world));
+    done world;
+  }
+  
+  func _init(PTR[WorldState] world) {
+    DRF(world).player.position.z = 10.0;
+  }
+  
+}
+
+package mogroft/world/Player {
+  
+  use mogroft/algebra/Vec3;
+
+  struct PlayerState (
+    Vec3 position
+  );
+  
+  func PlayerState new_Player() {
+    done PlayerState(
+      position = Vec3/new_Vec3()
+    );
+  }
+}
