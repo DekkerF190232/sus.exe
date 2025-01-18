@@ -1622,7 +1622,7 @@ function compile(state) {
       let memberName = expr.props.name;
       let structType = evalType(tyeExpr, scope, addressScope);
       if (structType.kind !== 'struct')
-        throw makeErr(expr.i, 'expected struct type');
+        throw makeErr(expr.i, 'expected struct type, got ' + typeToString(structType));
       let structName = structType.name;
       let structRow = findStructByAddress(state.ctx, structName);
       if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + structName);
@@ -1766,7 +1766,10 @@ function compile(state) {
     } else if (expr.name === 'expr-array') {
       r += compileStaticExprArray(expr, addressScope);
     } else {
-      throw makeImplErr('not a valid static init expression. allowed: literals, casts, reinterprets, constructors, arrays' + expr.name);
+      throw makeImplErr(
+        'not a valid static init expression. allowed: literals, casts, reinterprets, constructors, arrays' +
+          expr.name
+      );
     }
 
     return r;
@@ -1799,7 +1802,7 @@ function compile(state) {
     }
 
     if (kid.name === 'expr') kid = kid.kids[0];
-    
+
     return compileStaticExpr(kid, addressScope);
   }
 
@@ -1845,7 +1848,7 @@ function compile(state) {
     r += line('; array (');
 
     indented(() => {
-      let elType = getActualType(expr.kids[0]);
+      let elType = getActualType(expr.kids[0], addressScope);
       let arrayLength = expr.props.size;
       _ass(arrayLength);
 
@@ -2796,7 +2799,11 @@ function compile(state) {
       // r += line(`add     esp, ${rootScope.returnInfo.size}`); // left out because esp is overwritten next line
     } else {
       let returnExpr = ins.kids.find((x) => x.name === 'expr');
-      if (returnExpr) throw makeErr(ins.i, 'unnecessary return expression: ' + JSON.stringify(returnExpr));
+      if (returnExpr)
+        throw makeErr(
+          ins.i,
+          'unnecessary return expression: ' + JSON.stringify(returnExpr)
+        );
     }
 
     for (let i = 0; i < lv; i++) {
@@ -3389,7 +3396,10 @@ function compile(state) {
     r += line('; call expression ==================== (');
 
     if (params.length < nodeArgs.length)
-      throw makeErr(expr.i, 'to many arguments for ' + getCallInfoFuncName(callInfo));
+      throw makeErr(
+        expr.i,
+        'to many arguments for ' + getCallInfoFuncName(callInfo)
+      );
 
     // reserve return value
     if (callInfo.typeFuncPtr.returnType) {
@@ -3847,7 +3857,11 @@ function compile(state) {
     //   "could not find struct of name " + type.anyName
     // );
 
-    return getType(state.ctx, addressScope, typeNode);
+    try {
+      return getType(state.ctx, addressScope, typeNode);
+    } catch (e) {
+      throw makeErr(typeNode.i, 'failed to get type: ' + e.message);
+    }
   }
 
   function compileExprArr(expr, scope, addressScope) {
@@ -4172,7 +4186,8 @@ function compile(state) {
         let structRow = findStructByAddress(state.ctx, type.name);
         if (!structRow)
           throw makeErr(exprSym.i, 'struct ' + type.name + ' not found');
-        let structSizeAligned = structRow.size + (4 - structRow.size % 4) % 4; // new
+        let structSizeAligned =
+          structRow.size + ((4 - (structRow.size % 4)) % 4); // new
         asm += line(`; expr struct ${structRow.name} symbol: ${symbol} {`);
         asm += compilePush(symRes.register, row.off, structSizeAligned);
         asm += line('; }');
@@ -4275,7 +4290,7 @@ function lineNumber(str, idx) {
     const c = str[i];
     if (c == '\n') {
       line++;
-      col = 1;
+      col = 0;
       continue;
     }
     col++;
@@ -4360,7 +4375,9 @@ function typeToString(type) {
     case 'prim':
       return (
         type.name +
-        (type.args && type.args.length > 0 ? '[' + type.args.map(typeToString).join(', ') + ']' : '')
+        (type.args && type.args.length > 0
+          ? '[' + type.args.map(typeToString).join(', ') + ']'
+          : '')
       );
     case 'struct':
       return type.name;
@@ -4694,6 +4711,7 @@ function loadStatics(ctx, path, src, tree) {
   }
 }
 
+
 function loadStructs(ctx, path, src, tree) {
   for (const pkg of tree.kids) {
     if (pkg.name !== 'package') continue;
@@ -4773,7 +4791,10 @@ function loadIndexStruct(ctx) {
   }
 
   function calcStructSize(struct, depth = 1000) {
-    if (depth <= 0) throw new Error('probably recursive struct definition inside ' + struct.name);
+    if (depth <= 0)
+      throw new Error(
+        'probably recursive struct definition inside ' + struct.name
+      );
     if (struct.size !== null) return;
 
     let packingSize = 4;
@@ -4929,4 +4950,21 @@ export function doParse(ctx, path, src) {
 export function doCompile(ctx, path, src, isMain, tree) {
   let state = makeCompileState(ctx, path, src, isMain, tree, tree);
   return compile(state);
+}
+
+let errState = undefined;
+
+function ctxErr(message) {
+  _ass(errState.node.i);
+  _ass(errState.unitPath);
+  return new Error('(ctx err) ' + message + ' at ' + locErr(i, errState.unitPath, errState.text));
+}
+
+function locErr(i, unitPath, text) {
+  let { line, col } = lineNumber(text, i);
+  let l =
+    text
+      .slice(Math.max(0, i), Math.min(text.length, i + 50))
+      .replaceAll('\n', '<LF>') + '...';
+  return unitPath + ':' + line + ':' + col + '\n  ...' + l;
 }

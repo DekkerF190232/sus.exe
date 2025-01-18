@@ -143,7 +143,7 @@ package mogroft/InputHandlerFly {
     real32 accX = sideways;
     real32 accZ = 0.0 - forward;
     
-    PTR[WorldState] world = REF(DRF(Mogroft/_mogroft).worldState);
+    PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
     
     real32 speed = 10.0;
     

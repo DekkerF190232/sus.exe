@@ -1,35 +1,30 @@
 
 package mogroft/world/World {
 
-  use mogroft/world/ChunkManager;
+  use mogroft/world/ChunkList;
+  use mogroft/world/Player;
   use mogroft/world/Player;
   use mogroft/algebra/Vec3;
+  use sus/Memory;
 
-  struct WorldState (
-    PlayerState player,
-    ChunkManagerState chunkManager
+  struct World (
+    Player player,
+    ChunkList chunkList
   );
   
-  func WorldState new_World() {
-    WorldState world = WorldState(
-      player       = Player/new_Player(),
-      chunkManager = ChunkManager/new_ChunkManagerState()
-    );
-    _init(world: REF(world));
-    done world;
+  func PTR[World] alloc() {
+    PTR[World] this = RTP[PTR[World]](Memory/malloc(bytes: size[World]()));
+    DRF(this).player = Player/new();
+    DRF(this).chunkList = ChunkList/new();
+
+    done this;
   }
   
-  func _init(PTR[WorldState] world) {
-    DRF(world).player.position.z = 10.0;
-  }
-  
-}
-
-package mogroft/world/ChunkLoader {
-
 }
 
 package mogroft/world/Block {
+  
+  struct BlockCoord(int32 x, int32 y, int32 z);
 
   struct Block (
     int8 id
@@ -40,20 +35,26 @@ package mogroft/world/Block {
 package mogroft/world/Chunk {
   
   use mogroft/world/Block;
+  use mogroft/world/Chunk;
   use sus/Memory;
 
   static int32 SIZE = 16;
-  
+  static Chunk CHUNK_EMPTY = Chunk(
+    chunkCoord = ChunkCoord(x=0, y=0, z=0),
+    blocks = array[Block, 4096](Block(id = cast[int8](0)))
+  );
+
+  struct ChunkCoord (
+    int32 x,
+    int32 y,
+    int32 z
+  );
 
   struct Chunk (
-    
-    # 16^3 = 4096
-    int32 chunkX,
-    int32 chunkY,
-    int32 chunkZ,
-    array[Block, 4096] blocks
-
+    ChunkCoord chunkCoord,
+    array[Block, 4096] blocks # 16^3 = 4096
   );
+
 
   func PTR[Chunk] alloc() {
     done RTP[PTR[Chunk]](Memory/malloc(bytes: size[Chunk]()));
@@ -65,27 +66,108 @@ package mogroft/world/Chunk {
 
 }
 
-package mogroft/world/ChunkManager {
+package mogroft/world/ChunkList {
 
-  struct ChunkManagerState(
-    ptr _unused
+  use sus/List;
+  use mogroft/world/Chunk;
+
+  struct ChunkList(
+    List list # <Chunk>
   );
 
-  func ChunkManagerState new_ChunkManagerState() {
-    done ChunkManagerState(_unused=RTP[ptr](0));
+  func ChunkList new() {
+    done ChunkList(
+      list = List/alloc(elementSize: size[Chunk]())
+    );
   }
+  
+  func PTR[Chunk] add(PTR[ChunkList] this) {
+    done RTP[PTR[Chunk]](List/add(this: REF(DRF(this).list), element: RTP[ptr](0)));
+  }
+
+  func PTR[Chunk] find(PTR[ChunkList] this, ChunkCoord chunkCoord) {
+    PTR[Chunk] current = RTP[PTR[Chunk]](List/at(
+      this: REF(DRF(this).list),
+      i: 0
+    ));
+    PTR[Chunk] end = RTP[PTR[Chunk]](List/at(
+      this: REF(DRF(this).list),
+      i: DRF(this).list.length
+    ));
+
+    while (RTP[int32](current) != RTP[int32](end)) {
+      if (
+        (DRF(current).chunkCoord.x == chunkCoord.x) &&
+        (DRF(current).chunkCoord.y == chunkCoord.y) &&
+        (DRF(current).chunkCoord.z == chunkCoord.z)
+      ) done RTP[PTR[Chunk]](current);
+      current = current + size[Chunk]();
+    }
+    done RTP[PTR[Chunk]](0);
+  }
+
+}
+
+package mogroft/world/ChunkCoordList {
+
+  use sus/List;
+  use mogroft/world/Chunk;
+
+  struct ChunkCoordList (
+    List list
+  );
+
+  func ChunkCoordList alloc() {
+    done ChunkCoordList(
+      list = List/alloc(elementSize: size[ChunkCoord]())
+    );
+  }
+  
+  func PTR[ChunkCoord] add(PTR[ChunkCoordList] this) {
+    done RTP[PTR[ChunkCoord]](List/add(this: REF(DRF(this).list), element: RTP[ptr](0)));
+  }
+
+  func remove(PTR[ChunkCoordList] this, int32 i) {
+    List/remove(this: REF(DRF(this).list), i: i);
+  }
+  
+  func remove(PTR[ChunkCoordList] this, PTR[ChunkCoord] index) {
+    List/remove(this: REF(DRF(this).list), index: RTP[PTR[ptr]](index));
+  }
+
+  func PTR[ChunkCoord] find(PTR[ChunkCoordList] this, ChunkCoord element) {
+    PTR[ChunkCoord] current = RTP[PTR[ChunkCoord]](List/at(
+      this: REF(DRF(this).list),
+      i: 0
+    ));
+    PTR[ChunkCoord] end = RTP[PTR[ChunkCoord]](List/at(
+      this: REF(DRF(this).list),
+      i: DRF(this).list.length
+    ));
+
+    while (RTP[int32](current) != RTP[int32](end)) {
+      if (
+        (DRF(current).x == element.x) &&
+        (DRF(current).y == element.y) &&
+        (DRF(current).z == element.z)
+      ) done RTP[PTR[ChunkCoord]](current);
+      current = current + size[ChunkCoord]();
+    }
+    done RTP[PTR[ChunkCoord]](0);
+  }
+
 }
 
 package mogroft/world/Player {
   
   use mogroft/algebra/Vec3;
 
-  struct PlayerState (
+  struct Player (
     Vec3 position
   );
   
-  func PlayerState new_Player() {
-    done PlayerState(
+  func Player new() {
+    done Player(
       position = Vec3/new_Vec3()
     );
   }

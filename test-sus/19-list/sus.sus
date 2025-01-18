@@ -677,20 +677,29 @@ package sus/List {
     );
   }
 
-  # removes element at i
+  # removes the *i*th element
   func remove(PTR[List] this, int32 i) {
-    if (i < 0) System/fatal(reason: STR"removing negative list index");
-    if (i >= DRF(this).length) System/fatal(reason: STR"removing to big list index");
-    
-    int32 after = DRF(this).length - 1 - i;
     PTR[ptr] index = at(this: this, i: i);
-    PTR[ptr] src = at(this: this, i: i + 1);
+    remove(this: this, index: index);
+  }
+
+  # removes element at the pointer *index*
+  # does bounds checking, however no alignment checking.
+  func remove(PTR[List] this, PTR[ptr] index) {
+    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    int32 off = RTP[int32](index - DRF(this)._memory);
+
+    if (off < 0) System/fatal(reason: STR"removing to small list pointer");
+    if (index >= (end - DRF(this)._elementSize + 1)) System/fatal(reason: STR"removing to big list pointer");
+    
+    int32 after = RTP[int32](end - index - DRF(this)._elementSize);
+    PTR[ptr] src = index + DRF(this)._elementSize;
 
     int32 _0 = Memory/memmove_s(
       dest: RTP[ptr](index),
       destSize: Limits/INT32_MAX, # ^^
       source: RTP[ptr](src),
-      bytes: after * DRF(this)._elementSize
+      bytes: after
     );
 
     DRF(this).length = DRF(this).length - 1;

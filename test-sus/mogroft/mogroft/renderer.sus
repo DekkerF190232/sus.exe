@@ -9,6 +9,7 @@ package mogroft/Renderer {
   use mogroft/Texture;
   use mogroft/Mogroft;
   use mogroft/world/World;
+  use mogroft/world/WorldManager;
   
   struct RendererState (
     int32 width,
@@ -68,8 +69,8 @@ package mogroft/Renderer {
   }
   
   func setWorldCamera(PTR[RendererState] this) {
-    PTR[WorldState] world = REF(DRF(Mogroft/_mogroft).worldState);
-    #DRF(world).player.position.z;        
+    PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
+    if (RTP[int32](world) == 0) done;
 
     Gl/glTranslatef(x: 0.0 - DRF(world).player.position.x, y: 0.0 - DRF(world).player.position.y, z: 0.0 - DRF(world).player.position.z);
   }

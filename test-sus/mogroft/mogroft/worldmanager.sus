@@ -1,0 +1,51 @@
+package mogroft/world/WorldManager {
+
+  use mogroft/world/World;
+  use mogroft/world/Block;
+  use mogroft/world/Chunk;
+  use mogroft/world/ChunkList;
+  use mogroft/world/ChunkCoordList;
+  
+  struct WorldManager (
+    PTR[World] world
+  );
+
+  func WorldManager new() {
+    done WorldManager(
+      world = RTP[PTR[World]](0)
+    );
+  }
+
+  func loadExample(PTR[WorldManager] this) {
+    PTR[World] world = World/alloc();
+    DRF(this).world = world;
+
+    DRF(world).player.position.z = 10.0;
+
+    PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
+
+    PTR[Chunk] newChunk = ChunkList/add(this: chunkList);
+    DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = 0, z = 0);
+
+    generateChunk(chunk: newChunk);
+  }
+
+  func generateChunk(PTR[Chunk] chunk) {
+    PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));
+    int32 x = 0;
+    int32 y = 0;
+    int32 z = 0;
+    while (z < Chunk/SIZE) {
+      while (y < Chunk/SIZE) {
+        while (x < Chunk/SIZE) {
+          PTR[Block] block = blocks + (z * Chunk/SIZE * Chunk/SIZE) + (y * Chunk/SIZE) + x;
+          x = x + 1;
+        }
+        y = y + 1;
+      }
+      z = z + 1;
+    }
+  }
+
+}
+

@@ -7,10 +7,11 @@ package mogroft/Mogroft {
   use mogroft/Controls;
   use mogroft/Texture;
   use mogroft/world/World;
+  use mogroft/world/WorldManager;
 
   struct MogroftState (
     RendererState rendererState,
-    WorldState worldState
+    WorldManager worldManager
   );
   
   static PTR[MogroftState] _mogroft = RTP[PTR[MogroftState]](0);
@@ -18,9 +19,10 @@ package mogroft/Mogroft {
   func runMogroft() {
     MogroftState theInst = MogroftState(
       rendererState = Renderer/new_RendererState(),
-      worldState = World/new_World()
+      worldManager = WorldManager/new()
     );
     _mogroft = REF(theInst);
+    WorldManager/loadExample(this: REF(theInst.worldManager));
   
     Window/run(windowHandler: WindowHandler(
       render = funcref(render),
