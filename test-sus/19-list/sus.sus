@@ -680,17 +680,20 @@ package sus/List {
   # removes element at i
   func remove(PTR[List] this, int32 i) {
     if (i < 0) System/fatal(reason: STR"removing negative list index");
-    if (i > DRF(this).length) System/fatal(reason: STR"removing to big list index");
+    if (i >= DRF(this).length) System/fatal(reason: STR"removing to big list index");
     
     int32 after = DRF(this).length - 1 - i;
-    PTR[ptr] index = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    PTR[ptr] index = at(this: this, i: i);
+    PTR[ptr] src = at(this: this, i: i + 1);
 
     int32 _0 = Memory/memmove_s(
       dest: RTP[ptr](index),
       destSize: Limits/INT32_MAX, # ^^
-      source: RTP[ptr](index + 1),
+      source: RTP[ptr](src),
       bytes: after * DRF(this)._elementSize
-    ); 
+    );
+
+    DRF(this).length = DRF(this).length - 1;
   }
 
   func clear(PTR[List] this) {
@@ -699,7 +702,7 @@ package sus/List {
 
   # returns pointer to element at i
   func PTR[ptr] at(PTR[List] this, int32 i) {
-    done DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    done DRF(this)._memory + (i * DRF(this)._elementSize);
   }
   
 }

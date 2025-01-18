@@ -1,0 +1,69 @@
+
+package Main {
+
+  use sus/native/Win;
+
+  use sus/System;
+  use sus/List;
+
+  static boo doOutput = no;
+
+  main {
+    boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+    System/println(s: STR"testing...");
+
+    #int32 repetitions = 100000;
+    #while (repetitions > 0) {
+    #  doTest();
+    #  repetitions = repetitions - 1;
+    #}
+
+    doOutput = yes;
+    doTest();
+
+    System/println(s: STR"done.");
+    System/exit(code: 0);
+  }
+
+  func doTest() {
+    List int32List = List/alloc(elementSize: size[int32]());
+
+    int32 i = 0;
+
+    int32 v = 123;
+    List/add(this: REF(int32List), element: RTP[ptr](REF(v)));
+    while (i < 1000) {
+      List/add(this: REF(int32List), element: RTP[ptr](REF(i)));
+      i = i + 1;
+    }
+
+    List/remove(this: REF(int32List), i: 1000);
+    List/remove(this: REF(int32List), i: 1);
+    List/remove(this: REF(int32List), i: 1);
+    List/remove(this: REF(int32List), i: 1);
+
+    if (doOutput) {
+      printIntList(intList: REF(int32List));
+    }
+
+    List/free(this: REF(int32List));
+  }
+
+  func printIntList(PTR[List] intList) {
+    int32 i = 0;
+    System/print(s: STR"int list (");
+    System/print(i: DRF(intList).length);
+    System/println(s: STR" elements):");
+    
+    while (i < DRF(intList).length) {
+      System/print(s: STR" ");
+      PTR[int32] index = RTP[PTR[int32]](List/at(this: intList, i: i));
+      System/print(i: DRF(index));
+      i = i + 1;
+    }
+    System/println();
+
+  }
+
+
+}

@@ -243,7 +243,7 @@ package mogroft/Window {
     DRF(this).windowHandle = Win/CreateWindowExA(
       extendedStyle: 0,
       className:     STR"Mogroft",
-      windowName:    STR"Mogroft sus.exe",
+      windowName:    STR"Mogroft [sus.exe] - ISC",
       style:         style,
       x:             0,
       y:             0,

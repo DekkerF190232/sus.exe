@@ -50,6 +50,7 @@ ACTUALLY IMPLEMENTED
       - Ref member: [x] Symbol base, [ ] Deref base
 
 BUGS
+  - if scope is 0 (bc in static expression) some expression compilations result in js errors
   - type system does not catch error:
       array[int32, 5] a = array[int32, 5](@11223344);
       PTR[int32] p = REF(a);

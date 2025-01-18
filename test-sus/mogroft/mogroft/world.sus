@@ -1,15 +1,20 @@
 
 package mogroft/world/World {
 
+  use mogroft/world/ChunkManager;
   use mogroft/world/Player;
   use mogroft/algebra/Vec3;
 
   struct WorldState (
-    PlayerState player
+    PlayerState player,
+    ChunkManagerState chunkManager
   );
   
   func WorldState new_World() {
-    WorldState world = WorldState(player=Player/new_Player());
+    WorldState world = WorldState(
+      player       = Player/new_Player(),
+      chunkManager = ChunkManager/new_ChunkManagerState()
+    );
     _init(world: REF(world));
     done world;
   }
@@ -18,6 +23,57 @@ package mogroft/world/World {
     DRF(world).player.position.z = 10.0;
   }
   
+}
+
+package mogroft/world/ChunkLoader {
+
+}
+
+package mogroft/world/Block {
+
+  struct Block (
+    int8 id
+  );
+
+}
+
+package mogroft/world/Chunk {
+  
+  use mogroft/world/Block;
+  use sus/Memory;
+
+  static int32 SIZE = 16;
+  
+
+  struct Chunk (
+    
+    # 16^3 = 4096
+    int32 chunkX,
+    int32 chunkY,
+    int32 chunkZ,
+    array[Block, 4096] blocks
+
+  );
+
+  func PTR[Chunk] alloc() {
+    done RTP[PTR[Chunk]](Memory/malloc(bytes: size[Chunk]()));
+  }
+
+  func free(PTR[Chunk] this) {
+    Memory/free(pointer: RTP[ptr](this));
+  }
+
+}
+
+package mogroft/world/ChunkManager {
+
+  struct ChunkManagerState(
+    ptr _unused
+  );
+
+  func ChunkManagerState new_ChunkManagerState() {
+    done ChunkManagerState(_unused=RTP[ptr](0));
+  }
 }
 
 package mogroft/world/Player {
