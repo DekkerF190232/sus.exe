@@ -1,22 +1,3 @@
-how to continue
-  goals: implement cdecl, use opengl, floats, maybe conversions, maybe function pointers, maybe strings
-
-  issues:
-    - need cdecl
-      - combine compileScopeSus and compileScopeStd
-
-  notes on assembly:
-    [>esp] should not be accessed
-
-
-
-
-
-
-
-
-
-
 
 ACTUALLY IMPLEMENTED
   - Top Level Statements
@@ -30,10 +11,9 @@ ACTUALLY IMPLEMENTED
       - Initializing, Assigning
     - Asm instructions
     - Expressions
-      - Operators: (arithmetics, refs, convert, size), String literals, int32 literals
+      - Operators: (arithmetics, refs, casts, size, bit manipulation), function calls, String literals, int32 literals
     - Branching
-      - Conditions, Boo logic, done, break
-      - While Loop
+      - Conditions, Boo logic, done, break, While Loop
     - Blocks/Scopes
   - Type checking
   - Pointers
@@ -41,6 +21,7 @@ ACTUALLY IMPLEMENTED
   - Stack-Arrays
   - Multiple Files: Automatic build script generator
   - Packages: use statement, main statement
+  - Fixed Arrays
   - Structures
     - Copying
       - Init: [x] Symbol
@@ -49,386 +30,162 @@ ACTUALLY IMPLEMENTED
       - Read member: [x] Symbol base, [x] Deref base, [x] Member chaining, [x] Struct member
       - Ref member: [x] Symbol base, [ ] Deref base
 
+FEATURE EVALUATION
+  - nice language features
+    - packages
+    - done and func syntax 
+    - error locations
+  - mixed blessings
+    - brackets make type declarations and expression readable
+    - stupid feature usage apparent because of capslock 3-letter keywords
+    - no initialization code
+
 BUGS
-  - if scope is 0 (bc in static expression) some expression compilations result in js errors
-  - type system does not catch error:
-      array[int32, 5] a = array[int32, 5](@11223344);
-      PTR[int32] p = REF(a);
-      PTR[int8] p2 = p+1; # <== here
-  - alignment for const constructors does not work because padding bytes are not added
+  - if scope is null (bc in static expression) some expression compilations result in js errors
 
 ISSUES
-  - code
+  - code smellies
     - parser: inconsistant parsing naming and use of tryParse etc, always using eatSpace ...
     - compiler: compiler state should be used more, not addressScope, scope etc.
+    - many redefinitions, repetition, methods not factored out
+    - parser: weird global state and syntax "append"
+    - context builder: to many arguments in functions, no clean context builder building state
+  - annoying language features
+    - DRF DRF DRF REF REF
+    - RTP RTP RTP CAST
+    - "struct not found", but no error location because of context builder
   - unmet requirements
     - only allow usage of local symbol after init
-    - more aggressive "eatPicky" parsing for better error messages
-    - error messages for util functions
-    - use statement checks
-    - naming checks: functions, consts etc.
-    - add unsigned types, chars, strings
-    - no main block, only main method, string syntax sugar, compiler directives/macros
-    - have "default" function parameters, which don't need a name
-    - have "const" type
-    - quicker/simpler syntax for pointers etc. less keywords.
+    - better error messages at unparsable statements
+    - "use"-statement checks if package exist
+    - naming collision checks: functions, consts etc.
+    - streams
+    - structure
+      - no main block, only main method, string syntax sugar, compiler directives/macros
+    - types
+      - add unsigned types
+      - add chars
+      - "safe" strings
 
 MISSING
-  - compile-time-sized arrays
   - Lambdas
   - Interfaces
   - Macros
   - Mogroft
-    - Matrices
-    - VAOs, VBOS
-    - Textures
+    - World Generator
+    - Matrices?
+    - VAOs, VBOS?
 
 QUESTION
   WHAT HAPPENS WHEN ASSIGNING ARRAY OUTSIDE OF IT'S SCOPE
 
+NOTES FOR MAYBE
 
-NOTES FOR NEVER
+  lambdas
+  interfaces
+  generic types
+  default parameters
 
-  const/readable type attribute
-
-
-NOTES FOR FEATURES NOW NOW
-
-
-  array[int8, 32] arr;
-  arr = array[int8, 32](cast[int8](0));
-
-  arr.1 = 0; # later.
-
-  DRF(REF(arr) + 1) = 0;
-
-
-
-
-
-NOTES FOR FEATURES NOW
+ABSTRACT CONCEPTS/REQUIREMENT FOR ISSUES IN CODE, THEIR SOLUTIONS AS I KNOW
+  functions:
+    1 parameter, labeled, types
+  types:
+    issue at runtime, issue at compile-time, mixed
+  fast code:
+    avoid expensive features
+    use caching
+    use complex data structures
+    use a complex algorithms
+  fast programming
+    use easy-to-use data structures
 
 
-  Return
-    func add(int32 a, int32 b) {
-      done;
-    }
+  architectural
+    general: what types of requirements require code changes
+      - new feature
+        - kinds of features: user interface, 
+        - levels of complexity
 
-    func int32 add(int32 a, int32 b) {
-      done a + b;
-    }
-
-  Calling conventions
-    func CON(stdcall) int32 add(int32 a, int32 b) {
-      done a + b;
-    }
-
-  Declarations for external code
-    func CON(stdcall) int32 add(int32 a, int32 b) EXT;
-
-  Function pointers and lambdas
-
-    struct Test (
-      func[] run;
-      func[(PTR[PTR[int8]] name)] getName;
-    );
-
-    func runFunc() {
-
-    }
-
-    -> if params need to be able to be captured
-      -> func type info at compile time
-        - signature
-        - asm name
-      -> func type info at runtime
-        - function pointer
-        - captured size
-        - captured parameter values
-      -> how to compile lambda expression definition?
-        - compile anonymus function
-        - takes captured parameters
-        - takes function parameters
-      -> how to compile func type call
-        - push actual arguments
-        - push captured arguments
-        - call function
-        - pop arguments
+    general: what types of changes can code get
+      - atomics:
+        - crud object, crud property
+          - example: new "person" object
+          - example: new "name" property
+        - crud function
+          - example: new add function
+        - crud function behaviour:
+          - example: a function now divides "a" and "b", instead of adding "a" and "b".
+        - crud function signature
+          - example: 
+      - complexities
+        - data
+          - new "entry"
+              example: crafting recipe in minecraft.
+          - new "entry" with handlers
+              example: new entity in minecraft. the entity has a special "render" handler, because it looks unlike anything else.
+          - new
+        - code
+    
 
 
-
-
-
-
-{
-  PTR[int8] str = STR"Hello, World!\n";
-  PTR[int8] buffer = ARR[int8](10);
   
-  int32 a = 14;
-  int32 b = 14;
-  int32 len = 14;
+  
+NOTES FOR NEVER (DON'T EVER DO THIS!!!)
 
-  out(STR"a+b=");
+  auto types
+  error/exception handling
+  actual memory safety
+  some fucking way to deal with lifetimes.
+    move semantics
+  initialization code for packages
+  classes
+  constructors / destructors
+  preprocessor language / macros
+  const/readonly type
+  nicer pointer syntax
+  different expression paradigm "stack"
+  optimizations: inlining, assembly, expressions, ...
+  multiple return values
+  
+  rambling section make it stop  make it stop  make it stop  make it stop  make it stop  make it stop  make it stop  
 
+    for |start=0, end=5, |i| {
+    }|
 
-}
+    macfunc for |start, end, default block|  {
+      int32 i = start||;
+      int32 e = end||;
 
-
-  add parsing and compilation for pointers with following features
-
-    nullptr ?
-
-    referencing
-      int32 someInt;
-      PTR[int32] somePtr = PTR(someInt); ; MISSING: PTR OPERATOR
-      
-    dereferencing
-      [somePtr] = 0;
-      int32 test = [somePtr]; ; MISSING: DEREFERENCE OPERATOR
-      PTR[int32] someArrPtr = ADR(test);
-    
-    arrays/pointer arithmetic
-    
-      [somePtr + 1] = 0; ; MISSING: ASSIGNMENTS: Assignment expression?
-      int32 test2 = [somePtr + 1];
-      
-      PTR[int8] someArrPtr = ARR[int8](12); ; MISSING: ARRAYS FOR CONSTANT SIZES
-
-    variable sized stack?
-      PTR[int8] someArrPtr = ARR[int8](v); ; MISSING: ARRAYS FOR VARIABLE SIZES
-      
-    void pointers
-      ptr asdf;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-RAMBLING SECTION MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  MAKE IT STOP  
-
-
-for |start=0, end=5, |i| {
-}|
-
-macfunc for |start, end, default block|  {
-  int32 i = start||;
-  int32 e = end||;
-
-  while(i < e) {
-    block|i|
-    i = e + i;
-  }
-}
-
-
-
-; STANDARD LIBRARY
-
-func exit(int32 code) {
-    asm {
-        extern  _ExitProcess@4
-        push    sus{code}
-        call    _ExitProcess@4
-        hlt
+      while(i < e) {
+        block|i|
+        i = e + i;
+      }
     }
-}
 
-; PROGRAM
-
-func test(int32 a, int32 b, [int32] r) {
-    [r] = a + b;
-}
-
-[int32] r = [0];
-test(10, 10, r);
-exit([r])
-
-PARSABLE NODES AS SEEN FROM SOURCE TREE
-  root
-    func: name
-        params
-        param: type, name
-        instructions...
+notes on assembly, topics:
+  stack, stack frame, invoking functions
+  arithmetic operations
+  building
+  linking
+    subsystem: console/windows
+    libraries
+  syntax
+    some commands expect a size when using an address, when they don't contain the register
+  [>esp] should not be accessed
+  calling conventions:
+    - some registers need to be stored
+  struct alignment
     
-    instructions
-        ins-call: name
-        ins-asm
-        asmline
-            part: asmpart/sus{*variable*}
-        local-symbol-const: type, name
-        expression...
-        ins-assignment: symbol
-        expression: type
-            (operator-two-args: opcode
-            expression...1
-            expression...2) ; note: opcode may be +-*/
-            /
-            (primitive: type value)
 
-
-
-func test() {
-  asm { 
-    push sus{asdf}, sus{bbbb}
-    pop sus{aaa}
-  }
-}
-
-func amongUs(int asdf) {
-   int amongo= fuck + adf;
-}
-
-mow
-https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/itoa-s-itow-s?view=msvc-170
-https://stackoverflow.com/questions/15020621/what-is-between-esp-and-ebp
-https://stackoverflow.com/questions/35735403/writing-functions-in-assembler
-https://www.google.com/search?client=firefox-b-d&q=assembler+local+variables
-https://learn.microsoft.com/en-us/windows/console/getstdhandle
-https://en.wikipedia.org/wiki/X86_calling_conventions
-https://www.google.com/search?client=firefox-b-d&q=windows+asm+window+example
-https://sonictk.github.io/asm_tutorial/
-https://stackoverflow.com/questions/1023593/how-to-write-hello-world-in-assembly-under-windows
-https://stackoverflow.com/questions/40621744/how-are-windows-api-calls-made-on-assembly-level
-https://chatgpt.com/c/671fa584-273c-800a-aef2-1193acbdb4fc
-https://stackoverflow.com/questions/1658294/whats-the-purpose-of-the-lea-instruction
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-func test()
-{
-  ASM
-  { 
-    push SUS{asdf}, SUS{bbbb}
-    pop SUS{aaa}
-  }
-}
-
-func amongUs(int asdf)
-{
-  int amongo= fuck + adf;
-  done;
-}
-
-
-{
-  int32 amongo = fuck + adf;
-
-}
-
-{
-  int32 a = 0;
-  int32 b = 0;
-  test(asdf:nig);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-func out(int32 buffer, int32 size) {
-  ASM {
-      extern  _GetStdHandle@4
-      extern  _WriteFile@20
-
-      push    -11
-      call    _GetStdHandle@4
-      mov     ecx, eax    
-      push    0
-      push    0
-      mov     eax, SUS{size}
-      push    eax
-      mov     eax, SUS{buffer}
-      push    eax
-      push    ecx
-      call    _WriteFile@20
-  }
-}
-
-{
-  int32 a = 0;
-  int32 b = 0;
-  out(buffer:a,size:1);
-}
-
-
-
-
-
-
-missing: 
-	operators
-	
-	loops
-	
-
-	referencing
-		int32 someInt;
-		PTR somePtr = PTR[someInt];
-		
-	dereferencing
-		[somePtr] = 0;
-		int32 test = [somePtr];
-		PTR[int32] someArrPtr = PTR[test];
-	
-	arrays/pointer arithmetic
-	
-		[somePtr + 1] = 0;
-		int32 test2 = [somePtr + 1];
-		
-		PTR[int32] someArrPtr = ARR[int8, 12];
-		
-	void pointers
-		ptr asdf;
-		
-		// has no arithmetic, cannot be dereferenced
-	
-	structs
-	
-	types
-	
-		type checking for symbols, assignments, parameters
-		
-		type checking for operators
-		
-		cast?
-		
-			converting between datatypes
-			
-			
-		
-		
+notes when i got started
+  https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/itoa-s-itow-s?view=msvc-170
+  https://stackoverflow.com/questions/15020621/what-is-between-esp-and-ebp
+  https://stackoverflow.com/questions/35735403/writing-functions-in-assembler
+  https://www.google.com/search?client=firefox-b-d&q=assembler+local+variables
+  https://learn.microsoft.com/en-us/windows/console/getstdhandle
+  https://en.wikipedia.org/wiki/X86_calling_conventions
+  https://www.google.com/search?client=firefox-b-d&q=windows+asm+window+example
+  https://sonictk.github.io/asm_tutorial/
+  https://stackoverflow.com/questions/1023593/how-to-write-hello-world-in-assembly-under-windows
+  https://stackoverflow.com/questions/40621744/how-are-windows-api-calls-made-on-assembly-level
+  https://stackoverflow.com/questions/1658294/whats-the-purpose-of-the-lea-instruction

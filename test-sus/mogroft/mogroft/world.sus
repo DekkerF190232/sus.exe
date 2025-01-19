@@ -168,7 +168,7 @@ package mogroft/world/Player {
   
   func Player new() {
     done Player(
-      position = Vec3/new_Vec3()
+      position = Vec3/new()
     );
   }
 }

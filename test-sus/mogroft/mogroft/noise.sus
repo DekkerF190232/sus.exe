@@ -1,0 +1,67 @@
+# https://de.wikipedia.org/wiki/Perlin-Noise
+
+package mogroft/Noise2D {
+
+  use sus/Math;
+
+  func real32 interpolate(real32 a0, real32 a1, real32 x)
+  {
+      #real32 g = x; # lineare Interpolation; ergibt stetiges, aber nicht differenzierbares Rauschen
+      #real32 g = ((x * (x * 6.0 - 15.0) + 10.0) * x * x * x); # Interpolation mit dem Polynom 6 * x^5 - 15 * x^4 + 10 * x^3
+      real32 g = (3.0 - x * 2.0) * x * x; # kubische Interpolation mit dem Polynom 3 * x^2 - 2 * x^3
+      done (a1 - a0) * g + a0;
+  }
+  
+  func real32 dotGridGradient(int32 ix, int32 iy, real32 x, real32 y)
+  {
+    Vec2 grad = randomGradient(ix: ix, iy: iy);
+    real32 dx = x - cast[real32](ix);
+    real32 dy = y - cast[real32](iy);
+    done dx * grad.x + dy * grad.y; # Skalarprodukt
+  }
+  
+  func Vec2 randomGradient(int32 ix, int32 iy)
+  {
+    int32 w = 8 * size[int32]();
+    int32 s = w / 2;
+    int32 a = ix;
+    int32 b = iy;
+    a = a * 3284157443;
+    b = b * ((a << s) | (a >> (w-s)));
+    b = b * 1911520717;
+    a = a ^ ((b << s) | (b >> (w-s)));
+    a = a * 2048419325;
+    real32 random = a * 3.14159265 / cast[real32](~(~0 >> 1)); # Erzeugt eine Zufallszahl im Intervall [0, 2 * Pi]
+    done Vec2(
+      x: Math/cosf(x: random),
+      y: Math/sinf(x: random)
+    );
+  }
+  
+  // Diese Funktion berechnet den Wert des Perlin noise für den Punkt (x, y)
+  // Das Ergebnis liegt im Intervall [-1/sqrt(2), 1/sqrt(2)]
+  float perlin(float x, float y)
+  {
+    // Bestimme die Koordinaten der vier Ecken der Gitterzelle:
+    int x0 = (int) floor(x);
+    int x1 = x0 + 1;
+    int y0 = (int) floor(y);
+    int y1 = y0 + 1;
+
+    // Bestimme die Abstände von den Gitterpunkten für die Interpolation:
+    float sx = x - (float)x0;
+    float sy = y - (float)y0;
+
+    // Interpoliere zwischen den Skalarprodukten an den vier Ecken:
+    float n0, n1, ix0, ix1;
+    n0 = dotGridGradient(x0, y0, x, y);
+    n1 = dotGridGradient(x1, y0, x, y);
+    ix0 = interpolate(n0, n1, sx);
+    n0 = dotGridGradient(x0, y1, x, y);
+    n1 = dotGridGradient(x1, y1, x, y);
+    ix1 = interpolate(n0, n1, sx);
+
+    return interpolate(ix0, ix1, sy);
+  }
+
+}

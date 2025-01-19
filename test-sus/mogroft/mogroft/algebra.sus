@@ -1,3 +1,5 @@
+
+
 package mogroft/algebra/Vec3 {
   
   struct Vec3 (
@@ -6,8 +8,21 @@ package mogroft/algebra/Vec3 {
     real32 z
   );
   
-  func Vec3 new_Vec3() {
+  func Vec3 new() {
     done Vec3(x = 0.0, y = 0.0, z = 0.0);
   }
   
+}
+
+package mogroft/algebra/Vec2 {
+
+  struct Vec2 (
+    real32 x,
+    real32 y
+  );
+  
+  func Vec2 new() {
+    done Vec2(x = 0.0, y = 0.0);
+  }
+
 }

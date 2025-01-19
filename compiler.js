@@ -87,6 +87,7 @@ function parse(state) {
   const makeNodeExprBrackets = () => makeNode('expr-brackets', null, []); // expression
   const makeNodeExprRef = () => makeNode('expr-ref', null, []); // kids: expression to get pointer of
   const makeNodeExprDrf = () => makeNode('expr-drf', null, []); // kids: expression to express value of
+  const makeNodeExprInvert = () => makeNode('expr-inv', null, []); // expr
   const makeNodeExprFuncref = (address) =>
     makeNode('expr-funcref', { address }, []);
   const makeNodeExprRtp = () => makeNode('expr-reinterpret', null, []); // kids: type, expression
@@ -570,7 +571,7 @@ function parse(state) {
 
   function tryParseNodeExprOp(nodeExprA) {
     return tryParse((_) => {
-      let op = eat(/^([+\-*/%]|>>|<<|==|!=|>=|<=|>|<|\|\||\&\&|&|\|)/);
+      let op = eat(/^([+\-*/%]|>>|<<|==|!=|>=|<=|>|<|\|\||\&\&|\^|&|\|)/);
       if (!op) return undefined;
       eatEmpty();
       let n = makeNodeExprOp(op);
@@ -581,17 +582,6 @@ function parse(state) {
       return n;
     });
   }
-
-  // , () => {
-  //     let memberAccessOp = eat(/^\./);
-  //     if (!memberAccessOp) return;
-  //     eatEmpty();
-  //     let memberName = eatSymbol();
-  //     eatEmpty();
-  //     let n = makeNodeExprMemberName(memberName);
-  //     n.kids.push(nodeExprA);
-  //     return n;
-  //   }
 
   // tries to parse as much preceding operators as possible
   function tryParseNodeExprGreedy() {
@@ -703,6 +693,13 @@ function parse(state) {
         eatPicky(')');
         eatEmpty();
         return drfNode;
+      },
+      () => {
+        if (!eat(/^~/)) return;
+        eatEmpty();
+        let n = makeNodeExprInvert();
+        n.kids.push(tryParseNodeExprVal());
+        return n;
       },
       () => {
         if (!eat(/^funcref/)) return;
@@ -1539,6 +1536,7 @@ function compile(state) {
         // prettier-ignore
         return evalBinOp( op, expr, scope, addressScope, allowedShift, compatibleShift );
       case '|':
+      case '^':
       case '&':
         // prettier-ignore
         return evalBinOp( op, expr, scope, addressScope, allowedBitwise, compatibleBitwise );
@@ -1634,6 +1632,8 @@ function compile(state) {
         );
       return member.type;
     } else if (expr.name === 'expr-sym') {
+      if (!scope) throw new makeErr(expr.i, 'can not use symbols in const inits');
+
       let type;
 
       let symbol = expr.props.symbol;
@@ -1709,6 +1709,9 @@ function compile(state) {
       let typeType = getActualType(expr.kids[0], addressScope);
       let size = expr.props.size;
       return makeTypeArray(typeType, size);
+    } else if (expr.name === 'expr-inv') {
+      let innerExpr = expr.kids[0];
+      return evalType(innerExpr, scope, addressScope);
     } else {
       throw makeImplErr('unknown expression ' + expr.name);
     }
@@ -3306,10 +3309,24 @@ function compile(state) {
       asm += compileExprFuncRef(expr, scope, addressScope);
     } else if (expr.name === 'expr-array') {
       asm += compileExprArray(expr, scope, addressScope);
+    } else if (expr.name === 'expr-inv') {
+      asm += compileExprInvert(expr, scope, addressScope);
     } else {
       throw makeImplErr('unknown expression ' + expr.name);
     }
     return asm;
+  }
+
+  function compileExprInvert(expr, scope, addressScope) {
+    let kid = expr.kids[0];
+    checkTypeName(kid, scope, addressScope, 'int32');
+
+    let r = '';
+
+    r += compileExpr(kid, scope, addressScope);
+    r += line(`not     dword [esp]`);
+    
+    return r;
   }
 
   function makeCallInfoAsmName(asmName, typeFuncPtr) {
@@ -4012,6 +4029,8 @@ function compile(state) {
         if (exprATypeName === 'real32')
           return compileExprOpFloat(exprOp, scope, addressScope, op, 'faddp');
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'add');
+      case '^':
+        return compileExprOpSimple(exprOp, scope, addressScope, op, 'xor');
       case '|':
         return compileExprOpSimple(exprOp, scope, addressScope, op, 'or');
       case '&':

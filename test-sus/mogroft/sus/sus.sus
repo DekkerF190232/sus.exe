@@ -4,11 +4,13 @@ package sus/Math {
   static real32 PI = 3.14159265359;
   static real32 2PI = 6.28318530718;
 
+  func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+
   func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
-  func CON(cdecl) real32 tan(real32 x) EXT;
+  func CON(cdecl) real32 tanf(real32 x) EXT;
   func CON(cdecl) real32 sinf(real32 x) EXT;
   func CON(cdecl) real32 cosf(real32 x) EXT;
-  func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+  func CON(cdecl) real32 sqrtf(real32 x) EXT;
   
 }
 
