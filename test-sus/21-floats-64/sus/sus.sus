@@ -9,11 +9,11 @@ package sus/Math {
 
   func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
   func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
-  func CON(cdecl) real32 remainder(real32 x, real32 y) EXT;
+  func CON(cdecl) real32 remainderf(real32 x, real32 y) EXT;
   func CON(cdecl) real32 floor(real32 x) EXT;
   func CON(cdecl) real32 tan(real32 x) EXT;
-  func CON(cdecl) real32 sin(real32 x) EXT;# todo: upate declarations to double
-  func CON(cdecl) real32 cos(real32 x) EXT;
+  func CON(cdecl) real32 sinf(real32 x) EXT;
+  func CON(cdecl) real32 cosf(real32 x) EXT;
   func CON(cdecl) real32 sqrtf(real32 x) EXT;
   
 }

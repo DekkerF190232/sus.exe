@@ -1188,7 +1188,7 @@ function parse(state) {
         if (!name) return undefined;
 
         let isPrimitive = name.match(
-          /^(int8|int16|int32|real32|boo|PTR|ptr)(?![a-zA-Z0-9_\[<])/
+          /^(int8|int16|int32|real32|real64|boo|PTR|ptr)(?![a-zA-Z0-9_\[<])/
         );
         if (isPrimitive) {
           if (eat(/^\[/)) {
@@ -2709,6 +2709,10 @@ function compile(state) {
       // move float into sp0
       r += line(`fld     dword [esp]`);
       r += line(`add     esp, 4`);
+    } else if (returnTypeName === 'real64') {
+      // move double into sp0
+      r += line(`fld     qword [esp]`);
+      r += line(`add     esp, 8`);
     } else if (rootScope.returnInfo.off !== undefined) {
       if (rootScope.returnInfo.size <= 8) throw makeImplErr();
       let scopeRes = resolveScopeBase(scopes);
@@ -2743,6 +2747,10 @@ function compile(state) {
       // move float into sp0
       r += line(`fld     dword [esp]`);
       r += line(`add     esp, 4`);
+    } else if (returnTypeName === 'real64') {
+      // move double into sp0
+      r += line(`fld     qword [esp]`);
+      r += line(`add     esp, 8`);
     } else if (rootScope.returnInfo.off !== undefined) {
       if (rootScope.returnInfo.size <= 8) throw makeImplErr();
       let scopeRes = resolveScopeBase(scopes);
@@ -3479,6 +3487,7 @@ function compile(state) {
 
     let r = '';
     r += compileExpr(kid, scope, addressScope);
+    // note: may need to be changed for size-conversions
 
     let wanted = typeToString(wantedType);
     let actual = typeToString(actualType);
@@ -3491,10 +3500,26 @@ function compile(state) {
       r += line(`finit`);
       r += line(`fild    dword [esp]`);
       r += line(`fst     dword [esp]`);
-    } else if (wanted === 'int8' && actual === 'int32') {
-      // r += line(`xor     eax, eax`);
-      // r += line(`mov     al, [esp]`);
-      // r += line(`mov     [esp], eax`);
+    } else if (wanted === 'int32' && actual === 'real64') {
+      r += line(`finit`);
+      r += line(`fld     qword [esp]`);
+      r += line(`add     esp, 4`); // fix size reduction (qword is on top, but need dword)
+      r += line(`fisttp  dword [esp]`);
+    } else if (wanted === 'real64' && actual === 'int32') {
+      r += line(`finit`);
+      r += line(`fild    dword [esp]`);
+      r += line(`sub     esp, 4`); // fix size increase (dword is on top, but need qword)
+      r += line(`fst     qword [esp]`);
+    } else if (wanted === 'real32' && actual === 'real64') {
+      r += line(`finit`);
+      r += line(`fld     qword [esp]`);
+      r += line(`add     esp, 4`); // fix size reduction (qword is on top, but need dword)
+      r += line(`fst     dword [esp]`);
+    } else if (wanted === 'real64' && actual === 'real32') {
+      r += line(`finit`);
+      r += line(`fld     dword [esp]`);
+      r += line(`sub     esp, 4`); // fix size increase (dword is on top, but need qword)
+      r += line(`fst     qword [esp]`);
     } else if (wanted === 'int32' && actual === 'int8') {
       r += line(`xor     eax, eax`);
       r += line(`mov     al, [esp]`);
@@ -3504,9 +3529,7 @@ function compile(state) {
       r += line(`mov     ax, [esp]`);
       r += line(`mov     [esp], eax`);
     } else if (wanted === 'int16' && actual === 'int32') {
-      // r += line(`xor     eax, eax`);
-      // r += line(`mov     ax, [esp]`);
-      // r += line(`mov     [esp], eax`);
+    } else if (wanted === 'int8' && actual === 'int32') {
     } else {
       throw makeErr(expr.i, 'unknown conversion: ' + actual + ' -> ' + wanted);
     }
@@ -4457,6 +4480,8 @@ function getSize1(ctx, type) {
       case 'ptr':
       case 'PTR':
         return 4;
+      case 'real64':
+        return 8;
       default:
         throw new Error('unknown primitive type: ' + type.kind);
     }

@@ -1,0 +1,11 @@
+package Main {
+
+  main {
+
+    real64 a = 0.1;
+    real64 b = 0.2;
+    System/print(r: cast[real32](a + b));
+    
+  }
+
+}
