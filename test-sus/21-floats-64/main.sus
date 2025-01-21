@@ -1,10 +1,24 @@
 package Main {
 
-  main {
+  use sus/System;
+  use sus/native/Win;
 
-    real64 a = 0.1;
-    real64 b = 0.2;
-    System/print(r: cast[real32](a + b));
+  #func CON(stdcall) 
+
+  main {
+    boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+
+    ASM {
+      ; INIT
+    }
+    real64 a = cast[real64](0.1);
+    
+    ASM {
+      ; CONVERSION
+    }
+    real32 c = cast[real32](a);
+    System/print(r: c);
+    System/println();
     
   }
 

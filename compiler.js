@@ -1620,7 +1620,10 @@ function compile(state) {
       let memberName = expr.props.name;
       let structType = evalType(tyeExpr, scope, addressScope);
       if (structType.kind !== 'struct')
-        throw makeErr(expr.i, 'expected struct type, got ' + typeToString(structType));
+        throw makeErr(
+          expr.i,
+          'expected struct type, got ' + typeToString(structType)
+        );
       let structName = structType.name;
       let structRow = findStructByAddress(state.ctx, structName);
       if (!structRow) throw makeErr(expr.i, 'unknown struct: ' + structName);
@@ -1632,7 +1635,8 @@ function compile(state) {
         );
       return member.type;
     } else if (expr.name === 'expr-sym') {
-      if (!scope) throw new makeErr(expr.i, 'can not use symbols in const inits');
+      if (!scope)
+        throw new makeErr(expr.i, 'can not use symbols in const inits');
 
       let type;
 
@@ -3333,7 +3337,7 @@ function compile(state) {
 
     r += compileExpr(kid, scope, addressScope);
     r += line(`not     dword [esp]`);
-    
+
     return r;
   }
 
@@ -4212,18 +4216,22 @@ function compile(state) {
       asm += symRes.asm;
 
       if (type.kind === 'prim') {
-        asm += line(
-          `mov     eax, [${symRes.register}${getOffStr(
-            row.off
-          )}] ; expr symbol: ${symbol}`
-        );
-        asm += line(`push    eax`);
+        if (type.name === 'real64') {
+          // prettier-ignore
+          asm += line(`mov     eax, [${symRes.register}${getOffStr(row.off + 4)}] ; expr symbol (real64): ${symbol}`);
+          asm += line(`push    eax`);
+
+          // prettier-ignore
+          asm += line(`mov     eax, [${symRes.register}${getOffStr( row.off )}]`);
+          asm += line(`push    eax`);
+        } else {
+          // prettier-ignore
+          asm += line( `mov     eax, [${symRes.register}${getOffStr( row.off )}] ; expr symbol: ${symbol}` );
+          asm += line(`push    eax`);
+        }
       } else if (type.kind === 'funcptr') {
-        asm += line(
-          `push    dword [${symRes.register}${getOffStr(
-            row.off
-          )}] ; expr symbol: ${symbol}`
-        );
+        // prettier-ignore
+        asm += line( `push    dword [${symRes.register}${getOffStr( row.off )}] ; expr symbol: ${symbol}` );
       } else if (type.kind === 'struct') {
         let structRow = findStructByAddress(state.ctx, type.name);
         if (!structRow)
@@ -4753,7 +4761,6 @@ function loadStatics(ctx, path, src, tree) {
   }
 }
 
-
 function loadStructs(ctx, path, src, tree) {
   for (const pkg of tree.kids) {
     if (pkg.name !== 'package') continue;
@@ -4999,7 +5006,12 @@ let errState = undefined;
 function ctxErr(message) {
   _ass(errState.node.i);
   _ass(errState.unitPath);
-  return new Error('(ctx err) ' + message + ' at ' + locErr(i, errState.unitPath, errState.text));
+  return new Error(
+    '(ctx err) ' +
+      message +
+      ' at ' +
+      locErr(i, errState.unitPath, errState.text)
+  );
 }
 
 function locErr(i, unitPath, text) {
