@@ -29,6 +29,21 @@ package mogroft/world/Block {
   struct Block (
     int8 id
   );
+  
+  func Block new(int8 id) {
+    done Block(id = id);
+  }
+
+}
+
+package mogroft/world/Blocks {
+  
+  static int8 ID_AIR = cast[int8](1);
+  static int8 ID_STONE = cast[int8](2);
+  static int8 ID_GRASS = cast[int8](3);
+  static int8 ID_DIRT = cast[int8](4);
+  static int8 ID_LOG = cast[int8](5);
+  static int8 ID_WOOD = cast[int8](6);
 
 }
 
@@ -48,7 +63,7 @@ package mogroft/world/Chunk {
     int32 x,
     int32 y,
     int32 z
-  );
+  ); # [chunks]
 
   struct Chunk (
     ChunkCoord chunkCoord,
@@ -161,14 +176,27 @@ package mogroft/world/ChunkCoordList {
 package mogroft/world/Player {
   
   use mogroft/algebra/Vec3;
+  use sus/Math;
 
   struct Player (
-    Vec3 position
+    Vec3 position, # [blocks]
+    real32 yaw, # [deg]
+    real32 pitch # [deg]
   );
+  
+  func lookDelta(PTR[Player] this, real32 dyaw, real32 dpitch) {
+    DRF(this).yaw = Math/remainderf(x: DRF(this).yaw + dyaw, y: 360.0);
+    
+    DRF(this).pitch = DRF(this).pitch + dpitch;
+    if (DRF(this).pitch > 90.0) DRF(this).pitch = 90.0;
+    if (DRF(this).pitch < -90.0) DRF(this).pitch = -90.0;
+  }
   
   func Player new() {
     done Player(
-      position = Vec3/new()
+      position = Vec3/new(),
+      yaw = 0.0,
+      pitch = 0.0
     );
   }
 }

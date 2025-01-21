@@ -42,6 +42,8 @@ FEATURE EVALUATION
 
 BUGS
   - if scope is null (bc in static expression) some expression compilations result in js errors
+  - "struct not found", but no error location because of context builder
+  - no duplicate symbol checking for static variables or functions, maybe not even structs
 
 ISSUES
   - code smellies
@@ -53,7 +55,6 @@ ISSUES
   - annoying language features
     - DRF DRF DRF REF REF
     - RTP RTP RTP CAST
-    - "struct not found", but no error location because of context builder
   - unmet requirements
     - only allow usage of local symbol after init
     - better error messages at unparsable statements
@@ -68,6 +69,24 @@ ISSUES
       - "safe" strings
 
 MISSING
+  - type arguments
+
+    decl:
+    
+    struct List(int32 unused);
+
+    # creating of a keyed struct type
+    func List<T> new<T>() {
+      done List<T>();
+    }
+
+    # - limited types must be 
+    # - hidden parameter contains runtime type info
+    #   - must be pushed before calling, only works for suscall
+    func add<T>(PTR[List<T>] this, T element) {
+      int32 size = size[T]();
+    }
+
   - Lambdas
   - Interfaces
   - Macros

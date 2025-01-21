@@ -35,6 +35,33 @@ package mogroft/Texture {
     int32 biClrUsed,
     int32 biClrImportant
   );
+  
+  # note: expects rgba array, lowest row first, then every other row 
+  # (pixels from right to left). does not free data
+  func int32 loadTexture(int32 width, int32 height, PTR[int8] data) {
+    int32 textureId = 0;
+    Gl/glGenTextures(n: 1, textures: REF(textureId));
+    Gl/glBindTexture(target: Gl/GL_TEXTURE_2D, texture: textureId);
+    Gl/glTexImage2D(
+      target:         Gl/GL_TEXTURE_2D,
+      level:          0,
+      internalFormat: Gl/GL_RGBA,
+      width:          width,
+      height:         height,
+      border:         0,
+      format:         Gl/GL_RGBA,
+      type:           Gl/GL_UNSIGNED_BYTE,
+      pixels:         RTP[PTR[int8]](data)
+    );
+    
+    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_WRAP_S, param: Gl/GL_REPEAT);
+    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_WRAP_T, param: Gl/GL_REPEAT);
+    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MIN_FILTER, param: Gl/GL_LINEAR);
+    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MAG_FILTER, param: Gl/GL_LINEAR);
+    Gl/glBindTexture(target: Gl/GL_TEXTURE_2D, texture: 0);
+    
+    done textureId;
+  }
 
   func int32 loadTexture(PTR[int8] file) {
     System/print(s: STR"Loading texture at \"");
@@ -144,7 +171,6 @@ package mogroft/Texture {
 
       i = i + 1;
     }
-
 
     #System/print(s: STR"Image dump after");
     #System/print(s: file);

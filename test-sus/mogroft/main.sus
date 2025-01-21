@@ -5,6 +5,8 @@ package Main {
   
   main {
     boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+    Test/runTest();
+    
     System/println(s:STR"Starting mogroft written in sus.exe\n");
     
     mogroft/Mogroft/runMogroft();
@@ -22,4 +24,73 @@ package Main {
     
   }
 
+}
+
+
+package Test {
+
+  use sus/System;
+  use mogroft/Noise2D;
+  use mogroft/algebra/Vec3;
+
+  func runTest() {
+    #done;
+    System/println(s: STR"Running Tests ... ============================================================");
+    doTest();
+    System/println(s: STR"Ran Tests --------------------------------------------------------------------");
+    System/exit(code: 0);
+ }
+  
+  func doTest() {
+    testVectors();
+    # testNoise();
+  }
+  
+  func testVectors() {
+    Vec3 v1 = Vec3(x=0.0, y=0.0, z=1.0);
+    Vec3 v2 = Vec3(x=0.0, y=1.0, z=0.0);
+    
+    Vec3/rotate(this: REF(v1), angle: 90.0, v: Vec3(x=0.0, y=1.0, z=0.0));
+    
+    #real32 dp = Vec3/dot(a: REF(v1), b: REF(v2));
+    #System/print(r: dp);
+    #System/println();
+    
+    #Vec3 v3 = Vec3/cross(a: REF(v1), b: REF(v2));
+    #System/print(s: STR"v3: ");
+    #Vec3/print(this: REF(v3));
+    #System/println();
+    
+    Vec3/print(this: REF(v1));
+    System/println();
+  }
+  
+  func testNoise() {
+    real32 scale = 2.0;
+    int32 off = -10;
+    
+    int32 r = 0;
+    while (r < 40) {
+      int32 c = 0;
+      while (c < 55) {
+        real32 val = Noise2D/perlin(
+          x: cast[real32](c + off) * scale,
+          y: cast[real32](r + off) * scale
+        );
+        
+        PTR[int8] characters = STR"@O+-.  ";
+        int32 scalec = 6;
+        int32 idx = cast[int32](val * cast[real32](scalec));
+        PTR[int8] char = characters + idx;
+        
+        System/print(s: char, length: 1); 
+        System/print(s: STR" ");
+        
+        c = c + 1;
+      }
+      System/println();
+      r = r + 1;
+    }
+  }
+  
 }

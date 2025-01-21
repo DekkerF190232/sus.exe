@@ -2,17 +2,24 @@ package mogroft/world/WorldManager {
 
   use mogroft/world/World;
   use mogroft/world/Block;
+  use mogroft/world/Blocks;
   use mogroft/world/Chunk;
   use mogroft/world/ChunkList;
   use mogroft/world/ChunkCoordList;
   
   struct WorldManager (
-    PTR[World] world
+    PTR[World] world,
+    ChunkEventHandler chunkEventHandler
+  );
+  
+  struct ChunkEventHandler(
+    funcptr[(PTR[Chunk] chunk)] onLoaded
   );
 
-  func WorldManager new() {
+  func WorldManager new(ChunkEventHandler chunkEventHandler) {
     done WorldManager(
-      world = RTP[PTR[World]](0)
+      world = RTP[PTR[World]](0),
+      chunkEventHandler = chunkEventHandler
     );
   }
 
@@ -21,13 +28,20 @@ package mogroft/world/WorldManager {
     DRF(this).world = world;
 
     DRF(world).player.position.z = 10.0;
+    
+    funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
 
     PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
 
     PTR[Chunk] newChunk = ChunkList/add(this: chunkList);
     DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = 0, z = 0);
-
     generateChunk(chunk: newChunk);
+    onLoadedFunc(chunk: newChunk);
+
+    newChunk = ChunkList/add(this: chunkList);
+    DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = -1, z = 0);
+    generateChunk(chunk: newChunk);
+    onLoadedFunc(chunk: newChunk);
   }
 
   func generateChunk(PTR[Chunk] chunk) {
@@ -39,6 +53,13 @@ package mogroft/world/WorldManager {
       while (y < Chunk/SIZE) {
         while (x < Chunk/SIZE) {
           PTR[Block] block = blocks + (z * Chunk/SIZE * Chunk/SIZE) + (y * Chunk/SIZE) + x;
+          
+          if (DRF(chunk).chunkCoord.y >= 0) {
+            DRF(block) = Block/new(id: Blocks/ID_AIR);
+          } else {
+            DRF(block) = Block/new(id: Blocks/ID_STONE);
+          }
+          
           x = x + 1;
         }
         y = y + 1;

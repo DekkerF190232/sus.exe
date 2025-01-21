@@ -14,6 +14,8 @@ package mogroft/Window {
     funcptr[(int32 width, int32 height)] resize,
     funcptr[(int32 vk)] onKeyDown,
     funcptr[(int32 vk)] onKeyUp,
+    funcptr[(int32 x, int32 y)] onMouseMove,
+    funcptr[(int32 dx, int32 dy)] onMouseMoveDelta,
     funcptr[()] onLooseFocus
   );
 
@@ -21,7 +23,8 @@ package mogroft/Window {
     WindowHandle windowHandle,
     DeviceContextHandle deviceContextHandle,
     GlRenderContextHandle glRenderContextHandle,
-    WindowHandler windowHandler
+    WindowHandler windowHandler,
+    boo cursorGrabbed
   );
 
   static PTR[WindowState] _window = RTP[PTR[WindowState]](0);
@@ -34,7 +37,8 @@ package mogroft/Window {
       windowHandle=RTP[WindowHandle](0),
       deviceContextHandle=RTP[DeviceContextHandle](0),
       glRenderContextHandle=RTP[GlRenderContextHandle](0),
-      windowHandler = windowHandler
+      windowHandler = windowHandler,
+      cursorGrabbed = no
     );
     _window = REF(windowState);
     
@@ -49,9 +53,21 @@ package mogroft/Window {
     # create opengl context
     createContext(this: REF(windowState));
     
+    # add raw mouse input listener
+    RawInputDevice device = RawInputDevice(
+      usagePage = Win/HID_USAGE_PAGE_GENERIC,
+      usage = Win/HID_USAGE_GENERIC_MOUSE,
+      flags = 0,
+      targetHandle = windowState.windowHandle
+    );
+    boo _5 = Win/RegisterRawInputDevices(devices: REF(device), length: 1, rawInputDeviceSize: size[RawInputDevice]());
+    
     # use context
-    boo _5 = Win/wglMakeCurrent(dch: DRF(_window).deviceContextHandle, glRenderContextHandle:  DRF(_window).glRenderContextHandle);
-    if (_5 == no) {
+    boo _6 = Win/wglMakeCurrent(
+      dch: DRF(_window).deviceContextHandle,
+      glRenderContextHandle: DRF(_window).glRenderContextHandle
+    );
+    if (_6 == no) {
       int32 err = Win/GetLastError();
       errMsg(code: err, message: STR"Error setting window context:");
       System/exit(code: err);
@@ -159,6 +175,8 @@ package mogroft/Window {
       funcptr[(int32 width, int32 height)] resizeFunc = DRF(_window).windowHandler.resize;
       resizeFunc(width: width, height: height);
       
+      if (DRF(_window).cursorGrabbed) grabCursor();
+      
       done 0;
     } else if (message == Win/WM_TIMER && (wParam == TIMER_ID_WINDOW)) {
       boo _1 = Win/InvalidateRect(handle: handle, rectangle: RTP[PTR[Rectangle]](0), erase: yes);
@@ -175,11 +193,136 @@ package mogroft/Window {
     } else if (message == Win/WM_KILLFOCUS) {
       funcptr[()] onLooseFocusFunc = DRF(_window).windowHandler.onLooseFocus;
       onLooseFocusFunc();
+    } else if (message == Win/WM_LBUTTONDOWN) {
+      funcptr[(int32 vk)] onKeyDownFunc = DRF(_window).windowHandler.onKeyDown;
+      onKeyDownFunc(vk: Win/VK_LBUTTON);
+    } else if (message == Win/WM_LBUTTONUP) {
+      funcptr[(int32 vk)] onKeyDownFunc = DRF(_window).windowHandler.onKeyUp;
+      onKeyDownFunc(vk: Win/VK_LBUTTON);
+    } else if (message == Win/WM_RBUTTONDOWN) {
+      funcptr[(int32 vk)] onKeyDownFunc = DRF(_window).windowHandler.onKeyDown;
+      onKeyDownFunc(vk: Win/VK_RBUTTON);
+    } else if (message == Win/WM_RBUTTONUP) {
+      funcptr[(int32 vk)] onKeyDownFunc = DRF(_window).windowHandler.onKeyUp;
+      onKeyDownFunc(vk: Win/VK_RBUTTON);
+    } else if (message == Win/WM_CLOSE) {
+      ungrabCursor();
+    } else if (message == Win/WM_MOUSEMOVE) {
+      int32 x = lParam & @ffff;
+      int32 y = lParam >> cast[int8](16) & @ffff;
+      funcptr[(int32 x, int32 y)] onMouseMoveFunc = DRF(_window).windowHandler.onMouseMove;
+      onMouseMoveFunc(x: x, y: y);
+    } else if (message == Win/WM_INPUT) {
+      RawInputHandle rawInputHandle = RTP[RawInputHandle](lParam);
+      
+      int32 dataSize = -1;
+      int32 r = Win/GetRawInputData(
+        handle:     rawInputHandle,
+        uiCommand:  Win/RID_INPUT,
+        data:       RTP[ptr](0),
+        dataSize:   REF(dataSize),
+        headerSize: size[RawInputHeader]()
+      );
+      
+      if (dataSize <= 0) {
+        System/fatal(reason: STR"Failed to read raw input: dataSize <= 0");
+      }
+      
+      PTR[int8] buffer = ARR[int8](dataSize);
+      r = Win/GetRawInputData(
+        handle:     rawInputHandle,
+        uiCommand:  Win/RID_INPUT,
+        data:       RTP[ptr](buffer),
+        dataSize:   REF(dataSize),
+        headerSize: size[RawInputHeader]()
+      );
+      if (r != dataSize) {
+        System/fatal(reason: STR"Failed to read raw input: r != dataSize");
+      }
+      
+      PTR[RawInput] rawInput = RTP[PTR[RawInput]](buffer);
+      if (DRF(rawInput).header.type == Win/RIM_TYPEMOUSE) {
+        PTR[RawInputDataMouse] data = RTP[PTR[RawInputDataMouse]](REF(DRF(rawInput).data));
+        int32 dx = DRF(data).lastX;
+        int32 dy = DRF(data).lastY;
+        
+        funcptr[(int32 dx, int32 dy)] onMouseMoveDeltaFunc = DRF(_window).windowHandler.onMouseMoveDelta;
+        onMouseMoveDeltaFunc(dx: dx, dy: dy);
+        
+        #System/print(s: STR"delta mouse: ");
+        #System/print(i: dx);
+        #System/print(s: STR",");
+        #System/print(i: dy);
+        #System/println();
+      }
+      
     }
   
     done Win/DefWindowProcA(handle: handle, message:message, wParam: wParam, lParam: lParam);
   }
-
+  
+  # confines to window size, not point.
+  #func grabCursor() {
+  #  Rectangle windowSize = Rectangle(left = 0, top = 0, right = 0, bottom = 0);
+  #  boo _1 = Win/GetClientRect(
+  #    handle:     DRF(_window).windowHandle,
+  #    rectangle:  REF(windowSize)
+  #  );
+  #  boo _2 = Win/ClientToScreen(
+  #    handle: DRF(_window).windowHandle,
+  #    point:  RTP[PTR[Point]](REF(windowSize))
+  #  );
+  #  boo _3 = Win/ClientToScreen(
+  #    handle: DRF(_window).windowHandle,
+  #    point:  RTP[PTR[Point]](REF(windowSize)) + size[Point]()
+  #  );
+  #  DRF(_window).centerX = windowSize.left + (windowSize.right - windowSize.left) / 2;
+  #  DRF(_window).centerY = windowSize.top + (windowSize.bottom - windowSize.top) / 2;
+  #  boo _4 = Win/ClipCursor(rectangle: REF(rect));
+  #}
+  
+  # confines to center of window
+  func grabCursor() {
+    Rectangle windowSize = Rectangle(left = 0, top = 0, right = 0, bottom = 0);
+    boo _1 = Win/GetClientRect(
+      handle:     DRF(_window).windowHandle,
+      rectangle:  REF(windowSize)
+    );
+    Point center = Point(
+      x = windowSize.right / 2,
+      y = windowSize.bottom / 2
+    );
+    boo _2 = Win/ClientToScreen(
+      handle: DRF(_window).windowHandle,
+      point:  REF(center)
+    );
+    Rectangle rect = Rectangle(
+      left = center.x,
+      top = center.y,
+      right = center.x + 1,
+      bottom = center.y + 1);
+    boo _4 = Win/ClipCursor(rectangle: REF(rect));
+  }
+  
+  func ungrabCursor() {
+    boo _1 = Win/ClipCursor(rectangle: RTP[PTR[Rectangle]](0));
+  }
+  
+  func setCursorGrabbed(boo cursorGrabbed) {
+    boo before = DRF(_window).cursorGrabbed;
+    
+    DRF(_window).cursorGrabbed = cursorGrabbed;
+    
+    if (before != cursorGrabbed) {
+      if (cursorGrabbed) grabCursor();
+      else ungrabCursor();
+    }
+  }
+  
+  func setCursorVisible(boo cursorVisible) {
+    int32 _ = Win/ShowCursor(show: cursorVisible);
+  }
+  
   func registerClass() {
     int32 err = 0;
 

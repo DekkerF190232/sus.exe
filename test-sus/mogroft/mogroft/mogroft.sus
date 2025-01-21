@@ -7,7 +7,9 @@ package mogroft/Mogroft {
   use mogroft/Controls;
   use mogroft/Texture;
   use mogroft/world/World;
+  use mogroft/world/Chunk;
   use mogroft/world/WorldManager;
+  
 
   struct MogroftState (
     RendererState rendererState,
@@ -19,7 +21,9 @@ package mogroft/Mogroft {
   func runMogroft() {
     MogroftState theInst = MogroftState(
       rendererState = Renderer/new_RendererState(),
-      worldManager = WorldManager/new()
+      worldManager = WorldManager/new(chunkEventHandler: ChunkEventHandler(
+        onLoaded = funcref(onChunkLoaded)
+      ))
     );
     _mogroft = REF(theInst);
     WorldManager/loadExample(this: REF(theInst.worldManager));
@@ -30,8 +34,22 @@ package mogroft/Mogroft {
       resize = funcref(resize),
       onKeyDown = funcref(onKeyDown),
       onKeyUp = funcref(onKeyUp),
-      onLooseFocus = funcref(onLooseFocus)
+      onLooseFocus = funcref(onLooseFocus),
+      onMouseMove = funcref(onMouseMove),
+      onMouseMoveDelta = funcref(onMouseMoveDelta)
     ));
+  }
+  
+  func onMouseMove(int32 x, int32 y) {
+    Controls/onMouseMove(x: x, y: y);
+  }
+  
+  func onMouseMoveDelta(int32 dx, int32 dy) {
+    Controls/onMouseMoveDelta(dx: dx, dy: dy);
+  }
+  
+  func onChunkLoaded(PTR[Chunk] chunk) {
+    #Renderer/onChunLoaded(chunk: chunk);
   }
   
   func init() {

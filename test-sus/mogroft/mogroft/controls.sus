@@ -5,6 +5,7 @@ package mogroft/Controls {
   use mogroft/world/World;
   use mogroft/Mogroft;
   use mogroft/InputHandlerFly;
+  use mogroft/Window;
   
   # KEY BUFFER ==================================================== [
   
@@ -27,16 +28,22 @@ package mogroft/Controls {
     done findDownKeyIndex(vk: vk) != -1;
   }
   
+  func boo isCursorGrabbed() {
+    done grabbed;
+  }
+  
   # ] KEY BUFFER
 
-  struct InputHandler (
+  struct InputHandler(
     funcptr[(real32 dt)] tick,
     funcptr[(int32 vk)] press,
     funcptr[(int32 vk)] release,
+    funcptr[(int32 x, int32 y)] mouseMove,
+    funcptr[(int32 dx, int32 dy)] mouseMoveDelta,
     funcptr[()] looseFocus
   );
   
-  static InputHandler inputHandler = RTP[InputHandler](array[int32, 4](0));
+  static InputHandler inputHandler = RTP[InputHandler](array[int32, 6](0));
   func init() {
     keyBuffer = RTP[PTR[int32]](REF(keyArray));
 
@@ -47,9 +54,32 @@ package mogroft/Controls {
     funcptr[(real32 dt)] tickFunc = inputHandler.tick;
     tickFunc(dt: dt);
   }
+  
+  static boo grabbed = no;
+  func setGrabbed(boo grabbed) {
+    boo change = grabbed != Controls/grabbed;
+    if (change) {
+      Controls/grabbed = grabbed;
+      Window/setCursorGrabbed(cursorGrabbed: grabbed);
+      Window/setCursorVisible(cursorVisible: grabbed == no);
+    }
+  }
 
   func onKeyDownInitial(int32 vk) {
+    if (vk == Win/VK_ESCAPE) {
+      setGrabbed(grabbed: no);
+    } else if (vk == Win/VK_LBUTTON) {
+      setGrabbed(grabbed: yes);
+    }
+  }
   
+  func onMouseMove(int32 x, int32 y) {
+    
+  }
+  
+  func onMouseMoveDelta(int32 dx, int32 dy) {
+    funcptr[(int32 dx, int32 dy)] mouseMoveDeltaFunc = inputHandler.mouseMoveDelta;
+    mouseMoveDeltaFunc(dx: dx, dy: dy);
   }
 
   func onKeyDown(int32 vk) {
@@ -60,34 +90,26 @@ package mogroft/Controls {
       DRF(keyBuffer + (keysDown * size[int32]())) = vk;
       keysDown = keysDown + 1;
     }
-    
-    #System/print(s: STR"DOWN");
-    #System/println(i: vk);
-    #printBuff();
   }
   
   func onKeyUp(int32 vk) {
-    # remove down key
     int32 index = findDownKeyIndex(vk: vk);
-    if (index != -1) {
-      int32 i = index;
-      while (i < (keysDown - 1)) {
-        PTR[int32] current = keyBuffer + (i * size[int32]());
-        PTR[int32] next = current + size[int32]();
-        DRF(current) = DRF(next);
-        i = i + 1;
-      }
-      keysDown = keysDown - 1;
-    }
+    if (index == -1) done;
     
-    #System/print(s: STR"  up");
-    #System/println(i: vk);
-    #System/println();
-    #printBuff();
+    # remove down key
+    int32 i = index;
+    while (i < (keysDown - 1)) {
+      PTR[int32] current = keyBuffer + (i * size[int32]());
+      PTR[int32] next = current + size[int32]();
+      DRF(current) = DRF(next);
+      i = i + 1;
+    }
+    keysDown = keysDown - 1;
   }
   
   func onLooseFocus() {
     keysDown = 0;
+    setGrabbed(grabbed: no);
   }
   
   #func printBuff() {
@@ -107,9 +129,11 @@ package mogroft/Controls {
 package mogroft/InputHandlerFly {
 
   use mogroft/Controls;
+  use mogroft/algebra/Vec3;
   use sus/System;
   use sus/native/Win;
   use mogroft/world/World;
+  use mogroft/world/Player;
   use mogroft/Mogroft;
 
   func InputHandler createInputHandler() {
@@ -117,11 +141,33 @@ package mogroft/InputHandlerFly {
       tick = funcref(tick),
       press = funcref(press),
       release = funcref(release),
-      looseFocus = funcref(looseFocus)
+      looseFocus = funcref(looseFocus),
+      mouseMove = funcref(mouseMove),
+      mouseMoveDelta = funcref(mouseMoveDelta)
     );
   }
-
+  
+  func mouseMoveDelta(int32 dx, int32 dy) {
+    if (Controls/isCursorGrabbed() == no) done;
+    
+    # how many pixels does the mouse have to move for the player to turn around 360°
+    real32 fullRotationPx = 1920.0 * 2.0; 
+    
+    real32 deltaYaw = cast[real32](dx) / fullRotationPx * -360.0;
+    real32 deltaPitch = cast[real32](dy) / fullRotationPx * -360.0;
+    
+    PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
+    Player/lookDelta(this: REF(DRF(world).player), dyaw: deltaYaw, dpitch: deltaPitch);
+    
+    System/print(s: STR"player look: ");
+    System/print(r: DRF(world).player.yaw, digits: 0);
+    System/print(s: STR" ");
+    System/print(r: DRF(world).player.pitch, digits: 0);
+    System/println();
+  }
+  
   func tick(real32 dt) {
+    if (Controls/isCursorGrabbed() == no) done;
   
     # 'WASD'.split('').map(x => x.charCodeAt(0).toString(16))
     # Array(4) [ "57", "41", "53", "44" ]
@@ -130,28 +176,30 @@ package mogroft/InputHandlerFly {
     int32 vkS = @53;
     int32 vkD = @44;
     
-    real32 forward = 0.0;
-    real32 sideways = 0.0;
-    real32 up = 0.0;
-    if (Controls/isDown(vk: vkW)) forward  = forward  - 1.0;
-    if (Controls/isDown(vk: vkS)) forward  = forward  + 1.0;
-    if (Controls/isDown(vk: vkD)) sideways = sideways + 1.0;
-    if (Controls/isDown(vk: vkA)) sideways = sideways - 1.0;
-    if (Controls/isDown(vk: Win/VK_SHIFT)) up = up - 1.0;
-    if (Controls/isDown(vk: Win/VK_SPACE)) up = up + 1.0;
-    
-    real32 accX = sideways;
-    real32 accZ = 0.0 - forward;
+    Vec3 wanted = Vec3(x=0.0, y=0.0, z=0.0);
+    if (Controls/isDown(vk: vkW))           wanted.z  = wanted.z - 1.0;
+    if (Controls/isDown(vk: vkS))           wanted.z  = wanted.z + 1.0;
+    if (Controls/isDown(vk: vkD))           wanted.x  = wanted.x + 1.0;
+    if (Controls/isDown(vk: vkA))           wanted.x  = wanted.x - 1.0;
     
     PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
+    real32 yaw = DRF(world).player.yaw;
+    
+    # rotate about view
+    
+    Vec3/rotate(this: REF(wanted), angle: yaw, v: Vec3(x=0.0, y = 1.0,z=0.0)); 
+    
+    if (Controls/isDown(vk: Win/VK_SHIFT))  wanted.y  = wanted.y - 1.0;
+    if (Controls/isDown(vk: Win/VK_SPACE))  wanted.y  = wanted.y + 1.0;
     
     real32 speed = 10.0;
     
-    DRF(world).player.position.z = DRF(world).player.position.z + (dt * speed * forward);
-    DRF(world).player.position.y = DRF(world).player.position.y + (dt * speed * up);
-    DRF(world).player.position.x = DRF(world).player.position.x + (dt * speed * sideways);
-
+    DRF(world).player.position.z = DRF(world).player.position.z + (dt * speed * wanted.z);
+    DRF(world).player.position.y = DRF(world).player.position.y + (dt * speed * wanted.y);
+    DRF(world).player.position.x = DRF(world).player.position.x + (dt * speed * wanted.x);
   }
+  
+  func mouseMove(int32 x, int32 y) {}
   func press(int32 vk) {}
   func release(int32 vk) {}
   func looseFocus() {}

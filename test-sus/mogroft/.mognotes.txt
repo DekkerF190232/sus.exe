@@ -1,5 +1,7 @@
 planed features:
 
+
+
   - chunk system:
 
     - block placing
@@ -8,4 +10,23 @@ planed features:
     
     - lighting?
     
-  - minesweeper
+  - game features
+  
+    - tree stems
+    
+    - leaves
+    
+    - dirt
+
+    - stone
+    
+    - crafting table
+    
+    - pickaxe 
+    
+    - axe
+    
+    - inventory 
+    
+    - inventory crafting
+    

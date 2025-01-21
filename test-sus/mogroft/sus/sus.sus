@@ -3,11 +3,15 @@ package sus/Math {
 
   static real32 PI = 3.14159265359;
   static real32 2PI = 6.28318530718;
-
+  static real32 SQRT2 = 1.41421356237;
+  
   func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
 
   func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
-  func CON(cdecl) real32 tanf(real32 x) EXT;
+  func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
+  func CON(cdecl) real32 remainderf(real32 x, real32 y) EXT;
+  func CON(cdecl) real32 floor(real32 x) EXT;
+  func CON(cdecl) real32 tan(real32 x) EXT;
   func CON(cdecl) real32 sinf(real32 x) EXT;
   func CON(cdecl) real32 cosf(real32 x) EXT;
   func CON(cdecl) real32 sqrtf(real32 x) EXT;
@@ -410,6 +414,7 @@ package sus/native/Win {
   }
   
   static int32 WM_CREATE         = @0001;
+  static int32 WM_INPUT          = @00ff;
   static int32 WM_PAINT          = @000f;
   static int32 WM_SIZE           = @0005;
   static int32 WM_KILLFOCUS      = @0008;
@@ -418,9 +423,22 @@ package sus/native/Win {
   static int32 WM_KEYDOWN        = @0100;
   static int32 WM_KEYUP          = @0101;
   static int32 WM_TIMER          = @0113;
+  static int32 WM_MOUSEMOVE      = @0200;
+  
+  static int32 WM_LBUTTONDOWN                  = @0201;
+  static int32 WM_LBUTTONUP                    = @0202;
+  static int32 WM_RBUTTONDOWN                  = @0204;
+  static int32 WM_RBUTTONUP                    = @0205;
 
-  func CON(stdcall) boo GetMessageA(PTR[WindowMessage] message, WindowHandle handle, int32 filterMin, int32 filterMax) EXT;
+  func CON(stdcall) boo GetMessageA(
+    PTR[WindowMessage] message,
+    WindowHandle handle,
+    int32 filterMin,
+    int32 filterMax) EXT;
 
+  func CON(stdcall) boo ReleaseCapture() EXT;
+  func CON(stdcall) WindowHandle SetCapture(WindowHandle handle) EXT;
+  
   func CON(stdcall) boo UpdateWindow(WindowHandle handle) EXT;
   func CON(stdcall) boo TranslateMessage(PTR[WindowMessage] message) EXT;
   func CON(stdcall) int32 DispatchMessageA(PTR[WindowMessage] message) EXT;
@@ -541,7 +559,10 @@ package sus/native/Win {
   func CON(stdcall) DeviceContextHandle BeginPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
   func CON(stdcall) DeviceContextHandle EndPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
 
-  
+  func CON(stdcall) boo ClipCursor(PTR[Rectangle] rectangle) EXT;
+  func CON(stdcall) int32 ShowCursor(boo show) EXT;
+  func CON(stdcall) boo GetClientRect(WindowHandle handle, PTR[Rectangle] rectangle) EXT;
+  func CON(stdcall) boo ClientToScreen(WindowHandle handle, PTR[Point] point) EXT;
   
   # files
   
@@ -589,6 +610,58 @@ package sus/native/Win {
   func CON(stdcall) boo GetFileSizeEx(
     int32 file,
     PTR[LargeInteger] fileSize
+  ) EXT;
+  
+  struct RawInputDevice (
+    int16 usagePage,
+    int16 usage,
+    int32 flags,
+    WindowHandle targetHandle
+  );
+  
+  static int16 HID_USAGE_PAGE_GENERIC     = cast[int16](@01);
+  static int16 HID_USAGE_GENERIC_MOUSE    = cast[int16](@02);
+  
+  static int32 RIM_TYPEMOUSE       = 0;
+  
+  func CON(stdcall) boo RegisterRawInputDevices(
+    PTR[RawInputDevice] devices,
+    int32 length,
+    int32 rawInputDeviceSize
+  ) EXT;
+  
+  struct RawInputHandle(int32 _unused);
+  
+  static int32 RID_HEADER = @10000005;
+  static int32 RID_INPUT = @10000003;
+  
+  struct RawInputHeader(
+    int32 type,
+    int32 length,
+    int32 deviceHandle,
+    int32 param
+  );
+  
+  struct RawInput(
+    RawInputHeader header,
+    array[int8, 24] data # may be RawInputDataMouse
+  );
+  
+  struct RawInputDataMouse (
+    int16 flags,
+    int32 buttons,
+    int32 rawButtons,
+    int32 lastX,
+    int32 lastY,
+    int32 extraInformation
+  );
+  
+  func CON(stdcall) int32 GetRawInputData(
+    RawInputHandle handle,
+    int32 uiCommand,
+    ptr data,
+    PTR[int32] dataSize,
+    int32 headerSize
   ) EXT;
 
 }

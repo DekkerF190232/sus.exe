@@ -4412,11 +4412,9 @@ function typeToString(type) {
       if (type.returnType) r += typeToString(type.returnType);
 
       if (type.convention !== 'sus' && type.convention !== undefined) {
-        if (r.length > 0) r += ' ';
-        r += 'CON(' + type.convention + ')';
+        r += 'CON(' + type.convention + ') ';
       }
 
-      if (r.length > 0) r += ' ';
       r += '(';
       r += type.params
         .map((x) => typeToString(x.type) + ' ' + x.name)

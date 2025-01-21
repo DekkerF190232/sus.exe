@@ -1,6 +1,9 @@
 
 
 package mogroft/algebra/Vec3 {
+
+  use sus/Math;
+  use sus/System;
   
   struct Vec3 (
     real32 x,
@@ -11,6 +14,98 @@ package mogroft/algebra/Vec3 {
   func Vec3 new() {
     done Vec3(x = 0.0, y = 0.0, z = 0.0);
   }
+  
+  # https://stackoverflow.com/a/42422624
+  #
+  # angle: [degrees]
+  # v: vector in relation to origin to rotate about anticlockwise
+  func rotate(PTR[Vec3] this, real32 angle, Vec3 v) {
+    real32 angleRad = angle * Math/PI / 180.0;
+    System/print(s: STR"angle: ");
+    System/print(r: angle);
+    System/print(s: STR" (");
+    System/print(r: angleRad);
+    System/print(s: STR")");
+    System/println();
+    
+    real32 cosTheta = Math/cosf(x: angleRad);
+    real32 sinTheta = Math/sinf(x: angleRad);
+    
+    System/print(s: STR"cos:");
+    System/print(r: cosTheta);
+    System/print(r: Math/cosf(x: angleRad));
+    System/println();
+    System/print(s: STR"sin:");
+    System/print(r: sinTheta);
+    System/println();
+    
+    Vec3 result = DRF(this);
+    System/println();
+    mul(this: REF(result), s: cosTheta);
+    System/print(s: STR"v1: ");
+    print(this: REF(result));
+    System/println();
+    
+    Vec3 v1 = cross(a: REF(v), b: this);
+    mul(this: REF(v1),      s: sinTheta);
+    add(this: REF(result),  v: v1);
+    System/print(s: STR"v2: ");
+    print(this: REF(v1));
+    System/println();
+    
+    Vec3 v2 = v;
+    mul(this: REF(v2),      s: dot(a: REF(v), b: this) * (1.0 - cosTheta));
+    add(this: REF(result),  v: v2);
+    System/print(s: STR"v3: ");
+    print(this: REF(v2));
+    System/println();
+    
+    
+    DRF(this) = result;
+  }
+  
+  func add(PTR[Vec3] this, Vec3 v) {
+    DRF(this).x = DRF(this).x + v.x;
+    DRF(this).y = DRF(this).y + v.y;
+    DRF(this).z = DRF(this).z + v.z;
+  }
+  
+  func mul(PTR[Vec3] this, Vec3 v) {
+    DRF(this).x = DRF(this).x * v.x;
+    DRF(this).y = DRF(this).y * v.y;
+    DRF(this).z = DRF(this).z * v.z;
+  }
+  
+  func mul(PTR[Vec3] this, real32 s) {
+    DRF(this).x = DRF(this).x * s;
+    DRF(this).y = DRF(this).y * s;
+    DRF(this).z = DRF(this).z * s;
+  }
+  
+  func real32 dot(PTR[Vec3] a, PTR[Vec3] b) {
+    done (DRF(a).x * DRF(b).x) +
+         (DRF(a).y * DRF(b).y) +
+         (DRF(a).z * DRF(b).z);
+  }
+  
+  func Vec3 cross(PTR[Vec3] a, PTR[Vec3] b) {
+    done Vec3(
+      x = (DRF(a).y * DRF(b).z) - (DRF(a).z * DRF(b).y),
+      y = (DRF(a).z * DRF(b).x) - (DRF(a).x * DRF(b).z),
+      z = (DRF(a).x * DRF(b).y) - (DRF(a).y * DRF(b).x)
+    );
+  }
+  
+  func print(PTR[Vec3] this) {
+    System/print(s: STR"(");
+    System/print(r: DRF(this).x);
+    System/print(s: STR", ");
+    System/print(r: DRF(this).y);
+    System/print(s: STR", ");
+    System/print(r: DRF(this).z);
+    System/print(s: STR")");
+  }
+  
   
 }
 
