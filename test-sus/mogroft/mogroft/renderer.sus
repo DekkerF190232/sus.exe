@@ -48,7 +48,7 @@ package mogroft/Renderer {
     real32 aspect = cast[real32](DRF(this).width) / cast[real32](DRF(this).height);
 
     # i dont know what's going on with near and far plane....
-    setWorldPerspective(fov: 90.0, aspect: aspect, near: 30.0, far: 100.0); 
+    setWorldPerspective(fov: 70.0, aspect: aspect, near: 0.5, far: 1000.0); 
     
     Gl/glPushMatrix();
     
@@ -90,7 +90,7 @@ package mogroft/Renderer {
   }
   
   func setWorldPerspective(real32 fov, real32 aspect, real32 near, real32 far) {
-    real32 f = 1.0 / Math/tan(x: fov * 0.5 * Math/2PI / 360.0);
+    real32 f = 1.0 / Math/tanf(x: fov * 0.5 * Math/PI / 180.0);
     
     PTR[real32] matrix = ARR[real32](16);
     

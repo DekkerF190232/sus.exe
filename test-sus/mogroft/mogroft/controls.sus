@@ -159,11 +159,11 @@ package mogroft/InputHandlerFly {
     PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
     Player/lookDelta(this: REF(DRF(world).player), dyaw: deltaYaw, dpitch: deltaPitch);
     
-    System/print(s: STR"player look: ");
-    System/print(r: DRF(world).player.yaw, digits: 0);
-    System/print(s: STR" ");
-    System/print(r: DRF(world).player.pitch, digits: 0);
-    System/println();
+    #System/print(s: STR"player look: ");
+    #System/print(r: DRF(world).player.yaw, digits: 0);
+    #System/print(s: STR" ");
+    #System/print(r: DRF(world).player.pitch, digits: 0);
+    #System/println();
   }
   
   func tick(real32 dt) {

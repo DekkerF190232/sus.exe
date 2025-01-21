@@ -21,43 +21,20 @@ package mogroft/algebra/Vec3 {
   # v: vector in relation to origin to rotate about anticlockwise
   func rotate(PTR[Vec3] this, real32 angle, Vec3 v) {
     real32 angleRad = angle * Math/PI / 180.0;
-    System/print(s: STR"angle: ");
-    System/print(r: angle);
-    System/print(s: STR" (");
-    System/print(r: angleRad);
-    System/print(s: STR")");
-    System/println();
-    
-    real32 cosTheta = Math/sin(x: angleRad); # WHAT THE ACTUAL FUCK 
-    real32 sinTheta = Math/cos(x: angleRad);
-    
-    System/print(s: STR"cos:");
-    System/print(r: cosTheta);
-    System/println();
-    System/print(s: STR"sin:");
-    System/print(r: sinTheta);
-    System/println();
+
+    real32 cosTheta = Math/cosf(x: angleRad);
+    real32 sinTheta = Math/sinf(x: angleRad);
     
     Vec3 result = DRF(this);
-    System/println();
     mul(this: REF(result), s: cosTheta);
-    System/print(s: STR"v1: ");
-    print(this: REF(result));
-    System/println();
     
     Vec3 v1 = cross(a: REF(v), b: this);
     mul(this: REF(v1),      s: sinTheta);
     add(this: REF(result),  v: v1);
-    System/print(s: STR"v2: ");
-    print(this: REF(v1));
-    System/println();
     
     Vec3 v2 = v;
     mul(this: REF(v2),      s: dot(a: REF(v), b: this) * (1.0 - cosTheta));
     add(this: REF(result),  v: v2);
-    System/print(s: STR"v3: ");
-    print(this: REF(v2));
-    System/println();
     
     
     DRF(this) = result;

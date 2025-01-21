@@ -35,7 +35,7 @@ package Test {
   use sus/Math;
 
   func runTest() {
-    #done;
+    done;
     System/println(s: STR"Running Tests ... ============================================================");
     doTest();
     System/println(s: STR"Ran Tests --------------------------------------------------------------------");
@@ -48,12 +48,12 @@ package Test {
   }
   
   func testVectors() {
-    #System/print(s: STR"sin: ");
-    System/print(r: Math/sin(x: 3.14));
+    System/print(s: STR"sin: ");
+    System/print(r: Math/sinf(x: 3.14));
     System/println();
     
-    #System/print(s: STR"cos: ");
-    System/print(r: Math/cos(x: 3.14));
+    System/print(s: STR"cos: ");
+    System/print(r: Math/cosf(x: 3.14));
     System/println();
     
     #Vec3 v1 = Vec3(x=0.0, y=0.0, z=1.0);
