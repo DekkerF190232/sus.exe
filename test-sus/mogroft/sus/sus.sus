@@ -1,20 +1,39 @@
 
+package sus/native/CMath {
+  
+  func CON(cdecl) real64 sin(real64 x) EXT;
+  func CON(cdecl) real64 cos(real64 x) EXT;
+  
+}
+
 package sus/Math {
+
+  use sus/native/CMath;
 
   static real32 PI = 3.14159265359;
   static real32 2PI = 6.28318530718;
   static real32 SQRT2 = 1.41421356237;
   
   func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
-
   func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
   func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
-  func CON(cdecl) real32 remainder(real32 x, real32 y) EXT;
+  func CON(cdecl) real32 remainderf(real32 x, real32 y) EXT;
+  func CON(cdecl) real32 sqrtf(real32 x) EXT;
+  
+  # works apparently (idk why, it does not have f prefix/suffix)
   func CON(cdecl) real32 floor(real32 x) EXT;
   func CON(cdecl) real32 tan(real32 x) EXT;
-  func CON(cdecl) real32 sin(real32 x) EXT;# todo: upate declarations to double
+  func CON(cdecl) real32 sin(real32 x) EXT;
   func CON(cdecl) real32 cos(real32 x) EXT;
-  func CON(cdecl) real32 sqrtf(real32 x) EXT;
+  
+  #func CON(cdecl) real64 sin(real64 x) EXT;
+  #func CON(cdecl) real64 cos(real64 x) EXT;
+  #func real32 sinf(real32 x) {
+  #  done cast[real32](CMath/sin(x: cast[real64](x)));
+  #}
+  #func real32 cosf(real32 x) {
+  #  done cast[real32](CMath/cos(x: cast[real64](x)));
+  #}
   
 }
 

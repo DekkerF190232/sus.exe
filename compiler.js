@@ -2299,6 +2299,8 @@ function compile(state) {
 
     let isFloat =
       hasReturn && typeToString(callInfo.typeFuncPtr.returnType) === 'real32';
+    let isDouble =
+      hasReturn && typeToString(callInfo.typeFuncPtr.returnType) === 'real64';
     // reserve return value and push pointer to return value as hidden argument
     if (hasReturn && returnSize > 8) {
       // r += line(`lea     eax, [esp - 4]`);
@@ -2328,6 +2330,9 @@ function compile(state) {
     if (isFloat) {
       r += line('sub     esp, 4');
       r += line('fstp    dword [esp]');
+    } else if (isDouble) {
+      r += line('sub     esp, 8');
+      r += line('fstp    qword [esp]');
     } else {
       if (returnSize <= 8) r += line('push    eax');
       if (returnSize === 8) r += line('push    edx');
@@ -2354,6 +2359,8 @@ function compile(state) {
 
     let isFloat =
       hasReturn && typeToString(callInfo.typeFuncPtr.returnType) === 'real32';
+    let isDouble =
+      hasReturn && typeToString(callInfo.typeFuncPtr.returnType) === 'real64';
 
     // reserve return value and push pointer to return value as hidden argument
     if (hasReturn && returnSize > 8) {
@@ -2381,6 +2388,9 @@ function compile(state) {
     if (isFloat) {
       r += line('sub     esp, 4');
       r += line('fstp    dword [esp]');
+    } else if (isDouble) {
+      r += line('sub     esp, 8');
+      r += line('fstp    qword [esp]');
     } else {
       if (returnSize <= 8) r += line('push    eax');
       if (returnSize === 8) r += line('push    edx');

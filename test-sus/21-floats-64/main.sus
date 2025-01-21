@@ -2,24 +2,44 @@ package Main {
 
   use sus/System;
   use sus/native/Win;
+  use sus/c/CMath;
 
-  #func CON(stdcall) 
-
+  # Angle (degrees)   Angle (radians)	  sin(angle)	cos(angle)
+  # 0°	              0.000000	        0.000000	  1.000000
+  # 30°	              0.523599	        0.500000	  0.866025
+  # 45°	              0.785398	        0.707107	  0.707107
+  # 60°	              1.047198	        0.866025	  0.500000
+  # 90°	              1.570796	        1.000000	  0.000000
   main {
     boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
-
-    ASM {
-      ; INIT
-    }
-    real64 a = cast[real64](0.1);
     
-    ASM {
-      ; CONVERSION
-    }
-    real32 c = cast[real32](a);
+    real64 x = cast[real64](2.2);
+    real64 r = CMath/sin(x: x);
+    real32 c = cast[real32](r);
+
+    System/print(s:STR"sin(");
+    System/print(r: cast[real32](x));
+    System/print(s:STR") = ");
     System/print(r: c);
     System/println();
     
+    System/exit(code: 0);
   }
+
+  func basics() {
+
+    real64 a = cast[real64](0.1);
+    
+    real32 c = cast[real32](a);
+    System/print(r: c);
+    System/println();
+  }
+
+}
+  
+package sus/c/CMath {
+  
+  func CON(cdecl) real64 sin(real64 x) EXT;
+  func CON(cdecl) real64 cos(real64 x) EXT;
 
 }

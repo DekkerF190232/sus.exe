@@ -28,12 +28,11 @@ package mogroft/algebra/Vec3 {
     System/print(s: STR")");
     System/println();
     
-    real32 cosTheta = Math/cosf(x: angleRad);
-    real32 sinTheta = Math/sinf(x: angleRad);
+    real32 cosTheta = Math/sin(x: angleRad); # WHAT THE ACTUAL FUCK 
+    real32 sinTheta = Math/cos(x: angleRad);
     
     System/print(s: STR"cos:");
     System/print(r: cosTheta);
-    System/print(r: Math/cosf(x: angleRad));
     System/println();
     System/print(s: STR"sin:");
     System/print(r: sinTheta);
