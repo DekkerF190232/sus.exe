@@ -2823,12 +2823,9 @@ function compile(state) {
       }
       // r += line(`add     esp, ${rootScope.returnInfo.size}`); // left out because esp is overwritten next line
     } else {
-      let returnExpr = ins.kids.find((x) => x.name === 'expr');
-      if (returnExpr)
-        throw makeErr(
-          ins.i,
-          'unnecessary return expression: ' + JSON.stringify(returnExpr)
-        );
+      let returnExpr = ins.kids !== undefined && ins.kids.find((x) => x.name === 'expr');
+      // prettier-ignore
+      if (returnExpr) throw makeErr( ins.i, 'unnecessary return expression: ' + JSON.stringify(returnExpr) );
     }
 
     for (let i = 0; i < lv; i++) {
@@ -3598,7 +3595,7 @@ function compile(state) {
   function compileExprArray(expr, scope, addressScope) {
     let r = '';
 
-    let elType = getActualType(expr.kids[0]);
+    let elType = getActualType(expr.kids[0], addressScope);
     let size = expr.props.size;
     _ass(size);
 
@@ -3914,6 +3911,7 @@ function compile(state) {
     try {
       return getType(state.ctx, addressScope, typeNode);
     } catch (e) {
+      console.log('(causing error) ', e);
       throw makeErr(typeNode.i, 'failed to get type: ' + e.message);
     }
   }
@@ -4839,7 +4837,7 @@ function loadIndexStruct(ctx) {
       calcStructSize(struct, structDepth);
       return struct.size;
     } else if (type.kind === 'array') {
-      return getSize1(ctx, type.type) * type.size;
+      return calcMemberSize(type.type, structDepth) * type.size;
     } else if (type.kind === 'prim') {
       return getSize1(ctx, type);
     } else if (type.kind === 'funcptr') {

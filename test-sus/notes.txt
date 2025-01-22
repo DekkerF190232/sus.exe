@@ -71,8 +71,7 @@ ISSUES
 MISSING
   - type arguments
 
-    decl:
-    
+    # decl:
     struct List(int32 unused);
 
     # creating of a keyed struct type
@@ -86,6 +85,9 @@ MISSING
     func add<T>(PTR[List<T>] this, T element) {
       int32 size = size[T]();
     }
+
+    # calls
+    List/add(this: REF(list), element: REF(newChunk));
 
   - Lambdas
   - Interfaces

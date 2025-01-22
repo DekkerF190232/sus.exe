@@ -37,6 +37,7 @@ package sus/Gl {
   static int32 GL_TEXTURE_2D                   = @0DE1;
   static int32 GL_DEPTH_TEST                   = @0B71;
   static int32 GL_BLEND                        = @0BE2;
+  static int32 GL_CULL_FACE                    = @0B44;
   
   # formats
   static int32 GL_RGBA                         = @1908;
@@ -73,6 +74,31 @@ package sus/Gl {
   # texture wrap mode
   static int32 GL_CLAMP                        = @2900;
   static int32 GL_REPEAT                       = @2901;
+  
+  # list modes 
+  static int32 GL_COMPILE                      = @1300;
+  static int32 GL_COMPILE_AND_EXECUTE          = @1301;
+  
+  # draw buffer mode
+  static int32 GL_NONE                         = 0;
+  static int32 GL_FRONT_LEFT                   = @0400;
+  static int32 GL_FRONT_RIGHT                  = @0401;
+  static int32 GL_BACK_LEFT                    = @0402;
+  static int32 GL_BACK_RIGHT                   = @0403;
+  static int32 GL_FRONT                        = @0404;
+  static int32 GL_BACK                         = @0405;
+  static int32 GL_LEFT                         = @0406;
+  static int32 GL_RIGHT                        = @0407;
+  static int32 GL_FRONT_AND_BACK               = @0408;
+  static int32 GL_AUX0                         = @0409;
+  static int32 GL_AUX1                         = @040A;
+  static int32 GL_AUX2                         = @040B;
+  static int32 GL_AUX3                         = @040C;
+  
+  # polygon mode
+  static int32 GL_POINT                        = @1B00;
+  static int32 GL_LINE                         = @1B01;
+  static int32 GL_FILL                         = @1B02;
     
   # erros
   func CON(stdcall) int32 glGetError() EXT;
@@ -96,6 +122,13 @@ package sus/Gl {
     PTR[int8] pixels) EXT;
   func CON(stdcall) glBindTexture(int32 target, int32 texture) EXT;
   func CON(stdcall) glGenTextures(int32 n, PTR[int32] textures) EXT;
+  
+  # lists
+  func CON(stdcall) glDeleteLists(int32 lists, int32 range) EXT;
+  func CON(stdcall) glNewList(int32 lists, int32 mode) EXT;
+  func CON(stdcall) glCallList(int32 lists) EXT;
+  func CON(stdcall) glEndList() EXT;
+  func CON(stdcall) int32 glGenLists(int32 range) EXT;
     
   # general rendering
   func CON(stdcall) glViewport(int32 x, int32 y, int32 width, int32 height) EXT;
@@ -108,6 +141,7 @@ package sus/Gl {
   func CON(stdcall) glDisable(int32 cap) EXT;
   func CON(stdcall) glBlendFunc(int32 sfactor, int32 dfactor) EXT;
   
+  
   # matrices
   func CON(stdcall) glMatrixMode(int32 mode) EXT;
   func CON(stdcall) glMultMatrixf(PTR[real32] matrix) EXT;
@@ -119,6 +153,7 @@ package sus/Gl {
   func CON(stdcall) glTranslatef(real32 x, real32 y, real32 z) EXT;
   
   # drawing
+  func CON(stdcall) glPolygonMode(int32 face, int32 mode) EXT;
   func CON(stdcall) glVertex3f(real32 x, real32 y, real32 z) EXT;
   func CON(stdcall) glTexCoord2f(real32 u, real32 v) EXT;
   func CON(stdcall) glEnd() EXT;

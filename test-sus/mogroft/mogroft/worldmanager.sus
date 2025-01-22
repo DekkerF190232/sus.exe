@@ -1,5 +1,6 @@
 package mogroft/world/WorldManager {
 
+  use sus/System;
   use mogroft/world/World;
   use mogroft/world/Block;
   use mogroft/world/Blocks;
@@ -33,7 +34,9 @@ package mogroft/world/WorldManager {
 
     PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
 
-    PTR[Chunk] newChunk = ChunkList/add(this: chunkList);
+    PTR[Chunk] newChunk = RTP[PTR[Chunk]](0);
+  
+    newChunk = ChunkList/add(this: chunkList);
     DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = 0, z = 0);
     generateChunk(chunk: newChunk);
     onLoadedFunc(chunk: newChunk);
@@ -45,27 +48,35 @@ package mogroft/world/WorldManager {
   }
 
   func generateChunk(PTR[Chunk] chunk) {
+    #System/print(s: STR"miau ");
+    
     PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));
-    int32 x = 0;
     int32 y = 0;
-    int32 z = 0;
-    while (z < Chunk/SIZE) {
-      while (y < Chunk/SIZE) {
+    while (y < Chunk/SIZE) {
+      int32 z = 0;
+      while (z < Chunk/SIZE) {
+        int32 x = 0;
         while (x < Chunk/SIZE) {
           PTR[Block] block = blocks + (z * Chunk/SIZE * Chunk/SIZE) + (y * Chunk/SIZE) + x;
           
           if (DRF(chunk).chunkCoord.y >= 0) {
-            DRF(block) = Block/new(id: Blocks/ID_AIR);
+            DRF(block) = Blocks/BLOCK_AIR;
           } else {
-            DRF(block) = Block/new(id: Blocks/ID_STONE);
+            DRF(block) = Blocks/BLOCK_STONE;
           }
+          
+          #System/print(b: Block/isSolid(block: block));
           
           x = x + 1;
         }
-        y = y + 1;
+        z = z + 1;
       }
-      z = z + 1;
+      y = y + 1;
     }
+    
+    #System/print(s: STR"world manager chunk: ");
+    #System/print(i: RTP[int32](chunk));
+    #System/println();
   }
 
 }

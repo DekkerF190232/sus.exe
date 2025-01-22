@@ -2,15 +2,18 @@ package mogroft/Texture {
 
   use sus/native/Win;
   use sus/System;
+  use sus/Limits;
   use sus/File;
   use sus/Memory;
   use mogroft/Renderer;
   use sus/Gl;
   
   static int32 txTile1 = -1;
+  static int32 txBlocks = -1;
   
   func init() {
     txTile1 = loadTexture(file: STR"assets/tile1.bmp");
+    txBlocks = loadTexture(file: STR"assets/blocks.bmp");
   }
   
   # note: using arrays, because of padding
@@ -36,8 +39,6 @@ package mogroft/Texture {
     int32 biClrImportant
   );
   
-  # note: expects rgba array, lowest row first, then every other row 
-  # (pixels from right to left). does not free data
   func int32 loadTexture(int32 width, int32 height, PTR[int8] data) {
     int32 textureId = 0;
     Gl/glGenTextures(n: 1, textures: REF(textureId));
@@ -99,8 +100,8 @@ package mogroft/Texture {
     
     Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_WRAP_S, param: Gl/GL_REPEAT);
     Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_WRAP_T, param: Gl/GL_REPEAT);
-    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MIN_FILTER, param: Gl/GL_LINEAR);
-    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MAG_FILTER, param: Gl/GL_LINEAR);
+    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MIN_FILTER, param: Gl/GL_NEAREST);
+    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MAG_FILTER, param: Gl/GL_NEAREST);
     Gl/glBindTexture(target: Gl/GL_TEXTURE_2D, texture: 0);
     
     Gl/printError(location: STR"After loading texture");
@@ -170,6 +171,37 @@ package mogroft/Texture {
       DRF(base+3) = DRF(RTP[PTR[int8]](REF(argb)) + 3);
 
       i = i + 1;
+    }
+    
+    # flip rows
+    {
+      int32 end = DRF(height) / 2;
+      int32 flipY = 0;
+      int32 scanSize = DRF(width) * 4;
+      ptr buffer = RTP[ptr](ARR[int8](scanSize));
+      while (flipY < end) {
+        ptr a = RTP[ptr](pixelData + (flipY * scanSize));
+        ptr b = RTP[ptr](pixelData + ((DRF(height) - 1 - flipY) * scanSize));
+        int32 _1 = Memory/memcpy_s(
+          dest:     buffer,
+          destSize: Limits/INT32_MAX,
+          source:   a,
+          bytes:    scanSize
+        );
+        int32 _2 = Memory/memcpy_s(
+          dest:     a,
+          destSize: Limits/INT32_MAX,
+          source:   b,
+          bytes:    scanSize
+        );
+        int32 _3 = Memory/memcpy_s(
+          dest:     b,
+          destSize: Limits/INT32_MAX,
+          source:   buffer,
+          bytes:    scanSize
+        );
+        flipY = flipY + 1;
+      }
     }
 
     #System/print(s: STR"Image dump after");

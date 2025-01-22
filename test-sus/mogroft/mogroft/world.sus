@@ -33,17 +33,29 @@ package mogroft/world/Block {
   func Block new(int8 id) {
     done Block(id = id);
   }
+  
+  func boo isSolid(PTR[Block] block) {
+    done cast[int32](DRF(block).id) > 1;
+  }
 
 }
 
 package mogroft/world/Blocks {
   
-  static int8 ID_AIR = cast[int8](1);
-  static int8 ID_STONE = cast[int8](2);
-  static int8 ID_GRASS = cast[int8](3);
-  static int8 ID_DIRT = cast[int8](4);
-  static int8 ID_LOG = cast[int8](5);
-  static int8 ID_WOOD = cast[int8](6);
+  use mogroft/world/Block;
+  
+  static Block BLOCK_AIR   = Block(id=cast[int8](1));
+  static Block BLOCK_STONE = Block(id=cast[int8](2));
+  static Block BLOCK_GRASS = Block(id=cast[int8](3));
+  static Block BLOCK_DIRT  = Block(id=cast[int8](4));
+  static Block BLOCK_LOG   = Block(id=cast[int8](5));
+  static Block BLOCK_WOOD  = Block(id=cast[int8](6));
+  
+  static int32 BLOCK_COUNT = 6;
+
+  func int32 ordinal(Block block) {
+    done cast[int32](block.id) - 1;
+  }
 
 }
 
@@ -69,7 +81,6 @@ package mogroft/world/Chunk {
     ChunkCoord chunkCoord,
     array[Block, 4096] blocks # 16^3 = 4096
   );
-
 
   func PTR[Chunk] alloc() {
     done RTP[PTR[Chunk]](Memory/malloc(bytes: size[Chunk]()));

@@ -40,22 +40,22 @@ package mogroft/Mogroft {
     ));
   }
   
-  func onMouseMove(int32 x, int32 y) {
-    Controls/onMouseMove(x: x, y: y);
-  }
-  
-  func onMouseMoveDelta(int32 dx, int32 dy) {
-    Controls/onMouseMoveDelta(dx: dx, dy: dy);
-  }
+  # world events
   
   func onChunkLoaded(PTR[Chunk] chunk) {
-    #Renderer/onChunLoaded(chunk: chunk);
+    Renderer/onChunkLoaded(this: REF(DRF(_mogroft).rendererState), chunk: chunk);
+  }
+  
+  # game loop events
+  
+  func tick(real32 dt) {
+    Controls/tick(dt: dt);
   }
   
   func init() {
     Controls/init();
-    Renderer/init();
     Texture/init();
+    Renderer/init(this: REF(DRF(_mogroft).rendererState));
   }
   
   func render() {
@@ -65,8 +65,14 @@ package mogroft/Mogroft {
     tick(dt: dt);
   }
   
-  func tick(real32 dt) {
-    Controls/tick(dt: dt);
+  # user events
+  
+  func onMouseMove(int32 x, int32 y) {
+    Controls/onMouseMove(x: x, y: y);
+  }
+  
+  func onMouseMoveDelta(int32 dx, int32 dy) {
+    Controls/onMouseMoveDelta(dx: dx, dy: dy);
   }
   
   func resize(int32 width, int32 height) {
