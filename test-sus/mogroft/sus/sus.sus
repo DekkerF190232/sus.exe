@@ -760,6 +760,30 @@ package sus/List {
     DRF(this)._memory = newMemory;
   }
   
+  # func PTR[ptr] add2(PTR[List] this, ptr element) {
+  #   System/print(s: STR"before list insert: ");
+  #   System/println(i_0x: DRF(RTP[PTR[int32]](element)));
+  #   
+  #   checkGrow(this: this, amount: 1);
+  # 
+  #   PTR[ptr] index = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+  #   DRF(this).length = DRF(this).length + 1;
+  #   
+  #   if (RTP[int32](element) == 0) done index;
+  # 
+  #   int32 _0 = Memory/memcpy_s(
+  #     dest:     RTP[ptr](index),
+  #     destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
+  #     source:   element,
+  #     bytes:    DRF(this)._elementSize
+  #   );
+  #   
+  #   System/print(s: STR"after list insert: ");
+  #   System/println(i_0x: DRF(RTP[PTR[int32]](index)));
+  #   
+  #   done index;
+  # }
+  
   # adds element at the pointer *element* and returns pointer to the copy made into the list.
   # *element* may be 0
   func PTR[ptr] add(PTR[List] this, ptr element) {

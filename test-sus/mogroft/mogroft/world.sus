@@ -68,7 +68,7 @@ package mogroft/world/Chunk {
   static int32 SIZE = 16;
   static Chunk CHUNK_EMPTY = Chunk(
     chunkCoord = ChunkCoord(x=0, y=0, z=0),
-    blocks = array[Block, 4096](Block(id = cast[int8](0)))
+    blocks = array[Block, 4096](Block(id = cast[int8](1)))
   );
 
   struct ChunkCoord (

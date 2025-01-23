@@ -377,6 +377,7 @@ package mogroft/render/ChunkRender {
   
   use mogroft/world/World;
   use mogroft/world/Chunk;
+  use mogroft/world/ChunkList;
   use mogroft/world/Block;
   use mogroft/world/WorldManager;
 
@@ -392,15 +393,25 @@ package mogroft/render/ChunkRender {
   
   func ChunkRender new() {
     done ChunkRender(
-      chunkQueue = List/alloc(elementSize: size[PTR[Chunk]]()), # later, chunks to be updated will be stored here.
+      chunkQueue = List/alloc(elementSize: size[ChunkCoord]()), # note: can not use chunk itself, because chunks are stored in dynamic list. -> chunk pointers change
       chunkBuildList = List/alloc(elementSize: size[ChunkBuild]())
     );
   }
   
   func onChunkLoaded(PTR[ChunkRender] this, PTR[RendererState] renderer, PTR[Chunk] chunk) {
+    #System/print(s: STR"last: ");
+    #System/print(i: DRF(chunk).chunkCoord.x);
+    #System/print(s: STR" ");
+    #System/print(i: DRF(chunk).chunkCoord.y);
+    #System/print(s: STR" ");
+    #System/print(i: DRF(chunk).chunkCoord.z);
+    #System/println();
+    
+    ChunkCoord coord = DRF(chunk).chunkCoord;
+    
     PTR[ptr] _1 = List/add(
       this:     REF(DRF(this).chunkQueue),
-      element:  RTP[ptr](REF(chunk))
+      element:  RTP[ptr](REF(coord))
     );
   }
 
@@ -448,21 +459,34 @@ package mogroft/render/ChunkRender {
   
   # chooses chunks to load from queue
   func chooseRebuilds(PTR[ChunkRender] this, PTR[RendererState] renderer) {
-    PTR[PTR[Chunk]] current = RTP[PTR[PTR[Chunk]]](List/at(
+    PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
+    PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
+    
+    PTR[ChunkCoord] current = RTP[PTR[ChunkCoord]](List/at(
       this: REF(DRF(this).chunkQueue),
       i: 0
     ));
-    PTR[PTR[Chunk]] end = RTP[PTR[PTR[Chunk]]](List/at(
+    PTR[ChunkCoord] end = RTP[PTR[ChunkCoord]](List/at(
       this: REF(DRF(this).chunkQueue),
       i: DRF(this).chunkQueue.length
     ));
-
+    
     while (RTP[int32](current) != RTP[int32](end)) {
-      PTR[Chunk] chunk = DRF(current);
+      #System/print(s:STR"rebuild: ");
+      #System/print(i:DRF(current).x);
+      #System/print(s:STR" ");
+      #System/print(i:DRF(current).y);
+      #System/print(s:STR" ");
+      #System/print(i:DRF(current).z);
+      #System/println();
+      
+      PTR[Chunk] chunk = ChunkList/find(this: chunkList, chunkCoord: DRF(current));
+      
+      if (RTP[int32](chunk) == 0) System/fatal(reason: STR"rebuilding unloaded chunk");
       
       rebuild(this: this, renderer: renderer, chunk: chunk);
       
-      current = current + size[PTR[Chunk]]();
+      current = current + DRF(this).chunkQueue._elementSize;
     }
     List/clear(this: REF(DRF(this).chunkQueue));
   }
@@ -672,9 +696,9 @@ package mogroft/render/ChunkRender {
             
             if (Block/isSolid(block: block) == no) break 1;
             
-            real32 rx = cast[real32](x);
-            real32 ry = cast[real32](y);
-            real32 rz = cast[real32](z);
+            real32 rx = cast[real32](x + (DRF(chunk).chunkCoord.x * Chunk/SIZE));
+            real32 ry = cast[real32](y + (DRF(chunk).chunkCoord.y * Chunk/SIZE));
+            real32 rz = cast[real32](z + (DRF(chunk).chunkCoord.z * Chunk/SIZE));
             
             if (front == no)  buildFront(renderer: renderer, block: block, x: rx, y: ry, z: rz);
             if (back == no)   buildBack(renderer: renderer, block: block, x: rx, y: ry, z: rz);

@@ -1,6 +1,9 @@
 package mogroft/world/WorldManager {
 
   use sus/System;
+
+  use mogroft/Noise2DFractal;
+
   use mogroft/world/World;
   use mogroft/world/Block;
   use mogroft/world/Blocks;
@@ -32,23 +35,86 @@ package mogroft/world/WorldManager {
     
     funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
 
-    PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
+    #PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
+    
+    callGenerateRange(this: this, x: 0, y: 0, z: 0, flatRange: 1, yRange: 1);
 
-    PTR[Chunk] newChunk = RTP[PTR[Chunk]](0);
+    #PTR[Chunk] newChunk = RTP[PTR[Chunk]](0);
+    #
+    #newChunk = ChunkList/add(this: chunkList);
+    #DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = 0, z = 0);
+    #generateChunk(chunk: newChunk);
+    #onLoadedFunc(chunk: newChunk);
+    #
+    #newChunk = ChunkList/add(this: chunkList);
+    #DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = -1, z = 0);
+    #generateChunk(chunk: newChunk);
+    #onLoadedFunc(chunk: newChunk);
+  }
   
-    newChunk = ChunkList/add(this: chunkList);
-    DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = 0, z = 0);
-    generateChunk(chunk: newChunk);
-    onLoadedFunc(chunk: newChunk);
-
-    newChunk = ChunkList/add(this: chunkList);
-    DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = -1, z = 0);
-    generateChunk(chunk: newChunk);
-    onLoadedFunc(chunk: newChunk);
+  func callGenerateRange(PTR[WorldManager] this, int32 x, int32 y, int32 z, int32 flatRange, int32 yRange) {
+    PTR[ChunkList] chunkList = REF(DRF(DRF(this).world).chunkList);
+    funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
+    
+    #PTR[Chunk] last = RTP[PTR[Chunk]](0);
+    int32 cy = y - yRange;
+    while (cy < (y + yRange)) {
+      int32 cz = z - flatRange;
+      while (cz < (z + flatRange)) {
+        int32 cx = x - flatRange;
+        while (cx < (x + flatRange)) {
+          #if (RTP[int32](last) != 0) {
+          #  System/print(s:STR"range: ");
+          #  System/print(i:DRF(last).chunkCoord.x);
+          #  System/print(s:STR" ");
+          #  System/print(i:DRF(last).chunkCoord.y);
+          #  System/print(s:STR" ");
+          #  System/print(i:DRF(last).chunkCoord.z);
+          #  System/println();
+          #}
+          ChunkCoord chunkCoord = ChunkCoord(x = cx, y = cy, z = cz);
+          PTR[Chunk] existing = ChunkList/find(this: chunkList, chunkCoord: chunkCoord);
+          if (RTP[int32](existing) == 0) {
+            PTR[Chunk] newChunk = ChunkList/add(this: chunkList);
+            #ASM {
+            #  SETTING_COORD:
+            #}
+            DRF(newChunk).chunkCoord = chunkCoord;
+            generateChunk(chunk: newChunk);
+            onLoadedFunc(chunk: newChunk);
+            #if (cy == 0) last = newChunk;
+          }
+          cx = cx + 1;
+        }
+        cz = cz + 1;
+      }
+      cy = cy + 1;
+    }
+  }
+  
+  func int32 stoneLevel(int32 x, int32 y, int32 z) {
+    real32 maxMaxStone = 128.0;
+    real32 minMaxStone = 64.0;
+    real32 scale = 0.1;
+    
+    real32 val = Noise2DFractal/noise(
+      x: cast[real32](x) * scale,
+      y: cast[real32](z) * scale,
+      levels: 3,
+      seed: 0
+    );
+    
+    done cast[int32](minMaxStone + val * (maxMaxStone - minMaxStone));
   }
 
   func generateChunk(PTR[Chunk] chunk) {
-    #System/print(s: STR"miau ");
+    #System/print(s:STR"generate: ");
+    #System/print(i:DRF(chunk).chunkCoord.x);
+    #System/print(s:STR" ");
+    #System/print(i:DRF(chunk).chunkCoord.y);
+    #System/print(s:STR" ");
+    #System/print(i:DRF(chunk).chunkCoord.z);
+    #System/println();
     
     PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));
     int32 y = 0;
@@ -73,10 +139,6 @@ package mogroft/world/WorldManager {
       }
       y = y + 1;
     }
-    
-    #System/print(s: STR"world manager chunk: ");
-    #System/print(i: RTP[int32](chunk));
-    #System/println();
   }
 
 }
