@@ -1,0 +1,27 @@
+package Main {
+
+  use sus/System;
+  use sus/native/Win;
+  use sus/c/CMath;
+
+  struct SubStruct (int32 a, int32 b);
+
+  struct Test (
+    int32 asdf,
+    SubStruct subStruct
+  );
+
+  main {
+    boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+
+    Test test = Test(asdf = 1, subStruct = SubStruct(a = 2, b = 3));
+
+    dump test;
+
+    System/println(s: STR"exited successfully");
+    System/exit(code: 0);   
+  }
+
+
+
+}

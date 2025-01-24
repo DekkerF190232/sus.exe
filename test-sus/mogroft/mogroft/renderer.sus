@@ -295,6 +295,9 @@ package mogroft/render/BlockSpriteSheet {
   );
   
   func BlockSprite makeBlockSprite(PTR[BlockSpriteSheet] this, int32 row, int32 col) {
+    ASM {
+      BEFORE_BLOCK_SPRITE:
+    }
     done BlockSprite(faces = array[BlockSpriteFace, 6](BlockSpriteFace(
       u = cast[real32](col) / cast[real32](DRF(this).cols),
       v = cast[real32](row) / cast[real32](DRF(this).rows)
@@ -324,6 +327,15 @@ package mogroft/render/BlockSpriteSheet {
     register(this: this, loaded: REF(loaded), block: Blocks/BLOCK_LOG,      sprite: makeBlockSprite(this: this, row: 0, col: 4));
     register(this: this, loaded: REF(loaded), block: Blocks/BLOCK_WOOD,     sprite: makeBlockSprite(this: this, row: 0, col: 6));
     if (loaded != Blocks/BLOCK_COUNT) System/fatal(reason: STR"sprite registry failed.");
+    
+    #PTR[BlockSpriteFace] face = resolve(this: this, block: Blocks/BLOCK_DIRT, side: Side/UP);
+    #BlockSprite sprite = makeBlockSprite(this: this, row: 0, col: 1);
+    #PTR[BlockSpriteFace] sf = RTP[PTR[BlockSpriteFace]](REF(sprite.faces))
+    #  + (size[BlockSpriteFace]() * Side/ordinal(side: Side/UP));
+    #System/print(r: DRF(sf).u);
+    #System/print(s: STR" ");
+    #System/print(r: DRF(sf).v);
+    #System/println();
   }
   
   func register(PTR[BlockSpriteSheet] this, PTR[int32] loaded, Block block, BlockSprite sprite) {

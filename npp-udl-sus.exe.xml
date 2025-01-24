@@ -24,7 +24,7 @@
             <Keywords name="Folders in comment, open"></Keywords>
             <Keywords name="Folders in comment, middle"></Keywords>
             <Keywords name="Folders in comment, close"></Keywords>
-            <Keywords name="Keywords1">func if else done break STR PTR int32 int16 int8 boo ARR REF DRF ASM SUS struct while size ptr RTP package use main cast funcptr funcref const CON real32 EXT array static real64</Keywords>
+            <Keywords name="Keywords1">func if else done break STR PTR int32 int16 int8 boo ARR REF DRF ASM SUS struct while size ptr RTP package use main cast funcptr funcref const CON real32 EXT array static real64 nat32</Keywords>
             <Keywords name="Keywords2"></Keywords>
             <Keywords name="Keywords3">yes no</Keywords>
             <Keywords name="Keywords4"></Keywords>

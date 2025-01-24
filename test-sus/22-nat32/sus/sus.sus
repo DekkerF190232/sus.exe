@@ -1,42 +1,20 @@
 
-package sus/c/CMath {
-  
-  #func CON(cdecl) real64 sin(real64 x) EXT;
-  #func CON(cdecl) real64 cos(real64 x) EXT;
-  
-  func CON(cdecl) real64 floor(real64 x) EXT;
-  func CON(cdecl) real64 tan(real64 x) EXT;
-  func CON(cdecl) real64 sin(real64 x) EXT;
-  func CON(cdecl) real64 cos(real64 x) EXT;
-  
-}
-
 package sus/Math {
-
-  use sus/c/CMath;
 
   static real32 PI = 3.14159265359;
   static real32 2PI = 6.28318530718;
   static real32 SQRT2 = 1.41421356237;
   
   func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+
   func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
   func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
   func CON(cdecl) real32 remainderf(real32 x, real32 y) EXT;
+  func CON(cdecl) real32 floor(real32 x) EXT;
+  func CON(cdecl) real32 tan(real32 x) EXT;
+  func CON(cdecl) real32 sinf(real32 x) EXT;
+  func CON(cdecl) real32 cosf(real32 x) EXT;
   func CON(cdecl) real32 sqrtf(real32 x) EXT;
-  
-  func real32 floorf(real32 x) {
-    done cast[real32](CMath/floor(x: cast[real64](x)));
-  }
-  func real32 tanf(real32 x) {
-    done cast[real32](CMath/tan(x: cast[real64](x)));
-  }
-  func real32 sinf(real32 x) {
-    done cast[real32](CMath/sin(x: cast[real64](x)));
-  }
-  func real32 cosf(real32 x) {
-    done cast[real32](CMath/cos(x: cast[real64](x)));
-  }
   
 }
 
@@ -49,7 +27,6 @@ package sus/native/Win {
   # strings
   func CON(cdecl) int32 strnlen(PTR[int8] buffer, int32 size) EXT;
   func CON(cdecl) _itoa_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) EXT;
-  func CON(cdecl) int32 _i64toa_s(LargeInteger value, PTR[int8] buffer, nat32 bufferSize, int32 radix) EXT;
 
   # stdout
   static int32 STD_OUTPUT_HANDLE = -11;
@@ -63,15 +40,6 @@ package sus/native/Win {
 
   # threads
   func CON(stdcall) Sleep(int32 ms) EXT;
-  
-  # time
-  struct FileTime(
-    nat32 low,
-    nat32 high
-  );
-  func CON(stdcall) GetSystemTimeAsFileTime(
-    PTR[FileTime] fileTime100Ns
-  ) EXT;
   
   # windows
   
@@ -698,76 +666,6 @@ package sus/native/Win {
 
 }
 
-package sus/Time {
-
-  use sus/native/Win;
-  use sus/System;
-  
-  #struct FileTime(
-  #  nat32 low,
-  #  nat32 high
-  #);
-  #func CON(stdcall) GetSystemTimeAsFileTime(
-  #  PTR[FileTime] fileTime100Ns
-  #) EXT;
-  
-  struct Time (
-    nat32 _low,
-    nat32 _high
-  );
-  
-  func Time now() {
-    Time res = Time(_low=cast[nat32](0), _high=cast[nat32](0));
-    Win/GetSystemTimeAsFileTime(fileTime100Ns: RTP[PTR[FileTime]](REF(res)));
-    done res;
-  }
-  
-  func Time sub(Time a, Time b) {
-    Time r = Time(_low=cast[nat32](0), _high=cast[nat32](0));
-    r._low = a._low - b._low;
-    
-    nat32 borrow = cast[nat32](0);
-    if (a._low < b._low) borrow = cast[nat32](1);
-    
-    r._high = a._high - b._high - borrow;
-  
-    done r;
-  }
-  
-  # note: this does not work for big time differences, as a int32
-  # of microseconds can not be above somewhere over 35 minutes
-  func int32 diff_mu(Time a, Time b) {
-    a = sub(a: a, b: b);
-    # perform x86 64-bit division of a: a / 10
-    ASM {
-      lea     ebx, SUS{a}       ; get pointer to a
-      mov     eax, [ebx]        ; a._low
-      mov     edx, [ebx + 4]    ; a._high
-      mov     ebx, 10
-      idiv    ebx
-      mov     SUS{a}, eax
-    }
-    done RTP[int32](a._low);
-  }
-  
-  # note: this does not work for larger time differences, as a int32
-  # of milliseconds can not be above somewhere over 24 days
-  func int32 diff_ms(Time a, Time b) {
-    a = sub(a: a, b: b);
-    # perform x86 64-bit division of a: a / 10000
-    ASM {
-      lea     ebx, SUS{a}       ; get pointer to a
-      mov     eax, [ebx]        ; a._low
-      mov     edx, [ebx + 4]    ; a._high
-      mov     ebx, 10000
-      idiv    ebx
-      mov     SUS{a}, eax
-    }
-    done RTP[int32](a._low);
-  }
-  
-}
-
 package sus/Limits {
   
   static int32 INT32_MAX = 2147483647;
@@ -839,30 +737,6 @@ package sus/List {
 
     DRF(this)._memory = newMemory;
   }
-  
-  # func PTR[ptr] add2(PTR[List] this, ptr element) {
-  #   System/print(s: STR"before list insert: ");
-  #   System/println(i_0x: DRF(RTP[PTR[int32]](element)));
-  #   
-  #   checkGrow(this: this, amount: 1);
-  # 
-  #   PTR[ptr] index = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
-  #   DRF(this).length = DRF(this).length + 1;
-  #   
-  #   if (RTP[int32](element) == 0) done index;
-  # 
-  #   int32 _0 = Memory/memcpy_s(
-  #     dest:     RTP[ptr](index),
-  #     destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
-  #     source:   element,
-  #     bytes:    DRF(this)._elementSize
-  #   );
-  #   
-  #   System/print(s: STR"after list insert: ");
-  #   System/println(i_0x: DRF(RTP[PTR[int32]](index)));
-  #   
-  #   done index;
-  # }
   
   # adds element at the pointer *element* and returns pointer to the copy made into the list.
   # *element* may be 0
