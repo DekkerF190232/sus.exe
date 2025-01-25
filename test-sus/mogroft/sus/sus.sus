@@ -55,6 +55,7 @@ package sus/native/Win {
   static int32 STD_OUTPUT_HANDLE = -11;
   func CON(stdcall) ExitProcess(int32 code) EXT;
   func CON(stdcall) int32 GetStdHandle(int32 handle) EXT;
+  func CON(stdcall) boo FlushFileBuffers(int32 handle) EXT;
   func CON(stdcall) boo WriteFile(int32 file, PTR[int8] buffer, int32 length, PTR[int32] written, PTR[ptr] overlapped) EXT;
 
   # errors
@@ -387,6 +388,8 @@ package sus/native/Win {
   
   static int32 ATTACH_PARENT_PROCESS = -1;
   func CON(stdcall) boo AttachConsole(int32 processId) EXT;
+  func CON(stdcall) boo AllocConsole() EXT;
+  func CON(stdcall) boo IsDebuggerPresent() EXT;
   
   func CON(stdcall) IconHandle LoadIconA(InstanceHandle instance, PTR[int8] iconName) EXT;
 
@@ -716,52 +719,91 @@ package sus/Time {
     nat32 _high
   );
   
+  func Time zero() {
+    done Time(_low = cast[nat32](0), _high = cast[nat32](0));
+  }
+  
   func Time now() {
     Time res = Time(_low=cast[nat32](0), _high=cast[nat32](0));
     Win/GetSystemTimeAsFileTime(fileTime100Ns: RTP[PTR[FileTime]](REF(res)));
     done res;
   }
   
+  func printDuration(Time start, Time end) {
+    System/print(r: cast[real32](Time/diff_mu(a: end, b: start)) / 1000000.0, digits: 6);
+  }
+  
+  func Time add(Time a, Time b) {
+    Time r = Time(
+      _low = a._low + b._low,
+      _high = a._high + b._high);
+    if (r._low < a._low) r._high = r._high + cast[nat32](1);
+    done r;
+  }
+  
   func Time sub(Time a, Time b) {
     Time r = Time(_low=cast[nat32](0), _high=cast[nat32](0));
     r._low = a._low - b._low;
-    
     nat32 borrow = cast[nat32](0);
     if (a._low < b._low) borrow = cast[nat32](1);
-    
     r._high = a._high - b._high - borrow;
   
     done r;
   }
   
-  # note: this does not work for big time differences, as a int32
-  # of microseconds can not be above somewhere over 35 minutes
+  # note: this causes an error for big time differences, as a int32
+  # of microseconds can not be above somewhere over 35 minutes,
+  # additionally negative values where not tested.
+  func int32 mu(Time t) {
+    # perform x86 64-bit division of a: a / 10
+    ASM {
+      lea     ebx, SUS{t}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10              ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](t._low);
+  }
+  
+  # note: this causes an error for big time differences, as a int32
+  # of microseconds can not be above somewhere over 35 minutes,
+  # additionally negative values where not tested.
   func int32 diff_mu(Time a, Time b) {
     a = sub(a: a, b: b);
     # perform x86 64-bit division of a: a / 10
     ASM {
-      lea     ebx, SUS{a}       ; get pointer to a
-      mov     eax, [ebx]        ; a._low
-      mov     edx, [ebx + 4]    ; a._high
-      mov     ebx, 10
-      idiv    ebx
-      mov     SUS{a}, eax
+      lea     ebx, SUS{a}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10              ; decimal
+      idiv    ecx
+      mov     [ebx], eax
     }
     done RTP[int32](a._low);
   }
   
-  # note: this does not work for larger time differences, as a int32
-  # of milliseconds can not be above somewhere over 24 days
+  func print(Time t) {
+    PTR[int8] buffer = ARR[int8](32);
+    int32 _1 = Win/_i64toa_s(value: RTP[LargeInteger](t), buffer: buffer, bufferSize: cast[nat32](32), radix: 10);
+    #int32 len = Win/strnlen(buffer: buffer, size: 32);
+    System/print(s: buffer);
+  }
+  
+  # note: this causes an error for larger time differences, as a int32
+  # of milliseconds can not be above somewhere over 24 days,
+  # additionally negative values where not tested.
   func int32 diff_ms(Time a, Time b) {
     a = sub(a: a, b: b);
     # perform x86 64-bit division of a: a / 10000
     ASM {
-      lea     ebx, SUS{a}       ; get pointer to a
-      mov     eax, [ebx]        ; a._low
-      mov     edx, [ebx + 4]    ; a._high
-      mov     ebx, 10000
-      idiv    ebx
-      mov     SUS{a}, eax
+      lea     ebx, SUS{a}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10000           ; decimal
+      idiv    ecx
+      mov     [ebx], eax
     }
     done RTP[int32](a._low);
   }
@@ -1092,6 +1134,18 @@ package sus/System {
   use sus/native/Win;
   use sus/StringStream;
   
+  # required, when using subsystem: windows, to redirect std out to parent console
+  # if given, or have no console when opening program without console.
+  #
+  # if a debugger is attached the process will allocate it's own console window.
+  func initConsole() {
+    if (Win/IsDebuggerPresent()) {
+      boo _1 = Win/AllocConsole();
+    } else {
+      boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+    }
+  }
+  
   func fatal(PTR[int8] reason) {
     System/print(s: STR"A FATAL ERROR OCCURRED: ");
     System/print(s: reason);
@@ -1102,13 +1156,17 @@ package sus/System {
 
   func print(PTR[StringStream] stream) {
     int32 i = 0;
-    boo _r = Win/WriteFile(
-	    file:       Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE),
+    int32 file = Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE);
+    boo _1 = Win/WriteFile(
+	    file:       file,
 	    buffer:     DRF(stream).buffer,
 	    length:     DRF(stream).position,
 	    written:    RTP[PTR[int32]](0),
 	    overlapped: RTP[PTR[ptr]](0)
 	  );
+    boo _2 = Win/FlushFileBuffers(
+      handle: file
+    );
   }
   
   func println(PTR[StringStream] stream) {
@@ -1136,6 +1194,7 @@ package sus/System {
 	    written:    RTP[PTR[int32]](0),
 	    overlapped: RTP[PTR[ptr]](0)
 	  );
+    
   }
 
   func print(real32 r) {

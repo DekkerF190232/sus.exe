@@ -4,7 +4,8 @@ package Main {
   use sus/native/Win;
   
   main {
-    boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+    System/initConsole();
+    
     Test/runTest();
     
     System/println(s:STR"Starting mogroft written in sus.exe\n");
@@ -36,6 +37,7 @@ package Test {
   use mogroft/Noise2DFractal;
   use mogroft/algebra/Vec3;
   use sus/Math;
+  use sus/Time;
 
   func runTest() {
     done;
@@ -47,46 +49,63 @@ package Test {
  }
   
   func doTest() {
-    testNoise();
+    #testNoise();
+    while (yes) testTime();
     #testHash();
   }
+  
+  func testTime() {
+    #Time zero = Time/zero();
+    #Time time = Time(_low = cast[nat32](9993), _high = cast[nat32](0));
+    #
+    #Time/print(t: time);
+    #System/print(s: STR" + ");
+    #
+    #Time/print(t: zero);
+    #Time added = Time/add(a: zero, b: time);
+    #System/print(s: STR" = ");
+    #
+    #Time/print(t: added);
+    #
+    #System/println();
+  }
 
-  func testHash() {
+  #func testHash() {
     #int32 i = 0;
     #while (i < 50) {
     #  System/println(i: Noise2D/hash(x: i));
     #  i = i + 1;
     #}
-  }
+  #}
   
-  func testNoise() {
-    real32 scale = 0.2;
-    int32 off = -10;
-    
-    int32 r = 0;
-    while (r < 40) {
-      int32 c = 0;
-      while (c < 55) {
-        real32 val = Noise2DFractal/noise(
-          x: cast[real32](c + off) * scale,
-          y: cast[real32](r + off) * scale,
-          levels: 3,
-          seed: 0
-        );
-        
-        PTR[int8] characters = STR"@O+-.  ";
-        int32 characterCount = 6;
-        int32 idx = cast[int32](val * cast[real32](characterCount));
-        PTR[int8] char = characters + idx;
-        
-        System/print(s: char, length: 1); 
-        System/print(s: STR" ");
-        
-        c = c + 1;
-      }
-      System/println();
-      r = r + 1;
-    }
-  }
+  #func testNoise() {
+  #  real32 scale = 0.2;
+  #  int32 off = -10;
+  #  
+  #  int32 r = 0;
+  #  while (r < 40) {
+  #    int32 c = 0;
+  #    while (c < 55) {
+  #      real32 val = Noise2DFractal/noise(
+  #        x: cast[real32](c + off) * scale,
+  #        y: cast[real32](r + off) * scale,
+  #        levels: 3,
+  #        seed: 0
+  #      );
+  #      
+  #      PTR[int8] characters = STR"@O+-.  ";
+  #      int32 characterCount = 6;
+  #      int32 idx = cast[int32](val * cast[real32](characterCount));
+  #      PTR[int8] char = characters + idx;
+  #      
+  #      System/print(s: char, length: 1); 
+  #      System/print(s: STR" ");
+  #      
+  #      c = c + 1;
+  #    }
+  #    System/println();
+  #    r = r + 1;
+  #  }
+  #}
   
 }

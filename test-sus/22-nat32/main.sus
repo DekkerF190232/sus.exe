@@ -4,24 +4,37 @@ package Main {
   use sus/native/Win;
   use sus/c/CMath;
 
-  struct SubStruct (int32 a, int32 b);
-
-  struct Test (
-    int32 asdf,
-    SubStruct subStruct
-  );
+  struct Long (nat32 low, nat32 high);
 
   main {
     boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
 
-    Test test = Test(asdf = 1, subStruct = SubStruct(a = 2, b = 3));
+    #Long l = Long(low = cast[nat32](@00000002), high = cast[nat32](@540be400)); # 10 billion = 2 540BE400
+    int32 r = 0;
+    int32 m = 0;
+    ASM {
+    TEST_LOCATION:
+      ; int 3
 
-    dump test;
+      ; works for positive integers: 10 000 000 000 / 100 00
+      mov     eax, -0540BE400h           ; lower
+      mov     edx, -2                    ; higher
+      mov     ecx, 10000 ; decimal
+      idiv    ecx
+      ; quotient = 1 000 000
+      ; remainder = 0
+
+      mov     SUS{r}, eax
+      mov     SUS{m}, edx
+    }
+
+    System/print(s: STR"quotient=");
+    System/println(i: r);
+    System/print(s: STR"remainder=");
+    System/println(i: m);
 
     System/println(s: STR"exited successfully");
-    System/exit(code: 0);   
+    System/exit(code: 0);
   }
-
-
 
 }

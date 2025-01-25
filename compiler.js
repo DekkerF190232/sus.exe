@@ -4365,7 +4365,7 @@ function compile(state) {
         `; expr struct ${typeToString(type)} static: ${static_.fullName} {`
       );
       for (let i = 0; i < size; i++) {
-        asm += line(`push    dword [ecx${getOffStr(i * 4)}]`);
+        asm += line(`push    dword [ecx${getOffStr((size - 1 - i) * 4)}]`);
       }
       asm += line('; }');
     }

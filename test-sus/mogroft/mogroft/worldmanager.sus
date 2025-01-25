@@ -38,21 +38,15 @@ package mogroft/world/WorldManager {
 
     #PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
     
-    Time timeStart = Time/now();
     
     callGenerateRange(this: this, x: 0, y: 0, z: 0, flatRange: 3, yRange: 4);
 
-    Time timeEnd = Time/now();
-    System/print(s: STR"World gen duration (ms): ");
-    System/println(i: Time/diff_ms(a: timeEnd, b: timeEnd));
-
+    ## Singular chunk
     #PTR[Chunk] newChunk = RTP[PTR[Chunk]](0);
-    #
     #newChunk = ChunkList/add(this: chunkList);
     #DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = 0, z = 0);
     #generateChunk(chunk: newChunk);
     #onLoadedFunc(chunk: newChunk);
-    #
     #newChunk = ChunkList/add(this: chunkList);
     #DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = -1, z = 0);
     #generateChunk(chunk: newChunk);
@@ -128,14 +122,16 @@ package mogroft/world/WorldManager {
   #  
   #  done cast[int32](minLevel + (val * (maxLevel - minLevel)));
   #}
+  
+  static Time timePerlin = Time(_low = cast[nat32](0), _high = cast[nat32](0));
 
   func generateChunk(PTR[Chunk] chunk) {
-    System/print(s:STR"generate: ");
-    System/print(i:DRF(chunk).chunkCoord.x);
-    System/print(s:STR" ");
-    System/print(i:DRF(chunk).chunkCoord.y);
-    System/print(s:STR" ");
-    System/print(i:DRF(chunk).chunkCoord.z);
+    System/print(s: STR"generating: ");
+    System/print(i: DRF(chunk).chunkCoord.x);
+    System/print(s: STR" ");
+    System/print(i: DRF(chunk).chunkCoord.y);
+    System/print(s: STR" ");
+    System/print(i: DRF(chunk).chunkCoord.z);
     System/println();
     
     PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));
@@ -145,6 +141,7 @@ package mogroft/world/WorldManager {
       while (z < Chunk/SIZE) {
         int32 x = 0;
         while (x < Chunk/SIZE) {
+          
           PTR[Block] block = blocks + (z * Chunk/SIZE * Chunk/SIZE) + (y * Chunk/SIZE) + x;
           
           int32 bx = DRF(chunk).chunkCoord.x * Chunk/SIZE + x;
@@ -154,6 +151,8 @@ package mogroft/world/WorldManager {
           real32 stoneHeight = 70.0;
           real32 dirtHeight = 10.0;
           real32 totalHeight = stoneHeight + dirtHeight;
+          
+          Time t1 = Time/now();
           
           int32 stoney = cast[int32]((0.0 - totalHeight) + (Noise2DFractal/noise(
             x: cast[real32](bx) * 0.07,
@@ -169,6 +168,30 @@ package mogroft/world/WorldManager {
             seed: 0
           ) * dirtHeight));
           
+          Time t2 = Time/now();
+          Time diff = Time/sub(a: t2, b: t1);
+          
+          # if (diff._low > cast[nat32](0)) {
+          #   ASM {
+          #     int3
+          #   }
+          #   # System/print(s: STR"here\n");
+          # }
+          # ASM {
+          #   nop
+          #   nop
+          #   nop
+          # }
+          
+          Time/print(t: timePerlin);
+          timePerlin = Time/add(a: timePerlin, b: diff);
+          
+          System/print(s: STR" ");
+          Time/print(t: timePerlin);
+          System/print(s: STR" ");
+          Time/print(t: diff);
+          System/println();
+          
           if (by < stoney) {
             DRF(block) = Blocks/BLOCK_STONE;
           } else if (by < dirty) {
@@ -181,10 +204,18 @@ package mogroft/world/WorldManager {
           
           x = x + 1;
         }
+        
         z = z + 1;
       }
+    timePerlin = Time/zero();
+    System/fatal(reason: STR"done");
       y = y + 1;
     }
+    
+    
+    #System/print(s: STR"  perlin duration: ");
+    #System/println();
+    #System/print(r: cast[real32](Time/ms(t: timePerlin)) / 1000.0, digits: 6);
   }
 
 }
