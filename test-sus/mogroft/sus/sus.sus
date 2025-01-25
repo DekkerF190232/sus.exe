@@ -698,7 +698,89 @@ package sus/native/Win {
     PTR[int32] dataSize,
     int32 headerSize
   ) EXT;
+  
+  # threads
+  
+  func CON(stdcall) int32 CreateThread(
+    ptr securityAttributes,     # can be 0
+    nat32 stackSize,            # can be 0
+    funcptr[(ptr param)] routine,
+    ptr argument,               # can be 0
+    int32 flags,                # can be 0
+    PTR[int32] threadId         # can be 0
+  ) EXT;
+  
+  struct CriticalSection (
+    array[int8, 24] _data # i'm not declaring all of that
+  );
+  
+  func CON(stdcall) InitializeCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) EnterCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) LeaveCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) DeleteCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
 
+}
+
+package sus/Mutex {
+  
+  use sus/native/Win;
+  use sus/Memory;
+  
+  struct Mutex(
+    PTR[CriticalSection] _criticalSection
+  );
+  
+  func Mutex alloc() {
+    PTR[CriticalSection] criticalSection = RTP[PTR[CriticalSection]](
+      Memory/malloc(bytes: size[CriticalSection]())
+    );
+    Win/InitializeCriticalSection(criticalSection: criticalSection);
+    done Mutex(_criticalSection = criticalSection);
+  }
+  
+  func lock(PTR[Mutex] this) {
+    Win/EnterCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+  func unlock(PTR[Mutex] this) {
+    Win/LeaveCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+  func free(PTR[Mutex] this) {
+    Win/DeleteCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+}
+
+package sus/Thread {
+
+  use sus/native/Win;
+
+  struct Thread(int32 _handle);
+  
+  func Thread new(funcptr[(ptr param)] run, ptr arg) {
+    int32 result = Win/CreateThread(
+      securityAttributes: RTP[ptr](0),
+      stackSize:          cast[nat32](0),
+      routine:            run,
+      argument:           arg,
+      flags:              0,
+      threadId:           RTP[PTR[int32]](0)
+    );
+    done Thread(_handle = result);
+  }
+  
 }
 
 package sus/Time {
