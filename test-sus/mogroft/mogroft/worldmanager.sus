@@ -52,6 +52,22 @@ package mogroft/world/WorldManager {
     #onLoadedFunc(chunk: newChunk);
   }
   
+  
+  func tick(PTR[WorldManager] this, real32 dt) {
+    #_unloadUnused(this: this);
+    #_enqueueToGenerate(); # enqueue chunk coordinates to be generated
+    #_pollGenerated();     # retrieve generated chunks from thread and put them into world
+    
+  }
+  
+  #func _unloadUnused(PTR[WorldManager] this, ) {
+  #  # do nothing for now lol
+  #}
+  #
+  #func _pollGenerated(PTR[WorldManager] this, ) {
+  #  
+  #}
+  
   func callGenerateRange(PTR[WorldManager] this, int32 x, int32 y, int32 z, int32 flatRange, int32 yRange) {
     PTR[ChunkList] chunkList = REF(DRF(DRF(this).world).chunkList);
     funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
@@ -164,6 +180,18 @@ package mogroft/world/WorldManager {
 
 }
 
-package mogroft/world/BatchGenerator {
-
-}
+#package mogroft/world/BatchGenerator {
+#  
+#  # [ ] 1. input coordinate list to generate
+#  # [ ] 2. chunk buffers where they are generated
+#  # [ ] 3. nevermind i will never do this lol, too much!
+#  
+#  struct BatchGenerator(
+#    Mutex 
+#  );
+#  
+#  func create() {
+#    
+#  }  
+#  
+#}

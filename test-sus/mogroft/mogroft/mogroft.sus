@@ -50,6 +50,7 @@ package mogroft/Mogroft {
   
   func tick(real32 dt) {
     Controls/tick(dt: dt);
+    WorldManager/tick(this: REF(DRF(_mogroft).worldManager), dt: dt);
   }
   
   func init() {

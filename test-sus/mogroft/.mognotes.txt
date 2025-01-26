@@ -52,5 +52,5 @@ TEMPLATES
     t2 = Time/now();
     
     System/print(s: STR"XXXX Duration: ");
-    Time/printDuration(end: timeEnd, start: timeStart);
+    Time/printDuration(end: t2, start: t1);
     System/println();

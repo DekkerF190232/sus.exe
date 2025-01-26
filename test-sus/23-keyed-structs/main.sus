@@ -1,0 +1,23 @@
+package Main {
+
+  use sus/System;
+
+  struct TypedList(
+    int32 size
+  );
+
+  func TypedList newList<T>() {
+    done TypedList(size=0);
+  }
+
+  main {
+    System/initConsole();
+    
+    #TypedList<int32> list = 
+    
+    System/println(s: STR"Hello, World!");
+    
+    System/exit(code: 0);
+  }
+
+}

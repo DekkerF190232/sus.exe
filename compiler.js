@@ -53,6 +53,7 @@ function parse(state) {
     makeNode('func', { name, convention, external }, []); // list-param, list-ins
   const makeNodeListParam = (_) => makeNode('list-param', undefined, []); // param...
   const makeNodeParam = (name) => makeNode('param', { name }, []);
+  const makeNodeListKeys = (names) => makeNode('list-keys', { names }, []);
   const makeNodeListInst = (_) => makeNode('list-inst', undefined, []);
   const makeNodeInsAsm = (_) => makeNode('ins-asm', undefined, []);
   const makeNodeAsm = (_) => makeNode('asm', undefined, []);
@@ -1033,6 +1034,27 @@ function parse(state) {
 
     let n = makeNodeFunc(expect(name, 'function name'), convention, false);
     append(n, (_) => {
+      if (eat(/^\</)) {
+        eatEmpty();
+        append(makeNodeListKeys([]), () => {
+          let first = true;
+          while (!eat(/^\>/)) {
+            if (eof()) throw err('unexpected eof');
+  
+            if (!first) {
+              eatPicky(',');
+              eatEmpty();
+            }
+            first = false;
+  
+            let symbol = eatSymbol();
+            state.n.props.names.push(symbol);
+            eatEmpty(); 
+          }
+          eatEmpty();
+        });
+      }
+
       eatPicky('(');
       eatEmpty();
 
@@ -1202,6 +1224,30 @@ function parse(state) {
           }
 
           return makeTypePrim(name);
+        }
+
+        let args = [];
+
+        if (eat(/^\</)) {
+          eatEmpty();
+
+          let first = true;
+          while (!eat(/^\>/)) {
+            if (eof()) throw err('unexpected eol');
+            
+            if (!first && !eat(/^,/)) return;
+            eatEmpty();
+
+            let t = tryParseType();
+            if (!t) return;
+            args.push(t);
+            
+            first = false;
+          }
+          eatEmpty();
+
+          let type = makeTypePrim(name, args);
+          return type;
         }
 
         return makeTypeNamed(name);
