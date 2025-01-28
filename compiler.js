@@ -4251,7 +4251,8 @@ function compile(state) {
     // https://stackoverflow.com/a/8022107
     // https://www.felixcloutier.com/x86/idiv
     asm += line(`pop     eax`);
-    asm += line(`xor     edx, edx`);
+    //asm += line(`xor     edx, edx`);
+    asm += line(`cdq`);
     asm += line(`idiv    dword [esp]`);
     asm += line(`mov     [esp], eax`); // eax = quotient
 
