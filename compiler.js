@@ -171,7 +171,8 @@ function parse(state) {
     state.n = { name: null, props: {}, kids: [] };
     parserFunc();
     if (state.n.kids.length !== 1) {
-      throw new Error('no single node appended');
+      //throw err('no single node appended');
+      return;
     }
     let captured = state.n.kids[0];
     state.n = lastNode;
@@ -3498,10 +3499,10 @@ function compile(state) {
       let arg = nodeArgs.find((x) => x.props.name == param.name);
       if (!arg)
         throw makeErr(expr.i, 'can not find argument for param ' + param.name);
-      let expr = arg.kids.find((x) => x.name === 'expr');
-      checkType(expr, scope, addressScope, param.type);
+      let se = arg.kids.find((x) => x.name === 'expr');
+      checkType(se, scope, addressScope, param.type);
       sizeArgs += evalSize4(param.type);
-      r += compileExpr(expr, scope, addressScope);
+      r += compileExpr(se, scope, addressScope);
     }
 
     r += compileCallProc(callInfo);
