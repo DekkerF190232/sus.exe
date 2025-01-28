@@ -1705,14 +1705,10 @@ function compile(state) {
         throw makeErr(expr.i, 'could not resolve struct ' + expr.props.name);
       return row.type;
     } else if (expr.name === 'expr-call') {
-      let args = expr.kids.filter((x) => x.name === 'arg');
-      let paramNames = args.map((x) => x.props.name).sort();
-      let sig = resolveFuncSig(expr.props.name, paramNames, addressScope);
-      if (!sig)
-        throw makeErr(expr.i, 'could not find function ' + expr.props.name);
-      if (sig.returnType === undefined)
+      let callInfo = getCallInfo(expr, scope, addressScope);
+      if (callInfo.typeFuncPtr.returnType === undefined)
         throw makeErr(expr.i, 'function does not have return type');
-      return sig.returnType;
+      return callInfo.typeFuncPtr.returnType;
     } else if (expr.name === 'expr-arr') {
       let type = getActualType(
         expr.kids.find((x) => x.name === 'type'),
@@ -3427,11 +3423,12 @@ function compile(state) {
 
     if (loc) {
       let typeFuncPtr = loc.row.type;
+      _ass(typeFuncPtr.kind === 'funcptr');
       callInfo = makeCallInfoSymbol(symbol, loc, typeFuncPtr);
     } else {
-      if (symbol === 'Gl/glViewPort') {
-        console.log('hi');
-      }
+      //if (symbol === 'Gl/glViewPort') {
+      //  console.log('hi');
+      //}
       let sig = resolveFuncSig(symbol, paramNames, addressScope);
       if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol);
       let asmName = sig.asmName;
