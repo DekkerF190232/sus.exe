@@ -1,5 +1,7 @@
 package mogroft/Mogroft {
 
+  use Debug;
+
   use sus/System;
   
   use mogroft/Window;
@@ -49,13 +51,17 @@ package mogroft/Mogroft {
   # game loop events
   
   func tick(real32 dt) {
+    Debug/tick(dt: dt);
     Controls/tick(dt: dt);
     WorldManager/tick(this: REF(DRF(_mogroft).worldManager), dt: dt);
   }
   
   func init() {
+    WorldManager/init(this: REF(DRF(_mogroft).worldManager));
+    
     Controls/init();
     Texture/init();
+    
     Renderer/init(this: REF(DRF(_mogroft).rendererState));
   }
   

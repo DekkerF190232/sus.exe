@@ -46,6 +46,8 @@ BUGS
   - no duplicate symbol checking for static variables or functions, maybe not even structs
 
 ISSUES
+  - performance
+    - floats could be slow (omit finit?)
   - code smellies
     - parser: inconsistant parsing naming and use of tryParse etc, always using eatSpace ...
     - compiler: compiler state should be used more, not addressScope, scope etc.
@@ -84,6 +86,7 @@ MISSING
     #   - must be pushed before calling, only works for suscall
     func add<T>(PTR[List<T>] this, T element) {
       int32 size = size[T]();
+      
     }
 
     # calls

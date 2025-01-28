@@ -4269,7 +4269,8 @@ function compile(state) {
     asm += compileExpr(a, scope, addressScope);
     // refer to compileExprOpDiv
     asm += line(`pop     eax`);
-    asm += line(`xor     edx, edx`);
+    //asm += line(`xor     edx, edx`);
+    asm += line(`cdq`);
     asm += line(`idiv    dword [esp]`);
     asm += line(`mov     [esp], edx`); // edx = remainder
     return asm;

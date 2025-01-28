@@ -38,6 +38,7 @@ package Test {
   use mogroft/algebra/Vec3;
   use sus/Math;
   use sus/Time;
+  use sus/List;
 
   func runTest() {
     done;
@@ -46,15 +47,47 @@ package Test {
     doTest();
     System/println(s: STR"------------------------------------------------------------------------------");
     System/exit(code: 0);
- }
+  }
+ 
+ 
   
   func doTest() {
+    #testCalc();
+    #testList();
     #testNoise();
-    while (yes) testTime();
+    #while (yes) testTime();
     #testHash();
   }
   
-  func testTime() {
+  #static int32 CALC_SIZE = 16;
+  #func testCalc() {
+  #  real32 playerz = -2345.0;
+  #  #ASM {
+  #  #  int 3
+  #  #}
+  #  int32 z = (cast[int32](playerz) + (CALC_SIZE / 2)) / CALC_SIZE;
+  #  System/println(i: z);
+  #}
+  
+  #func testList() {
+  #  List list = List/alloc(elementSize: size[int32]());
+  #  DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = 1;
+  #  DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = 2;
+  #  DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = 3;
+  #  
+  #  List copied = List/alloc(elementSize: 4);
+  #  List/addAll(this: REF(copied), other: REF(list));
+  #  List/clear(this: REF(copied));
+  #  List/addAll(this: REF(copied), other: REF(list));
+  #  
+  #  System/print(s: STR"Length: ");
+  #  System/print(i: copied.length);
+  #  System/print(s: STR"\n");
+  #  System/printBytes(pointer: RTP[PTR[int8]](copied._memory), count: copied.length * 4);
+  #  System/println();
+  #}
+  
+  #func testTime() {
     #Time zero = Time/zero();
     #Time time = Time(_low = cast[nat32](9993), _high = cast[nat32](0));
     #
@@ -68,7 +101,7 @@ package Test {
     #Time/print(t: added);
     #
     #System/println();
-  }
+  #}
 
   #func testHash() {
     #int32 i = 0;

@@ -732,6 +732,38 @@ package sus/native/Win {
 
 }
 
+package sus/AtomicBoo {
+
+  use sus/Mutex;
+  
+  struct AtomicBoo(
+    Mutex _mutex,
+    boo _value
+  );
+  
+  func AtomicBoo alloc(boo value) {
+    done AtomicBoo(
+      _mutex = Mutex/alloc(),
+      _value = value
+    );
+  }
+  
+  func boo get(PTR[AtomicBoo] this) {
+    boo value = no;
+    Mutex/lock(this: REF(DRF(this)._mutex));
+    value = DRF(this)._value;
+    Mutex/unlock(this: REF(DRF(this)._mutex));
+    done value;
+  }
+  
+  func set(PTR[AtomicBoo] this, boo value) {
+    Mutex/lock(this: REF(DRF(this)._mutex));
+    DRF(this)._value = value;
+    Mutex/unlock(this: REF(DRF(this)._mutex));
+  }
+  
+}
+
 package sus/Mutex {
   
   use sus/native/Win;
@@ -779,6 +811,10 @@ package sus/Thread {
       threadId:           RTP[PTR[int32]](0)
     );
     done Thread(_handle = result);
+  }
+  
+  func sleep(int32 ms) {
+    Win/Sleep(ms: ms);
   }
   
 }
@@ -849,12 +885,20 @@ package sus/Time {
     done RTP[int32](t._low);
   }
   
-  # note: this causes an error for big time differences, as a int32
-  # of microseconds can not be above somewhere over 35 minutes,
-  # additionally negative values where not tested.
+  func int32 ms(Time t) {
+    ASM {
+      lea     ebx, SUS{t}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10000           ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](t._low);
+  }
+  
   func int32 diff_mu(Time a, Time b) {
     a = sub(a: a, b: b);
-    # perform x86 64-bit division of a: a / 10
     ASM {
       lea     ebx, SUS{a}
       mov     eax, [ebx]           ; lower
@@ -866,19 +910,8 @@ package sus/Time {
     done RTP[int32](a._low);
   }
   
-  func print(Time t) {
-    PTR[int8] buffer = ARR[int8](32);
-    int32 _1 = Win/_i64toa_s(value: RTP[LargeInteger](t), buffer: buffer, bufferSize: cast[nat32](32), radix: 10);
-    #int32 len = Win/strnlen(buffer: buffer, size: 32);
-    System/print(s: buffer);
-  }
-  
-  # note: this causes an error for larger time differences, as a int32
-  # of milliseconds can not be above somewhere over 24 days,
-  # additionally negative values where not tested.
   func int32 diff_ms(Time a, Time b) {
     a = sub(a: a, b: b);
-    # perform x86 64-bit division of a: a / 10000
     ASM {
       lea     ebx, SUS{a}
       mov     eax, [ebx]           ; lower
@@ -888,6 +921,13 @@ package sus/Time {
       mov     [ebx], eax
     }
     done RTP[int32](a._low);
+  }
+  
+  func print(Time t) {
+    PTR[int8] buffer = ARR[int8](32);
+    int32 _1 = Win/_i64toa_s(value: RTP[LargeInteger](t), buffer: buffer, bufferSize: cast[nat32](32), radix: 10);
+    #int32 len = Win/strnlen(buffer: buffer, size: 32);
+    System/print(s: buffer);
   }
   
 }
@@ -937,6 +977,22 @@ package sus/List {
     );
   }
 
+  func addAll(PTR[List] this, PTR[List] other) {
+    if (DRF(this)._elementSize != DRF(other)._elementSize)
+      System/fatal(reason: STR"incompatible element sizes");
+    
+    checkGrow(this: this, amount: DRF(other).length);
+    
+    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    int32 _0 = Memory/memcpy_s(
+      dest:     RTP[ptr](end),
+      destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
+      source:   RTP[ptr](DRF(other)._memory),
+      bytes:    DRF(this)._elementSize * DRF(other).length
+    );
+    DRF(this).length = DRF(this).length + DRF(other).length;
+  }
+
   func free(PTR[List] this) {
     Memory/free(pointer: RTP[ptr](DRF(this)._memory));
   }
@@ -963,30 +1019,6 @@ package sus/List {
 
     DRF(this)._memory = newMemory;
   }
-  
-  # func PTR[ptr] add2(PTR[List] this, ptr element) {
-  #   System/print(s: STR"before list insert: ");
-  #   System/println(i_0x: DRF(RTP[PTR[int32]](element)));
-  #   
-  #   checkGrow(this: this, amount: 1);
-  # 
-  #   PTR[ptr] index = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
-  #   DRF(this).length = DRF(this).length + 1;
-  #   
-  #   if (RTP[int32](element) == 0) done index;
-  # 
-  #   int32 _0 = Memory/memcpy_s(
-  #     dest:     RTP[ptr](index),
-  #     destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
-  #     source:   element,
-  #     bytes:    DRF(this)._elementSize
-  #   );
-  #   
-  #   System/print(s: STR"after list insert: ");
-  #   System/println(i_0x: DRF(RTP[PTR[int32]](index)));
-  #   
-  #   done index;
-  # }
   
   # adds element at the pointer *element* and returns pointer to the copy made into the list.
   # *element* may be 0

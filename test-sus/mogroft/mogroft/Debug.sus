@@ -1,5 +1,46 @@
 package Debug {
 
+  use sus/Time;
+  use sus/System;
+
+  use mogroft/Mogroft;
   
+  use mogroft/world/World;
+  use mogroft/world/Chunk;
+  use mogroft/world/WorldManager;
+  
+  static int32 REPORT_INTERVAL_MS = 2000;
+  
+  static Time timeReport = Time(_low=cast[nat32](0),_high=cast[nat32](0));
+
+  func tick(real32 dt) {
+    Time now = Time/now();
+    Time delta = Time/sub(a: now, b: timeReport);
+    
+    if (delta._high != cast[nat32](0)) {
+      timeReport = now;
+    } else {
+      if (Time/mu(t: delta) > (REPORT_INTERVAL_MS * 1000)) {
+        doReport();
+        timeReport = now;
+      }
+    }
+  }
+  
+  func doReport() {
+    PTR[MogroftState] mogroft = Mogroft/_mogroft;
+    PTR[WorldManager] worldManager = REF(DRF(mogroft).worldManager);
+    PTR[World] world = DRF(worldManager).world;
+    
+    #System/println(s: STR"=================================== [Debug Report] ===================================");
+    #System/println(s: STR"--------------------------------------------------------------------------------------");
+    
+    System/print(s: STR"  ");
+    System/print(s: STR"  Loaded: ");
+    System/print(i: DRF(world).chunkList.list.length);
+    System/print(s: STR" Enqueued: ");
+    System/print(i: DRF(worldManager)._queue.list.length);
+    System/println();
+  }
 
 }

@@ -1,7 +1,10 @@
 package mogroft/world/WorldManager {
 
   use sus/System;
+  use sus/List;
   use sus/Time;
+  use sus/Thread;
+  use sus/Mutex;
 
   use mogroft/Noise2DFractal;
   use mogroft/Noise2D;
@@ -15,7 +18,11 @@ package mogroft/world/WorldManager {
   
   struct WorldManager (
     PTR[World] world,
-    ChunkEventHandler chunkEventHandler
+    ChunkEventHandler chunkEventHandler,
+    ChunkCoordList _queue,
+    Mutex _mtxQueue,
+    ChunkList _buffer,
+    Mutex _mtxBuffer
   );
   
   struct ChunkEventHandler(
@@ -25,7 +32,12 @@ package mogroft/world/WorldManager {
   func WorldManager new(ChunkEventHandler chunkEventHandler) {
     done WorldManager(
       world = RTP[PTR[World]](0),
-      chunkEventHandler = chunkEventHandler
+      chunkEventHandler = chunkEventHandler,
+      # generator
+      _queue = ChunkCoordList/alloc(), 
+      _mtxQueue = Mutex/alloc(),
+      _buffer = ChunkList/new(),
+      _mtxBuffer = Mutex/alloc()
     );
   }
 
@@ -35,11 +47,11 @@ package mogroft/world/WorldManager {
 
     DRF(world).player.position.z = 10.0;
     
-    funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
     
-    callGenerateRange(this: this, x: 0, y: 0, z: 0, flatRange: 3, yRange: 4);
+    #callGenerateRange(this: this, x: 0, y: 0, z: 0, flatRange: 3, yRange: 4);
 
     ## Generate limited number of chunks
+    #funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
     #PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
     #PTR[Chunk] newChunk = RTP[PTR[Chunk]](0);
     #newChunk = ChunkList/add(this: chunkList);
@@ -49,42 +61,173 @@ package mogroft/world/WorldManager {
     #newChunk = ChunkList/add(this: chunkList);
     #DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = -1, z = 0);
     #generateChunk(chunk: newChunk);
-    #onLoadedFunc(chunk: newChunk);
+    #onLoadedFunc(chunk: newChunk); 
   }
   
+  func init(PTR[WorldManager] this) {
+    Thread genThread = Thread/new(
+      run: RTP[funcptr[(ptr param)]](funcref(_runGenerator)),
+      arg: RTP[ptr](this)
+    );
+  }
   
   func tick(PTR[WorldManager] this, real32 dt) {
     #_unloadUnused(this: this);
-    #_enqueueToGenerate(); # enqueue chunk coordinates to be generated
-    #_pollGenerated();     # retrieve generated chunks from thread and put them into world
-    
+    _enqueueToGenerate(this: this);
+    _pollGenerated(this: this);
   }
   
-  #func _unloadUnused(PTR[WorldManager] this, ) {
-  #  # do nothing for now lol
-  #}
-  #
-  #func _pollGenerated(PTR[WorldManager] this, ) {
-  #  
+  func _pollGenerated(PTR[WorldManager] this) {
+    PTR[List] chunkListList = REF(DRF(DRF(this).world).chunkList.list);
+    
+    Mutex/lock(this: REF(DRF(this)._mtxBuffer));
+    
+    int32 startIndex = DRF(chunkListList).length;
+    
+    List/addAll(this: chunkListList, other: REF(DRF(this)._buffer.list));
+    
+    Mutex/unlock(this: REF(DRF(this)._mtxBuffer));
+    
+    funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
+    List/clear(this: REF(DRF(this)._buffer.list));
+
+    PTR[Chunk] current = RTP[PTR[Chunk]](List/at(
+      this: chunkListList,
+      i:    startIndex
+    ));
+    PTR[Chunk] addEnd = RTP[PTR[Chunk]](List/at(
+      this: chunkListList,
+      i:    DRF(chunkListList).length
+    ));
+    
+    while (RTP[int32](current) != RTP[int32](addEnd)) {
+      #System/println(s: STR"hi there");
+      #System/fatal(reason: STR"lol");
+      onLoadedFunc(chunk: current);
+      current = current + size[Chunk]();
+    }
+  }
+  
+  #func _unloadUnused(PTR[WorldManager] this) {
   #}
   
-  func callGenerateRange(PTR[WorldManager] this, int32 x, int32 y, int32 z, int32 flatRange, int32 yRange) {
-    PTR[ChunkList] chunkList = REF(DRF(DRF(this).world).chunkList);
-    funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
+  func _runGenerator(PTR[WorldManager] this) {
+    PTR[ChunkCoordList] queue = REF(DRF(this)._queue);
     
+    ChunkCoordList localQueue = ChunkCoordList/alloc();
+    ChunkList localChunks = ChunkList/new();
+    
+    while (yes) {
+      # transfer over chunk coord queue to this thread
+      Mutex/lock(this: REF(DRF(this)._mtxQueue));
+      
+      List/clear(this: REF(localQueue.list));
+      List/addAll(this: REF(localQueue.list), other: REF(DRF(queue).list));
+      List/clear(this: REF(DRF(queue).list));
+      
+      Mutex/unlock(this: REF(DRF(this)._mtxQueue));
+      ###
+      
+      #if (localQueue.list.length > 0) {      
+      #  print(chunkCoordList: REF(localQueue));
+      #  System/fatal(reason: STR"exit after transfer");
+      #}
+      
+      # generate 10 chunks
+      int32 end = localQueue.list.length;
+      if (end > 10) end = 10;
+      int32 i = 0;
+      while (i < end) {
+        PTR[ChunkCoord] chunkCoord = RTP[PTR[ChunkCoord]](List/at(this: REF(localQueue.list), i: i));
+        PTR[Chunk] newChunk = ChunkList/add(this: REF(localChunks));
+        DRF(newChunk).chunkCoord = DRF(chunkCoord);
+        generateChunk(chunk: newChunk);
+        i = i + 1;
+      }
+      ###
+      
+      # transfer generated chunks over to buffer
+      Mutex/lock(this: REF(DRF(this)._mtxBuffer));
+      
+      List/addAll(this: REF(DRF(this)._buffer.list), other: REF(localChunks.list));
+      List/clear(this: REF(localChunks.list));
+      
+      Mutex/unlock(this: REF(DRF(this)._mtxBuffer));
+      ###
+
+      Thread/sleep(ms: 10);
+    }
+  }
+  
+  func print(PTR[ChunkCoordList] chunkCoordList) {
+    PTR[ChunkCoord] current = RTP[PTR[ChunkCoord]](List/at(
+      this: REF(DRF(chunkCoordList).list),
+      i: 0)
+    );
+    PTR[ChunkCoord] end = RTP[PTR[ChunkCoord]](List/at(
+      this: REF(DRF(chunkCoordList).list),
+      i: DRF(chunkCoordList).list.length)
+    );
+    System/println(s: STR"================================================================================");
+    while (RTP[int32](current) != RTP[int32](end)) {
+      print(chunkCoord: current);
+      System/println();
+      current = current + DRF(chunkCoordList).list._elementSize;
+    } 
+    System/println(s: STR"---------------------------------------------------------------------------------");
+  }
+  
+  func print(PTR[ChunkCoord] chunkCoord) {
+    System/print(i: DRF(chunkCoord).x);
+    System/print(s: STR" ");
+    System/print(i: DRF(chunkCoord).y);
+    System/print(s: STR" ");
+    System/print(i: DRF(chunkCoord).z);
+  }
+  
+  func _enqueueToGenerate(PTR[WorldManager] this) {
+    # generation box center
+    int32 x = (cast[int32](DRF(DRF(this).world).player.position.x) + (Chunk/SIZE / 2)) / Chunk/SIZE;
+    int32 y = (cast[int32](DRF(DRF(this).world).player.position.y) + (Chunk/SIZE / 2)) / Chunk/SIZE;
+    int32 z = (cast[int32](DRF(DRF(this).world).player.position.z) + (Chunk/SIZE / 2)) / Chunk/SIZE;
+    #System/print(r: DRF(DRF(this).world).player.position.z);
+    #System/print(s: STR" ");
+    #System/println(i: z);
+    
+    int32 flatRange = 3;
+    int32 yRange = 4;
+    
+    PTR[ChunkList] chunkList = REF(DRF(DRF(this).world).chunkList);
+    PTR[ChunkCoordList] queue = REF(DRF(this)._queue);
+    
+    Mutex/lock(this: REF(DRF(this)._mtxQueue));
+  
     int32 cy = y - yRange;
     while (cy < (y + yRange)) {
       int32 cz = z - flatRange;
       while (cz < (z + flatRange)) {
         int32 cx = x - flatRange;
         while (cx < (x + flatRange)) {
-          ChunkCoord chunkCoord = ChunkCoord(x = cx, y = cy, z = cz);
-          PTR[Chunk] existing = ChunkList/find(this: chunkList, chunkCoord: chunkCoord);
-          if (RTP[int32](existing) == 0) {
-            PTR[Chunk] newChunk = ChunkList/add(this: chunkList);
-            DRF(newChunk).chunkCoord = chunkCoord;
-            generateChunk(chunk: newChunk);
-            onLoadedFunc(chunk: newChunk);
+          {
+            ChunkCoord chunkCoord = ChunkCoord(x = cx, y = cy, z = cz);
+          
+            PTR[Chunk] loaded = ChunkList/find(
+              this: chunkList,
+              chunkCoord: chunkCoord
+            );
+            if (RTP[int32](loaded) != 0) break;
+            
+            PTR[ChunkCoord] enqueued = ChunkCoordList/find(
+              this: queue,
+              element: chunkCoord
+            );
+            if (RTP[int32](enqueued) != 0) break;
+            
+            DRF(ChunkCoordList/add(this: queue)) = chunkCoord;
+            
+            #System/print(s: STR"enqueued: ");
+            #print(chunkCoord: REF(chunkCoord));
+            #System/println();
           }
           cx = cx + 1;
         }
@@ -92,15 +235,39 @@ package mogroft/world/WorldManager {
       }
       cy = cy + 1;
     }
+    
+    Mutex/unlock(this: REF(DRF(this)._mtxQueue));
   }
+  
+  #func callGenerateRange(PTR[WorldManager] this, int32 x, int32 y, int32 z, int32 flatRange, int32 yRange) {
+  #  PTR[ChunkList] chunkList = REF(DRF(DRF(this).world).chunkList);
+  #  funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
+  #  
+  #  int32 cy = y - yRange;
+  #  while (cy < (y + yRange)) {
+  #    int32 cz = z - flatRange;
+  #    while (cz < (z + flatRange)) {
+  #      int32 cx = x - flatRange;
+  #      while (cx < (x + flatRange)) {
+  #        ChunkCoord chunkCoord = ChunkCoord(x = cx, y = cy, z = cz);
+  #        PTR[Chunk] existing = ChunkList/find(this: chunkList, chunkCoord: chunkCoord);
+  #        if (RTP[int32](existing) == 0) {
+  #          PTR[Chunk] newChunk = ChunkList/add(this: chunkList);
+  #          DRF(newChunk).chunkCoord = chunkCoord;
+  #          generateChunk(chunk: newChunk);
+  #          onLoadedFunc(chunk: newChunk);
+  #        }
+  #        cx = cx + 1;
+  #      }
+  #      cz = cz + 1;
+  #    }
+  #    cy = cy + 1;
+  #  }
+  #}
 
   func generateChunk(PTR[Chunk] chunk) {
     System/print(s: STR"generating: ");
-    System/print(i: DRF(chunk).chunkCoord.x);
-    System/print(s: STR" ");
-    System/print(i: DRF(chunk).chunkCoord.y);
-    System/print(s: STR" ");
-    System/print(i: DRF(chunk).chunkCoord.z);
+    print(chunkCoord: REF(DRF(chunk).chunkCoord));
     System/println();
     
     #Time timePerlin = Time/zero();
