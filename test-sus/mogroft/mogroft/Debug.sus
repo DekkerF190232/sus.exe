@@ -1,7 +1,9 @@
 package Debug {
 
   use sus/Time;
+  use sus/List;
   use sus/System;
+  use sus/Memory;
 
   use mogroft/Mogroft;
   
@@ -12,6 +14,20 @@ package Debug {
   static int32 REPORT_INTERVAL_MS = 2000;
   
   static Time timeReport = Time(_low=cast[nat32](0),_high=cast[nat32](0));
+  
+  static int32 FPS_MEASURE_INTERVAL_MS = 500;
+  struct Debug (
+    List deltaHistory
+  );
+  
+  static PTR[Debug] data = RTP[PTR[Debug]](0);
+  
+  func init() {
+    data = RTP[PTR[Debug]](Memory/malloc(bytes: size[Debug]()));
+    DRF(data) = Debug(
+      deltaHistory = List/alloc(elementSize: size[Debug]())
+    );
+  }
 
   func tick(real32 dt) {
     Time now = Time/now();
@@ -35,11 +51,19 @@ package Debug {
     #System/println(s: STR"=================================== [Debug Report] ===================================");
     #System/println(s: STR"--------------------------------------------------------------------------------------");
     
-    System/print(s: STR"  ");
-    System/print(s: STR"  Loaded: ");
+    System/print(s: STR"    Loaded: ");
     System/print(i: DRF(world).chunkList.list.length);
     System/print(s: STR" Enqueued: ");
     System/print(i: DRF(worldManager)._queue.list.length);
+    System/println();
+    
+    System/print(s: STR"    XYZ: ");
+    System/print(i: cast[int32](DRF(world).player.position.x));
+    System/print(s: STR",");
+    System/print(i: cast[int32](DRF(world).player.position.y));
+    System/print(s: STR",");
+    System/print(i: cast[int32](DRF(world).player.position.z));
+    
     System/println();
   }
 

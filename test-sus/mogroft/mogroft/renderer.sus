@@ -32,8 +32,13 @@ package mogroft/Renderer {
   }
   
   # world events
+  
   func onChunkLoaded(PTR[RendererState] this, PTR[Chunk] chunk) {
     ChunkRender/onChunkLoaded(this: REF(DRF(this).worldRender.chunkRender), renderer: this, chunk: chunk);
+  }
+  
+  func onChunkUnloaded(PTR[RendererState] this, PTR[ChunkCoord] chunkCoord) {
+    ChunkRender/onChunkUnloaded(this: REF(DRF(this).worldRender.chunkRender), renderer: this, chunkCoord: chunkCoord);
   }
   
   # game loop events
@@ -208,6 +213,8 @@ package mogroft/render/WorldRender {
   use mogroft/render/ChunkRender;
   use mogroft/render/BlockSpriteSheet;
   
+  use mogroft/Settings;
+  
   struct WorldRender(
     ChunkRender chunkRender,
     BlockSpriteSheet blockSpriteSheet
@@ -228,17 +235,67 @@ package mogroft/render/WorldRender {
     real32 aspect = cast[real32](DRF(renderer).width) / cast[real32](DRF(renderer).height);
 
     # i dont know what's going on with near and far plane....
-    Renderer/setPerspective(fov: 70.0, aspect: aspect, near: 0.5, far: 1000.0); 
+    Renderer/setPerspective(fov: 60.0, aspect: aspect, near: 0.5, far: 1000.0); 
     
     Gl/glPushMatrix();
     
     setWorldCamera();
+    
+    setupLights();
     
     #Renderer/drawCube();
     
     ChunkRender/render(this: REF(DRF(this).chunkRender), renderer: renderer, dt: dt);
     
     Gl/glPopMatrix();
+  }
+  
+  func setupLights() {
+    if (Settings/inst.lighting == no) {
+      Gl/glDisable(cap: Gl/GL_LIGHTING);
+      done;
+    }
+  
+    PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
+    
+    PTR[real32] diffuse = ARR[real32](4);
+    DRF(diffuse)      = 1.0;
+    DRF(diffuse + 4)  = 0.8;
+    DRF(diffuse + 8)  = 0.4;
+    DRF(diffuse + 12) = 1.0;
+    Gl/glLightfv(light: Gl/GL_LIGHT1, pname: Gl/GL_DIFFUSE, params: diffuse);
+    
+    PTR[real32] specular = ARR[real32](4);
+    DRF(specular)      = 1.0;
+    DRF(specular + 4)  = 0.5;
+    DRF(specular + 8)  = 0.1;
+    DRF(specular + 12) = 1.0;
+    Gl/glLightfv(light: Gl/GL_LIGHT1, pname: Gl/GL_SPECULAR, params: specular);
+    
+    PTR[real32] ambient = ARR[real32](4);
+    DRF(ambient)      = 1.0;
+    DRF(ambient + 4)  = 1.0;
+    DRF(ambient + 8)  = 1.0;
+    DRF(ambient + 12) = 1.0;
+    Gl/glLightfv(light: Gl/GL_LIGHT1, pname: Gl/GL_AMBIENT, params: ambient);
+    
+    Gl/glLightf(light: Gl/GL_LIGHT1, pname: Gl/GL_QUADRATIC_ATTENUATION, param: 0.1);
+    
+    PTR[real32] pos = ARR[real32](4);
+    DRF(pos)      = (DRF(world).player.position.x);
+    DRF(pos + 4)  = (DRF(world).player.position.y + 1.0);
+    DRF(pos + 8)  = (DRF(world).player.position.z);
+    DRF(pos + 12) = 1.0;
+    #DRF(pos)      = 0.0;
+    #DRF(pos + 4)  = 1.0;
+    #DRF(pos + 8)  = 0.0;
+    #DRF(pos + 12) = 1.0;
+    Gl/glLightfv(light: Gl/GL_LIGHT1, pname: Gl/GL_POSITION, params: pos);
+    
+    Gl/glLightModeli(pname: Gl/GL_LIGHT_MODEL_TWO_SIDE, param: Gl/GL_TRUE);
+    
+    Gl/glEnable(cap: Gl/GL_LIGHTING);
+    Gl/glEnable(cap: Gl/GL_LIGHT1);
   }
   
   func setWorldCamera() {
@@ -401,13 +458,71 @@ package mogroft/render/ChunkRender {
     ChunkCoord chunkCoord,
     int32 listId
   );
-  struct ChunkRender(List chunkQueue, List chunkBuildList);
+  
+  struct ChunkRender(
+    List chunkQueue,
+    List chunkBuildList
+  );
   
   func ChunkRender new() {
     done ChunkRender(
-      chunkQueue = List/alloc(elementSize: size[ChunkCoord]()), # note: can not use chunk itself, because chunks are stored in dynamic list. -> chunk pointers change
+      # note: can not use chunk itself, because chunks are stored in dynamic list. -> chunk pointers change
+      chunkQueue = List/alloc(elementSize: size[ChunkCoord]()),
       chunkBuildList = List/alloc(elementSize: size[ChunkBuild]())
     );
+  }
+  
+  func PTR[ChunkCoord] findChunkCoord(PTR[List] list, ChunkCoord element) {
+    PTR[ChunkCoord] current = RTP[PTR[ChunkCoord]](List/at(
+      this: list,
+      i: 0
+    ));
+    PTR[ChunkCoord] end = RTP[PTR[ChunkCoord]](List/at(
+      this: list,
+      i: DRF(list).length
+    ));
+
+    while (RTP[int32](current) != RTP[int32](end)) {
+      if (
+        (DRF(current).x == element.x) &&
+        (DRF(current).y == element.y) &&
+        (DRF(current).z == element.z)
+      ) done RTP[PTR[ChunkCoord]](current);
+      current = current + size[ChunkCoord]();
+    }
+    done RTP[PTR[ChunkCoord]](0);
+  }
+  
+  static int32 listCounter = 1; # note: i have my own list id counter, because glgenlist does not work for deleting in same frame i guess.
+  
+  func onChunkUnloaded(PTR[ChunkRender] this, PTR[RendererState] renderer, PTR[ChunkCoord] chunkCoord) {
+    PTR[ChunkCoord] queueElement = findChunkCoord(
+      list: REF(DRF(this).chunkQueue),
+      element: DRF(chunkCoord)
+    );
+    #System/print(s: STR"unloading:");
+    #System/print(i: DRF(chunkCoord).x);
+    #System/print(s: STR" ");
+    #System/print(i: DRF(chunkCoord).y);
+    #System/print(s: STR" ");
+    #System/print(i: DRF(chunkCoord).z);
+    #System/println();
+    if (RTP[int32](queueElement) != 0) List/remove(this: REF(DRF(this).chunkQueue), index: RTP[PTR[ptr]](queueElement));
+    
+    PTR[ChunkBuild] existing = findChunkBuild(this: this, chunkCoord: DRF(chunkCoord));
+    if (RTP[int32](existing) != 0) {
+      #System/println(i: DRF(existing).listId);
+      Gl/glDeleteLists(lists: DRF(existing).listId, range: 1);
+      List/remove(this: REF(DRF(this).chunkBuildList), index: RTP[PTR[ptr]](existing));
+      #System/print(s: STR"removed mesh: ");
+      #System/print(i: DRF(chunkCoord).x);
+      #System/print(s: STR" ");
+      #System/print(i: DRF(chunkCoord).y);
+      #System/print(s: STR" ");
+      #System/print(i: DRF(chunkCoord).z);
+      #System/println();
+      #System/printBytes(pointer: RTP[PTR[int8]](DRF(this).chunkBuildList._memory), count: size[ChunkBuild]() * DRF(this).chunkBuildList.length); 
+    }
   }
   
   func onChunkLoaded(PTR[ChunkRender] this, PTR[RendererState] renderer, PTR[Chunk] chunk) {
@@ -431,7 +546,7 @@ package mogroft/render/ChunkRender {
     #Renderer/drawCube();
     
     chooseRebuilds(this: this, renderer: renderer);
-    
+
     renderBuilds(this: this, renderer: renderer);
   }
   
@@ -478,12 +593,18 @@ package mogroft/render/ChunkRender {
       this: REF(DRF(this).chunkQueue),
       i: 0
     ));
+    #if (DRF(this).chunkQueue.length > 0) {
+    #  System/print(s: STR"rebuilding meshes: ");
+    #  System/println(i: DRF(this).chunkQueue.length);
+    #}
     PTR[ChunkCoord] end = RTP[PTR[ChunkCoord]](List/at(
       this: REF(DRF(this).chunkQueue),
       i: DRF(this).chunkQueue.length
     ));
     
-    while (RTP[int32](current) != RTP[int32](end)) {
+    int32 processed = 0;
+    int32 meshesGenerated = 0;
+    while (RTP[int32](current) != RTP[int32](end) && (meshesGenerated < 1)) {
       #System/print(s:STR"rebuild: ");
       #System/print(i:DRF(current).x);
       #System/print(s:STR" ");
@@ -494,170 +615,58 @@ package mogroft/render/ChunkRender {
       
       PTR[Chunk] chunk = ChunkList/find(this: chunkList, chunkCoord: DRF(current));
       
-      if (RTP[int32](chunk) == 0) System/fatal(reason: STR"rebuilding unloaded chunk");
-      
-      rebuild(this: this, renderer: renderer, chunk: chunk);
-      
+      if (RTP[int32](chunk) != 0) {
+        if (DRF(chunk).isAir) {
+          rebuildAir(this: this, renderer: renderer, chunk: chunk);
+        } else {
+          rebuild(this: this, renderer: renderer, chunk: chunk);
+          meshesGenerated = meshesGenerated + 1;
+        }
+      } else {
+        System/println(s: STR"[warn] a chunk was unloaded while it was in the mesh builder queue");
+      }
+        
       current = current + DRF(this).chunkQueue._elementSize;
+      processed = processed + 1;
     }
-    List/clear(this: REF(DRF(this).chunkQueue));
+    List/removeFirst(this: REF(DRF(this).chunkQueue), count: processed);
+    #List/clear(this: REF(DRF(this).chunkQueue));
   }
   
   #
   # chunk mesh builder
   #
   
-  func buildFront(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
-    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
-    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
-    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
-    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
-      this: blockSpriteSheet,
-      block: DRF(block),
-      side: Side/FRONT
-    );
-  
-    # order of vertices, with default view vector (0, 0, -1)
-    #  0--3
-    #  |  |
-    #  1--2
+  func rebuildAir(PTR[ChunkRender] this, PTR[RendererState] renderer, PTR[Chunk] chunk) {
+    #System/print(s:STR"rebuild: ");
+    #System/print(i:DRF(chunk).chunkCoord.x);
+    #System/print(s:STR" ");
+    #System/print(i:DRF(chunk).chunkCoord.y);
+    #System/print(s:STR" ");
+    #System/print(i:DRF(chunk).chunkCoord.z);
+    #System/println();
     
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
-    Gl/glVertex3f(x: x,       y: y + 1.0,   z: z + 1.0);
+    PTR[ChunkBuild] existing = findChunkBuild(this: this, chunkCoord: DRF(chunk).chunkCoord);
+    if (RTP[int32](existing) != 0) {
+      Gl/glDeleteLists(lists: DRF(existing).listId, range: 1);
+    }
     
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x,       y: y,         z: z + 1.0);
+    int32 newList = listCounter; #Gl/glGenLists(range: 1);
+    listCounter = listCounter + 1;
     
-    Gl/glTexCoord2f(u: DRF(face).u + spriteHeight, v: DRF(face).v + spriteWidth);
-    Gl/glVertex3f(x: x + 1.0, y: y,         z: z + 1.0);
+    Gl/glNewList(lists: newList, mode: Gl/GL_COMPILE);
     
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
-    Gl/glVertex3f(x: x + 1.0, y: y + 1.0,   z: z + 1.0);
-  }
-  
-  func buildBack(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
-    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
-    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
-    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
-    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
-      this: blockSpriteSheet,
-      block: DRF(block),
-      side: Side/BACK
-    );
-  
-    # order of vertices, with default view vector (0, 0, -1)
-    #  3--0
-    #  |  | 
-    #  2--1
+    #Gl/glBegin(mode: Gl/GL_QUADS);
+    #Gl/glEnd();
     
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
-    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z);
+    Gl/glEndList();
     
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x + 1.0, y: y, z: z);
-    
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x, y: y,z: z);
-    
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
-    Gl/glVertex3f(x: x, y: y + 1.0,z: z);
-  }
-  
-  func buildLeft(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
-    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
-    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
-    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
-    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
-      this: blockSpriteSheet,
-      block: DRF(block),
-      side: Side/LEFT
-    );
-  
-    # order of vertices, with default view vector (0, 0, -1)
-    #  0-3
-    #  | |
-    #  1-2
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
-    Gl/glVertex3f(x: x, y: y + 1.0, z: z);
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x, y: y, z: z);
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x, y: y, z: z + 1.0);
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
-    Gl/glVertex3f(x: x, y: y + 1.0, z: z + 1.0);
-  }
-  
-  func buildRight(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
-    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
-    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
-    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
-    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
-      this: blockSpriteSheet,
-      block: DRF(block),
-      side: Side/RIGHT
-    );
-  
-    # order of vertices, with default view vector (0, 0, -1)
-    #  0-3
-    #  | |
-    #  1-2
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
-    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z + 1.0);
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x + 1.0, y: y, z: z + 1.0);
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x + 1.0, y: y, z: z);
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
-    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z);
-  }
-  
-  func buildDown(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
-    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
-    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
-    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
-    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
-      this: blockSpriteSheet,
-      block: DRF(block),
-      side: Side/DOWN
-    );
-  
-    # order of vertices, with default view vector (0, 0, -1)
-    #  3-0
-    #  | |
-    #  2-1
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x + 1.0, y: y, z: z);
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
-    Gl/glVertex3f(x: x + 1.0, y: y, z: z + 1.0);
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
-    Gl/glVertex3f(x: x, y: y, z: z + 1.0);
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x, y: y, z: z);
-  }
-  
-  func buildUp(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
-    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
-    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
-    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
-    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
-      this: blockSpriteSheet,
-      block: DRF(block),
-      side: Side/UP
-    );
-  
-    # order of vertices, with default view vector (0, 0, -1)
-    #  0-3
-    #  | |
-    #  1-2
-    
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
-    Gl/glVertex3f(x: x, y: y + 1.0, z: z);
-    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x, y: y + 1.0, z: z + 1.0);
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
-    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z + 1.0);
-    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
-    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z);
+    PTR[ChunkBuild] build = RTP[PTR[ChunkBuild]](List/add(
+      this: REF(DRF(this).chunkBuildList),
+      element: RTP[ptr](0)
+    ));
+    DRF(build).chunkCoord = DRF(chunk).chunkCoord;
+    DRF(build).listId = newList;
   }
   
   func rebuild(PTR[ChunkRender] this, PTR[RendererState] renderer, PTR[Chunk] chunk) {
@@ -674,9 +683,42 @@ package mogroft/render/ChunkRender {
       Gl/glDeleteLists(lists: DRF(existing).listId, range: 1);
     }
     
-    int32 newList = Gl/glGenLists(range: 1);
+    int32 newList = listCounter; #Gl/glGenLists(range: 1);
+    listCounter = listCounter + 1;
     
     Gl/glNewList(lists: newList, mode: Gl/GL_COMPILE);
+    
+    ### set material
+    Gl/glColor4f(r: 1.0, g: 1.0, b: 1.0, a: 1.0);
+    
+    PTR[real32] matGold = ARR[real32](13);
+    # ambient
+    DRF(matGold)      = 0.0;
+    DRF(matGold + 4)  = 0.0;
+    DRF(matGold + 8)  = 0.0;
+    DRF(matGold + 12) = 1.0;
+    
+    # diffuse
+    DRF(matGold + 16) = 1.0;
+    DRF(matGold + 20) = 1.0;
+    DRF(matGold + 24) = 1.0;
+    DRF(matGold + 28) = 1.0;
+    
+    # specular
+    DRF(matGold + 32) = 1.0;
+    DRF(matGold + 36) = 1.0;
+    DRF(matGold + 40) = 1.0;
+    DRF(matGold + 44) = 1.0;
+    
+    # shininess
+    DRF(matGold + 48) = 50.0;
+    
+    Gl/glMaterialfv(face: Gl/GL_FRONT_AND_BACK, pname: Gl/GL_AMBIENT, params: matGold);
+    Gl/glMaterialfv(face: Gl/GL_FRONT_AND_BACK, pname: Gl/GL_DIFFUSE, params: matGold + 16);
+    Gl/glMaterialfv(face: Gl/GL_FRONT_AND_BACK, pname: Gl/GL_SPECULAR, params: matGold + 32);
+    Gl/glMaterialf(face: Gl/GL_FRONT_AND_BACK, pname: Gl/GL_SHININESS, param: DRF(matGold + 48));
+    
+    ###
     
     Gl/glBegin(mode: Gl/GL_QUADS);
     
@@ -736,6 +778,174 @@ package mogroft/render/ChunkRender {
     ));
     DRF(build).chunkCoord = DRF(chunk).chunkCoord;
     DRF(build).listId = newList;
+  }
+  
+  func buildFront(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
+    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
+    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
+    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
+    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
+      this: blockSpriteSheet,
+      block: DRF(block),
+      side: Side/FRONT
+    );
+  
+    # order of vertices, with default view vector (0, 0, -1)
+    #  0--3
+    #  |  |
+    #  1--2
+    
+    Gl/glNormal3f(x: 0.0, y: 0.0, z: 1.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
+    Gl/glVertex3f(x: x,       y: y + 1.0,   z: z + 1.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x,       y: y,         z: z + 1.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u + spriteHeight, v: DRF(face).v + spriteWidth);
+    Gl/glVertex3f(x: x + 1.0, y: y,         z: z + 1.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
+    Gl/glVertex3f(x: x + 1.0, y: y + 1.0,   z: z + 1.0);
+  }
+  
+  func buildBack(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
+    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
+    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
+    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
+    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
+      this: blockSpriteSheet,
+      block: DRF(block),
+      side: Side/BACK
+    );
+  
+    # order of vertices, with default view vector (0, 0, -1)
+    #  3--0
+    #  |  | 
+    #  2--1
+    
+    Gl/glNormal3f(x: 0.0, y: 0.0, z: -1.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
+    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z);
+    
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x + 1.0, y: y, z: z);
+    
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x, y: y,z: z);
+    
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
+    Gl/glVertex3f(x: x, y: y + 1.0,z: z);
+  }
+  
+  func buildLeft(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
+    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
+    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
+    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
+    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
+      this: blockSpriteSheet,
+      block: DRF(block),
+      side: Side/LEFT
+    );
+  
+    # order of vertices, with default view vector (0, 0, -1)
+    #  0-3
+    #  | |
+    #  1-2
+    
+    Gl/glNormal3f(x: -1.0, y: 0.0, z: 0.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
+    Gl/glVertex3f(x: x, y: y + 1.0, z: z);
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x, y: y, z: z);
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x, y: y, z: z + 1.0);
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
+    Gl/glVertex3f(x: x, y: y + 1.0, z: z + 1.0);
+  }
+  
+  func buildRight(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
+    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
+    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
+    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
+    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
+      this: blockSpriteSheet,
+      block: DRF(block),
+      side: Side/RIGHT
+    );
+  
+    # order of vertices, with default view vector (0, 0, -1)
+    #  0-3
+    #  | |
+    #  1-2
+    
+    Gl/glNormal3f(x: 1.0, y: 0.0, z: 0.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
+    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z + 1.0);
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x + 1.0, y: y, z: z + 1.0);
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x + 1.0, y: y, z: z);
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
+    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z);
+  }
+  
+  func buildDown(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
+    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
+    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
+    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
+    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
+      this: blockSpriteSheet,
+      block: DRF(block),
+      side: Side/DOWN
+    );
+  
+    # order of vertices, with default view vector (0, 0, -1)
+    #  3-0
+    #  | |
+    #  2-1
+    
+    Gl/glNormal3f(x: 0.0, y: -1.0, z: 0.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x + 1.0, y: y, z: z);
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
+    Gl/glVertex3f(x: x + 1.0, y: y, z: z + 1.0);
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
+    Gl/glVertex3f(x: x, y: y, z: z + 1.0);
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x, y: y, z: z);
+  }
+  
+  func buildUp(PTR[RendererState] renderer, PTR[Block] block, real32 x, real32 y, real32 z) {
+    PTR[BlockSpriteSheet] blockSpriteSheet = REF(DRF(renderer).worldRender.blockSpriteSheet);
+    real32 spriteWidth = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).width);
+    real32 spriteHeight = cast[real32](DRF(blockSpriteSheet).spriteSize) / cast[real32](DRF(blockSpriteSheet).height);
+    PTR[BlockSpriteFace] face = BlockSpriteSheet/resolve(
+      this: blockSpriteSheet,
+      block: DRF(block),
+      side: Side/UP
+    );
+  
+    # order of vertices, with default view vector (0, 0, -1)
+    #  0-3
+    #  | |
+    #  1-2
+    
+    Gl/glNormal3f(x: 0.0, y: 1.0, z: 0.0);
+    
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v);
+    Gl/glVertex3f(x: x, y: y + 1.0, z: z);
+    Gl/glTexCoord2f(u: DRF(face).u, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x, y: y + 1.0, z: z + 1.0);
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v + spriteHeight);
+    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z + 1.0);
+    Gl/glTexCoord2f(u: DRF(face).u + spriteWidth, v: DRF(face).v);
+    Gl/glVertex3f(x: x + 1.0, y: y + 1.0, z: z);
   }
   
   func PTR[ChunkBuild] findChunkBuild(PTR[ChunkRender] this, ChunkCoord chunkCoord) {

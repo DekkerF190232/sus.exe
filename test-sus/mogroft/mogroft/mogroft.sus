@@ -11,6 +11,7 @@ package mogroft/Mogroft {
   use mogroft/world/World;
   use mogroft/world/Chunk;
   use mogroft/world/WorldManager;
+  use mogroft/Settings;
   
 
   struct MogroftState (
@@ -24,7 +25,8 @@ package mogroft/Mogroft {
     MogroftState theInst = MogroftState(
       rendererState = Renderer/new_RendererState(),
       worldManager = WorldManager/new(chunkEventHandler: ChunkEventHandler(
-        onLoaded = funcref(onChunkLoaded)
+        onLoaded = funcref(onChunkLoaded),
+        onUnloaded = funcref(onChunkUnloaded)
       ))
     );
     _mogroft = REF(theInst);
@@ -43,6 +45,10 @@ package mogroft/Mogroft {
   }
   
   # world events
+  
+  func onChunkUnloaded(PTR[ChunkCoord] chunkCoord) {
+    Renderer/onChunkUnloaded(this: REF(DRF(_mogroft).rendererState), chunkCoord: chunkCoord);
+  }
   
   func onChunkLoaded(PTR[Chunk] chunk) {
     Renderer/onChunkLoaded(this: REF(DRF(_mogroft).rendererState), chunk: chunk);

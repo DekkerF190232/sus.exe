@@ -9,7 +9,7 @@ package mogroft/Noise2D {
     int8 w = cast[int8](8 * size[int32]());
     int8 m = cast[int8](4 * size[int32]());
     int8 wmm = cast[int8](cast[int32](w) - cast[int32](m));
-    int32 k = @131131;
+    int32 k = @9332801;
     k = k ^ (k >> wmm); 
     done (x * k) >> (wmm);
   }

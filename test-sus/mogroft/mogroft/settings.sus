@@ -1,0 +1,13 @@
+package mogroft/Settings {
+  
+  static Settings inst = Settings(
+    collision = yes,
+    lighting = yes
+  );
+  
+  struct Settings (
+    boo collision,
+    boo lighting
+  );
+
+}

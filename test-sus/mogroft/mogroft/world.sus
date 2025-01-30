@@ -66,10 +66,11 @@ package mogroft/world/Chunk {
   use sus/Memory;
 
   static int32 SIZE = 16;
-  static Chunk CHUNK_EMPTY = Chunk(
-    chunkCoord = ChunkCoord(x=0, y=0, z=0),
-    blocks = array[Block, 4096](Block(id = cast[int8](1)))
-  );
+  #static Chunk CHUNK_EMPTY = Chunk(
+  #  isAir = no,
+  #  chunkCoord = ChunkCoord(x=0, y=0, z=0),
+  #  blocks = array[Block, 4096](Block(id = cast[int8](1)))
+  #);
 
   struct ChunkCoord (
     int32 x,
@@ -78,6 +79,7 @@ package mogroft/world/Chunk {
   ); # [chunks]
 
   struct Chunk (
+    boo isAir,
     ChunkCoord chunkCoord,
     array[Block, 4096] blocks # 16^3 = 4096
   );

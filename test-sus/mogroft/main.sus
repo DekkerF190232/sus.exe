@@ -52,11 +52,24 @@ package Test {
  
   
   func doTest() {
+    testBoo();
     #testCalc();
     #testList();
     #testNoise();
     #while (yes) testTime();
     #testHash();
+  }
+  
+  func testBoo() {
+    #ASM {
+    #  TEST1:
+    #}
+    #System/println(b: no);
+    #ASM {
+    #  Setti:
+    #}
+    #System/println(b: no == no);
+    #System/println(b: yes == no);
   }
   
   #static int32 CALC_SIZE = 16;
@@ -69,23 +82,43 @@ package Test {
   #  System/println(i: z);
   #}
   
-  #func testList() {
-  #  List list = List/alloc(elementSize: size[int32]());
-  #  DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = 1;
-  #  DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = 2;
-  #  DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = 3;
-  #  
-  #  List copied = List/alloc(elementSize: 4);
-  #  List/addAll(this: REF(copied), other: REF(list));
-  #  List/clear(this: REF(copied));
-  #  List/addAll(this: REF(copied), other: REF(list));
-  #  
-  #  System/print(s: STR"Length: ");
-  #  System/print(i: copied.length);
-  #  System/print(s: STR"\n");
-  #  System/printBytes(pointer: RTP[PTR[int8]](copied._memory), count: copied.length * 4);
-  #  System/println();
-  #}
+  func int32 compareInt(PTR[ptr] a, PTR[ptr] b) {
+    PTR[int32] ia = RTP[PTR[int32]](a);
+    PTR[int32] ib = RTP[PTR[int32]](b);
+    if (DRF(ia) > DRF(ib)) done 1;
+    if (DRF(ia) < DRF(ib)) done -1;
+    done 0;
+  }
+  
+  func testList() {
+    List list = List/alloc(elementSize: size[int32]());
+    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @11111111;
+    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @55555555;
+    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @22222222;
+    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @33333333;
+    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @44444444;
+    
+    # List copied = List/alloc(elementSize: 4);
+    # List/addAll(this: REF(copied), other: REF(list));
+    # List/clear(this: REF(copied));
+    # List/addAll(this: REF(copied), other: REF(list));
+    
+    
+    System/print(s: STR"Length: ");
+    System/print(i: list.length);
+    System/print(s: STR"\n");
+    System/printBytes(pointer: RTP[PTR[int8]](list._memory), count: list.length * 4);
+    System/println();
+    
+    
+    List/sort(this: REF(list), compare: funcref(compareInt));
+    
+    System/print(s: STR"Length: ");
+    System/print(i: list.length);
+    System/print(s: STR"\n");
+    System/printBytes(pointer: RTP[PTR[int8]](list._memory), count: list.length * 4);
+    System/println();
+  }
   
   #func testTime() {
     #Time zero = Time/zero();

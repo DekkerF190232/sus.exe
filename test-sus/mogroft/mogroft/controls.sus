@@ -66,6 +66,9 @@ package mogroft/Controls {
   }
 
   func onKeyDownInitial(int32 vk) {
+    funcptr[(int32 vk)] pressFunc = inputHandler.press;
+    pressFunc(vk: vk);
+    
     if (vk == Win/VK_ESCAPE) {
       setGrabbed(grabbed: no);
     } else if (vk == Win/VK_LBUTTON) {
@@ -135,6 +138,8 @@ package mogroft/InputHandlerFly {
   use mogroft/world/World;
   use mogroft/world/Player;
   use mogroft/Mogroft;
+  
+  use mogroft/Settings;
 
   func InputHandler createInputHandler() {
     done InputHandler(
@@ -151,7 +156,7 @@ package mogroft/InputHandlerFly {
     if (Controls/isCursorGrabbed() == no) done;
     
     # how many pixels does the mouse have to move for the player to turn around 360°
-    real32 fullRotationPx = 1920.0 * 2.0; 
+    real32 fullRotationPx = 1920.0 * 2.5; 
     
     real32 deltaYaw = cast[real32](dx) / fullRotationPx * -360.0;
     real32 deltaPitch = cast[real32](dy) / fullRotationPx * -360.0;
@@ -189,18 +194,32 @@ package mogroft/InputHandlerFly {
     
     Vec3/rotate(this: REF(wanted), angle: yaw, v: Vec3(x=0.0, y = 1.0,z=0.0)); 
     
+    
     if (Controls/isDown(vk: Win/VK_SHIFT))  wanted.y  = wanted.y - 1.0;
     if (Controls/isDown(vk: Win/VK_SPACE))  wanted.y  = wanted.y + 1.0;
     
     real32 speed = 10.0;
+    if (Controls/isDown(vk: Win/VK_CONTROL)) speed = speed * 10.0;
     
     DRF(world).player.position.z = DRF(world).player.position.z + (dt * speed * wanted.z);
     DRF(world).player.position.y = DRF(world).player.position.y + (dt * speed * wanted.y);
     DRF(world).player.position.x = DRF(world).player.position.x + (dt * speed * wanted.x);
   }
   
+  func press(int32 vk) {
+    int32 vkL = 76;
+    if (vk == vkL) {
+      #Settings/inst.lighting = Settings/inst.lighting == no;
+      System/print(s: STR"LIGHTING: ");
+     #System/print(b: Settings/inst.lighting == no);
+     #System/print(b: Settings/inst.lighting);
+     #System/print(b: yes);
+     #System/print(b: no);
+     #System/println();
+    }
+  }
+  
   func mouseMove(int32 x, int32 y) {}
-  func press(int32 vk) {}
   func release(int32 vk) {}
   func looseFocus() {}
   

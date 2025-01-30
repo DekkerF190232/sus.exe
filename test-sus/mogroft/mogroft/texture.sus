@@ -57,7 +57,7 @@ package mogroft/Texture {
     
     Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_WRAP_S, param: Gl/GL_REPEAT);
     Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_WRAP_T, param: Gl/GL_REPEAT);
-    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MIN_FILTER, param: Gl/GL_LINEAR);
+    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MIN_FILTER, param: Gl/GL_NEAREST);
     Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MAG_FILTER, param: Gl/GL_LINEAR);
     Gl/glBindTexture(target: Gl/GL_TEXTURE_2D, texture: 0);
     
@@ -100,7 +100,7 @@ package mogroft/Texture {
     
     Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_WRAP_S, param: Gl/GL_REPEAT);
     Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_WRAP_T, param: Gl/GL_REPEAT);
-    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MIN_FILTER, param: Gl/GL_NEAREST);
+    Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MIN_FILTER, param: Gl/GL_LINEAR);
     Gl/glTexParameteri(target: Gl/GL_TEXTURE_2D, pname: Gl/GL_TEXTURE_MAG_FILTER, param: Gl/GL_NEAREST);
     Gl/glBindTexture(target: Gl/GL_TEXTURE_2D, texture: 0);
     

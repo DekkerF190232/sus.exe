@@ -19,6 +19,18 @@ package sus/Math {
   static real32 2PI = 6.28318530718;
   static real32 SQRT2 = 1.41421356237;
   
+  func real32 absf(real32 x) {
+    if (x < 0.0) done 0.0 - x;
+    done x;
+  }
+  
+  
+  func int32 absi(int32 x) {
+    if (x < 0) done 0 - x;
+    done x;
+    #done x & @7fffffff;
+  }
+  
   func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
   func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
   func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
@@ -959,6 +971,7 @@ package sus/List {
 
   struct List(
     PTR[ptr] _memory,
+    PTR[ptr] _memBlock,
     int32 _elementSize,
     int32 _capacity,
     int32 length
@@ -969,12 +982,129 @@ package sus/List {
   }
 
   func List alloc(int32 elementSize, int32 capacity) {
+    PTR[ptr] memory = RTP[PTR[ptr]](Memory/malloc(bytes: elementSize * capacity));
     done List(
-      _memory = RTP[PTR[ptr]](Memory/malloc(bytes: elementSize * capacity)),
+      _memory = memory,
+      _memBlock = memory,
       _elementSize = elementSize,
       _capacity = capacity,
       length = 0
     );
+  }
+  
+  func int32 _partition(
+    PTR[List]                                 this,
+    int32                                     low,
+    int32                                     high, 
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)]   compare
+  ) {
+    PTR[ptr] pivot = DRF(this)._memory + (high * DRF(this)._elementSize);
+    int32 i = low - 1;
+    
+    PTR[int8] swapBuffer = ARR[int8](DRF(this)._elementSize);
+    
+    int32 j = low;
+    while (j < high) {
+      PTR[ptr] elementj = DRF(this)._memory + (j * DRF(this)._elementSize);
+      
+      #funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] comp = compare;
+      int32 c = 0;
+      c = compare(a: elementj, b: pivot);
+      
+      #System/print(s: STR" compare: ");
+      #System/print(i_0x: DRF(RTP[PTR[int32]](elementj)));
+      #System/print(s: STR", ");
+      #System/print(i_0x: DRF(RTP[PTR[int32]](pivot)));
+      #System/print(s: STR" = ");
+      #System/print(i: c);
+      #System/println();
+      
+      if (c < 0) {
+        i = i + 1;
+        PTR[ptr] elementi = DRF(this)._memory + (i * DRF(this)._elementSize);
+        
+        swap(
+          a: RTP[ptr](elementi),
+          b: RTP[ptr](elementj),
+          buffer: RTP[ptr](swapBuffer),
+          bytes: DRF(this)._elementSize
+        );
+        
+        #System/print(i: i - 1);
+        #System/print(s: STR", ");
+        #System/print(i: j);
+        # System/println();
+        #System/println(s: STR" {");
+        #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+        #System/println(s: STR"}");
+      }
+      
+      j = j + 1;
+    }
+    
+    PTR[ptr] elementi1 = DRF(this)._memory + ((i + 1) * DRF(this)._elementSize);
+    PTR[ptr] elementh = DRF(this)._memory + ((high) * DRF(this)._elementSize);
+    
+    swap(a: RTP[ptr](elementi1), b: RTP[ptr](elementh), buffer: RTP[ptr](swapBuffer), bytes: DRF(this)._elementSize);
+    
+    done i + 1;
+  }
+  
+  func swap(ptr a, ptr b, ptr buffer, int32 bytes) {
+    if (RTP[int32](a) == RTP[int32](b)) done;
+    
+    int32 _1 = Memory/memcpy_s(
+      dest:     buffer,
+      destSize: Limits/INT32_MAX,
+      source:   b,
+      bytes:    bytes
+    );
+    int32 _2 = Memory/memcpy_s(
+      dest:     b,
+      destSize: Limits/INT32_MAX,
+      source:   a,
+      bytes:    bytes
+    );
+    int32 _3 = Memory/memcpy_s(
+      dest:     a,
+      destSize: Limits/INT32_MAX,
+      source:   buffer,
+      bytes:    bytes
+    );
+  }
+  
+  func sort(
+    PTR[List]                               this,
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] compare
+  ) {
+    sort(this: this, low: 0, high: DRF(this).length - 1, compare: compare); 
+  }
+  
+  func sort(
+    PTR[List]                               this,
+    int32                                   low,
+    int32                                   high,
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] compare
+  ) {
+    if (low < high) {
+      #System/print(s: STR" sort: ");
+      #System/print(i: low);
+      #System/print(s: STR", ");
+      #System/print(i: high);
+      #System/println();
+
+      #System/println(s: STR" [");
+      #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+      #System/println(s: STR"]");
+      
+      int32 pi = _partition(this: this, high: high, low: low, compare: compare);
+      
+      #System/println(s: STR"{");
+      #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+      #System/println(s: STR"}");
+      sort(this: this, low: low,    high: pi - 1, compare: compare);
+      sort(this: this, low: pi + 1, high: high,   compare: compare);
+    }
   }
 
   func addAll(PTR[List] this, PTR[List] other) {
@@ -994,7 +1124,15 @@ package sus/List {
   }
 
   func free(PTR[List] this) {
-    Memory/free(pointer: RTP[ptr](DRF(this)._memory));
+    Memory/free(pointer: RTP[ptr](DRF(this)._memBlock));
+  }
+  
+  func removeFirst(PTR[List] this, int32 count) {
+    int32 newLength = DRF(this).length - count;
+    if (newLength < 0) System/fatal(reason: STR"removed negative count");
+    DRF(this)._memory = DRF(this)._memory + (count * DRF(this)._elementSize);
+    DRF(this).length = newLength;
+    DRF(this)._capacity = DRF(this)._capacity - count;
   }
   
   # expands the list, if (amount) items do not fit.
@@ -1015,9 +1153,10 @@ package sus/List {
     );
 
     # remove old memory
-    Memory/free(pointer: RTP[ptr](DRF(this)._memory));
+    Memory/free(pointer: RTP[ptr](DRF(this)._memBlock));
 
     DRF(this)._memory = newMemory;
+    DRF(this)._memBlock = newMemory;
   }
   
   # adds element at the pointer *element* and returns pointer to the copy made into the list.
@@ -1351,13 +1490,13 @@ package sus/System {
   }
 
   func print(boo b) {
-    if (b) print(s:STR"1");
-    else print(s:STR"0");
+    if (b) print(s: STR"yes");
+    else print(s: STR"no");
   }
 
   func println(boo b) {
-    if (b) print(s:STR"1\n");
-    else print(s:STR"0\n");
+    if (b) print(s: STR"yes\n");
+    else print(s: STR"no\n");
   }
 
   func print(int32 i_0x) {
