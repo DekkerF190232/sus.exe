@@ -2920,7 +2920,7 @@ function compile(state) {
 
     r += compileExpr(expr, scope, addressScope);
     r += line(`pop     eax`);
-    r += line(`cmp     eax, 1`);
+    r += line(`cmp     al, 1`);
     r += line(`jne     ${nodeElse ? asmNameElse : asmNameEnd}`);
 
     r += line(asmNameYes + ':');
@@ -4088,6 +4088,7 @@ function compile(state) {
     switch (op) {
       // http://unixwiz.net/techtips/x86-jumps.html
       case '==':
+        if (exprATypeName === 'boo') return compileExprOpCompBoo(exprOp, scope, addressScope, 'sete');
         return compileExprOpComp(exprOp, scope, addressScope, 'sete');
       case '!=':
         return compileExprOpComp(exprOp, scope, addressScope, 'setne');
@@ -4288,6 +4289,25 @@ function compile(state) {
     r += line(`fst     dword [esp]`);
     return r;
   }
+  
+  function compileExprOpCompBoo(exprOp, scope, addressScope, inst) {
+    let a = exprOp.kids[0];
+    let b = exprOp.kids[1];
+    let asm = '';
+    asm += compileExpr(a, scope, addressScope);
+    asm += compileExpr(b, scope, addressScope);
+    // comparing: https://stackoverflow.com/questions/77062912/how-to-move-the-zero-flag-into-a-register-in-x86-64
+    // setz:      https://browncs1260.github.io/misc/assembly#directive-reference
+    asm += line(`xor     eax, eax`);
+    asm += line(`pop     edx`);
+    asm += line(`pop     ecx`);
+    asm += line(`cmp     cl, dl`);
+    asm += line(`${inst.padEnd(8, ' ')}al`);
+    asm += line(`push    eax`);
+
+    return asm;
+  }
+  
 
   function compileExprOpComp(exprOp, scope, addressScope, inst) {
     let a = exprOp.kids[0];

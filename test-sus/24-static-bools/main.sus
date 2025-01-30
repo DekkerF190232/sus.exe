@@ -1,0 +1,29 @@
+package Main {
+
+  use sus/System;
+
+  main {
+    System/initConsole();
+
+    System/println(s: STR"Hello, World");
+    Test/test.value = yes;
+    System/println(b: Test/test.value);
+    System/println(b: Test/test.value == no);
+    System/exit(code: 0);
+  }
+
+}
+
+package Test {
+
+  struct Test(
+    boo value,
+    boo _ignored2
+  );
+
+  static Test test = Test(
+    value = yes,
+    _ignored2 = yes
+  );
+
+}

@@ -1,0 +1,222 @@
+package sus/Gl {
+  
+  use sus/System;
+
+  # clear bits
+  static int32 GL_COLOR_BUFFER_BIT             = @00004000;
+  static int32 GL_DEPTH_BUFFER_BIT             = @00000100;
+  
+  # blend modes
+  static int32 GL_ZERO                         = 0;
+  static int32 GL_ONE                          = 1;
+  static int32 GL_SRC_COLOR                    = @0300;
+  static int32 GL_ONE_MINUS_SRC_COLOR          = @0301;
+  static int32 GL_SRC_ALPHA                    = @0302;
+  static int32 GL_ONE_MINUS_SRC_ALPHA          = @0303;
+  static int32 GL_DST_ALPHA                    = @0304;
+  static int32 GL_ONE_MINUS_DST_ALPHA          = @0305;
+  
+  # glbegin modes
+  static int32 GL_POINTS                       = @0000;
+  static int32 GL_LINES                        = @0001;
+  static int32 GL_LINE_LOOP                    = @0002;
+  static int32 GL_LINE_STRIP                   = @0003;
+  static int32 GL_TRIANGLES                    = @0004;
+  static int32 GL_TRIANGLE_STRIP               = @0005;
+  static int32 GL_TRIANGLE_FAN                 = @0006;
+  static int32 GL_QUADS                        = @0007;
+  static int32 GL_QUAD_STRIP                   = @0008;
+  static int32 GL_POLYGON                      = @0009;
+  
+  # matrix modes
+  static int32 GL_MODELVIEW                    = @1700;
+  static int32 GL_PROJECTION                   = @1701;
+  static int32 GL_TEXTURE                      = @1702;
+  
+  # targets
+  static int32 GL_TEXTURE_2D                   = @0DE1;
+  static int32 GL_DEPTH_TEST                   = @0B71;
+  static int32 GL_BLEND                        = @0BE2;
+  static int32 GL_CULL_FACE                    = @0B44;
+  static int32 GL_LIGHTING                     = @0B50;
+  
+  # formats
+  static int32 GL_RGBA                         = @1908;
+  
+  # data types
+  static int32 GL_BYTE                         = @1400;
+  static int32 GL_UNSIGNED_BYTE                = @1401;
+  static int32 GL_SHORT                        = @1402;
+  static int32 GL_UNSIGNED_SHORT               = @1403;
+  static int32 GL_INT                          = @1404;
+  static int32 GL_UNSIGNED_INT                 = @1405;
+  static int32 GL_FLOAT                        = @1406;
+  static int32 GL_2_BYTES                      = @1407;
+  static int32 GL_3_BYTES                      = @1408;
+  static int32 GL_4_BYTES                      = @1409;
+  static int32 GL_DOUBLE                       = @140A;
+  
+  # texture mag filter
+  static int32 GL_NEAREST                      = @2600;
+  static int32 GL_LINEAR                       = @2601;
+
+  # texture min filter
+  static int32 GL_NEAREST_MIPMAP_NEAREST       = @2700;
+  static int32 GL_LINEAR_MIPMAP_NEAREST        = @2701;
+  static int32 GL_NEAREST_MIPMAP_LINEAR        = @2702;
+  static int32 GL_LINEAR_MIPMAP_LINEAR         = @2703;
+
+  # texture parameter names
+  static int32 GL_TEXTURE_MAG_FILTER           = @2800;
+  static int32 GL_TEXTURE_MIN_FILTER           = @2801;
+  static int32 GL_TEXTURE_WRAP_S               = @2802;
+  static int32 GL_TEXTURE_WRAP_T               = @2803;
+  
+  # texture wrap mode
+  static int32 GL_CLAMP                        = @2900;
+  static int32 GL_REPEAT                       = @2901;
+  
+  # list modes 
+  static int32 GL_COMPILE                      = @1300;
+  static int32 GL_COMPILE_AND_EXECUTE          = @1301;
+  
+  # draw buffer mode
+  static int32 GL_NONE                         = 0;
+  static int32 GL_FRONT_LEFT                   = @0400;
+  static int32 GL_FRONT_RIGHT                  = @0401;
+  static int32 GL_BACK_LEFT                    = @0402;
+  static int32 GL_BACK_RIGHT                   = @0403;
+  static int32 GL_FRONT                        = @0404;
+  static int32 GL_BACK                         = @0405;
+  static int32 GL_LEFT                         = @0406;
+  static int32 GL_RIGHT                        = @0407;
+  static int32 GL_FRONT_AND_BACK               = @0408;
+  static int32 GL_AUX0                         = @0409;
+  static int32 GL_AUX1                         = @040A;
+  static int32 GL_AUX2                         = @040B;
+  static int32 GL_AUX3                         = @040C;
+  
+  # polygon mode
+  static int32 GL_POINT                        = @1B00;
+  static int32 GL_LINE                         = @1B01;
+  static int32 GL_FILL                         = @1B02;
+  
+  # light names
+  static int32 GL_LIGHT0                       = @4000;
+  static int32 GL_LIGHT1                       = @4001;
+  static int32 GL_LIGHT2                       = @4002;
+  static int32 GL_LIGHT3                       = @4003;
+  static int32 GL_LIGHT4                       = @4004;
+  static int32 GL_LIGHT5                       = @4005;
+  static int32 GL_LIGHT6                       = @4006;
+  static int32 GL_LIGHT7                       = @4007;
+
+  # light parameters
+  static int32 GL_AMBIENT                      = @1200;
+  static int32 GL_DIFFUSE                      = @1201;
+  static int32 GL_SPECULAR                     = @1202;
+  static int32 GL_POSITION                     = @1203;
+  static int32 GL_SPOT_DIRECTION               = @1204;
+  static int32 GL_SPOT_EXPONENT                = @1205;
+  static int32 GL_SPOT_CUTOFF                  = @1206;
+  static int32 GL_CONSTANT_ATTENUATION         = @1207;
+  static int32 GL_LINEAR_ATTENUATION           = @1208;
+  static int32 GL_QUADRATIC_ATTENUATION        = @1209;
+  static int32 GL_LIGHT_MODEL_LOCAL_VIEWER     = @0B51;
+  static int32 GL_LIGHT_MODEL_TWO_SIDE         = @0B52;
+  static int32 GL_LIGHT_MODEL_AMBIENT          = @0B53;
+  
+  # material parameters
+  static int32 GL_EMISSION                     = @1600;
+  static int32 GL_SHININESS                    = @1601;
+  static int32 GL_AMBIENT_AND_DIFFUSE          = @1602;
+  static int32 GL_COLOR_INDEXES                = @1603;
+  
+  # bool values
+  static int32 GL_TRUE                         = 1;
+  static int32 GL_FALSE                        = 0;
+    
+  # erros
+  func CON(stdcall) int32 glGetError() EXT;
+
+  # color
+  func CON(stdcall) glColor4b(int8 r, int8 g, int8 b, int8 a) EXT;
+  func CON(stdcall) glColor3f(real32 r, real32 g, real32 b) EXT;
+  func CON(stdcall) glColor4f(real32 r, real32 g, real32 b, real32 a) EXT;
+  
+  # texture loading / binding
+  func CON(stdcall) glTexParameteri(int32 target, int32 pname, int32 param) EXT;
+  func CON(stdcall) glTexImage2D (
+    int32 target,
+    int32 level,
+    int32 internalFormat,
+    int32 width,
+    int32 height,
+    int32 border,
+    int32 format,
+    int32 type,
+    PTR[int8] pixels) EXT;
+  func CON(stdcall) glBindTexture(int32 target, int32 texture) EXT;
+  func CON(stdcall) glGenTextures(int32 n, PTR[int32] textures) EXT;
+  
+  # lists
+  func CON(stdcall) glDeleteLists(int32 lists, int32 range) EXT;
+  func CON(stdcall) glNewList(int32 lists, int32 mode) EXT;
+  func CON(stdcall) glCallList(int32 lists) EXT;
+  func CON(stdcall) glEndList() EXT;
+  func CON(stdcall) int32 glGenLists(int32 range) EXT;
+    
+  # general rendering
+  func CON(stdcall) glViewport(int32 x, int32 y, int32 width, int32 height) EXT;
+  func CON(stdcall) glClear(int32 x, int32 y, int32 width, int32 height) EXT;
+  func CON(stdcall) glClear(int32 mask) EXT;
+  func CON(stdcall) glFlush() EXT;
+  func CON(stdcall) glFinish() EXT;
+  
+  # render state
+  func CON(stdcall) glEnable(int32 cap) EXT;
+  func CON(stdcall) glDisable(int32 cap) EXT;
+  func CON(stdcall) glBlendFunc(int32 sfactor, int32 dfactor) EXT;
+  
+  # matrices
+  func CON(stdcall) glMatrixMode(int32 mode) EXT;
+  func CON(stdcall) glMultMatrixf(PTR[real32] matrix) EXT;
+  func CON(stdcall) glLoadIdentity() EXT;
+  func CON(stdcall) glPushMatrix() EXT;
+  func CON(stdcall) glPopMatrix() EXT;
+  func CON(stdcall) glScalef(real32 x, real32 y, real32 z) EXT;
+  func CON(stdcall) glRotatef(real32 angle, real32 x, real32 y, real32 z) EXT;
+  func CON(stdcall) glTranslatef(real32 x, real32 y, real32 z) EXT;
+  
+  # drawing
+  func CON(stdcall) glPolygonMode(int32 face, int32 mode) EXT;
+  func CON(stdcall) glEnd() EXT;
+  func CON(stdcall) glBegin(int32 mode) EXT;
+  func CON(stdcall) glVertex3f(real32 x, real32 y, real32 z) EXT;
+  func CON(stdcall) glTexCoord2f(real32 u, real32 v) EXT;
+  func CON(stdcall) glNormal3f(real32 x, real32 y, real32 z) EXT;
+  func CON(stdcall) glMaterialfv(int32 face, int32 pname, PTR[real32] params) EXT;
+  func CON(stdcall) glMaterialf(int32 face, int32 pname, real32 param) EXT;
+  
+  # lighting
+  func CON(stdcall) glLightfv(int32 light, int32 pname, PTR[real32] params) EXT;
+  func CON(stdcall) glLightf(int32 light, int32 pname, real32 param) EXT;
+  func CON(stdcall) glLightModelfv(int32 pname, PTR[real32] params) EXT;
+  func CON(stdcall) glLightModeli(int32 pname, int32 param) EXT;
+  
+  func printError(PTR[int8] location) {
+    int32 error = Gl/glGetError();
+    if (error != 0) {
+      System/println(s: STR"### OPENGL ERROR ###############################################################");
+      System/print(s: STR"  ");
+      System/print(s: location);
+      System/print(s: STR": ");
+      System/print(i: error);
+      System/print(s: STR" (");
+      System/print(i_0x: error);
+      System/print(s: STR")\n");
+      System/println(s: STR"################################################################################");
+    }
+  }
+
+}

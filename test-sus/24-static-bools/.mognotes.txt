@@ -1,0 +1,56 @@
+planed features:
+
+
+
+  - chunk system:
+
+    - block placing
+    
+    - textures
+    
+    - lighting?
+    
+  - game features
+  
+    - tree stems
+    
+    - leaves
+    
+    - dirt
+
+    - stone
+    
+    - crafting table
+    
+    - pickaxe 
+    
+    - axe
+    
+    - inventory 
+    
+    - inventory crafting
+   
+   
+TEMPLATES
+
+
+  PROFILER:
+  
+    Time timeStart = Time/now();
+    
+    Time timeEnd = Time/now();
+    System/print(s: STR"XXXX Duration: ");
+    Time/printDuration(end: timeEnd, start: timeStart);
+    System/println();
+    
+    
+  PROFILER, MULTIPLE
+    Time t1 = Time/zero();
+    Time t2 = Time/zero();
+  
+    t1 = Time/now();
+    t2 = Time/now();
+    
+    System/print(s: STR"XXXX Duration: ");
+    Time/printDuration(end: t2, start: t1);
+    System/println();

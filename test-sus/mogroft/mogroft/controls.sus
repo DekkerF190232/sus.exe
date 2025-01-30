@@ -209,13 +209,18 @@ package mogroft/InputHandlerFly {
   func press(int32 vk) {
     int32 vkL = 76;
     if (vk == vkL) {
-      #Settings/inst.lighting = Settings/inst.lighting == no;
+      Settings/inst.lighting = Settings/inst.lighting == no;
+      #Settings/inst.lighting = yes;
+      #System/printBytes(
+      #  pointer: RTP[PTR[int8]](REF(Settings/inst.lighting)),
+      #  count: 4
+      #);
       System/print(s: STR"LIGHTING: ");
-     #System/print(b: Settings/inst.lighting == no);
-     #System/print(b: Settings/inst.lighting);
-     #System/print(b: yes);
-     #System/print(b: no);
-     #System/println();
+      System/print(b: Settings/inst.lighting);
+      #System/println(b: Settings/inst.lighting);
+      #System/print(b: yes);
+      #System/print(b: no);
+      #System/println();
     }
   }
   
