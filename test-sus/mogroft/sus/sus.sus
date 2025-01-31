@@ -24,14 +24,38 @@ package sus/Math {
     done x;
   }
   
-  
   func int32 absi(int32 x) {
     if (x < 0) done 0 - x;
     done x;
     #done x & @7fffffff;
   }
   
+  func int32 floor_divi(int32 x, int32 y) {
+    # http://blog.pkh.me/p/36-figuring-out-round%2C-floor-and-ceil-with-integer-division.html
+    
+    ASM {
+      ; eax:edx = dividend
+      mov     eax, SUS{x}
+      cdq
+      
+      ; eax = quotient
+      ; edx = remainder
+      idiv    dword SUS{y}
+      
+      ; sub one, when there is a remainder and the result is negative.
+      sar     edx, 31
+      and     edx, 1
+      sub     eax, edx
+      
+      mov     SUS{x}, eax
+    }
+    
+    # x was reused as result
+    done x;
+  }
+  
   func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+  
   func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
   func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
   func CON(cdecl) real32 remainderf(real32 x, real32 y) EXT;
