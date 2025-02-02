@@ -15,6 +15,15 @@ package mogroft/algebra/Vec3 {
     done Vec3(x = 0.0, y = 0.0, z = 0.0);
   }
   
+  func norm(PTR[Vec3] this) {
+    real32 length = Math/sqrtf(
+      x: (DRF(this).x * DRF(this).x) +
+         (DRF(this).y * DRF(this).y) +
+         (DRF(this).z * DRF(this).z)
+    );
+    
+  }
+  
   # https://stackoverflow.com/a/42422624
   #
   # angle: [degrees]
@@ -38,6 +47,30 @@ package mogroft/algebra/Vec3 {
     
     
     DRF(this) = result;
+  }
+  
+  func Vec3 sub(PTR[Vec3] a, PTR[Vec3] b) {
+    done Vec3(
+      x = DRF(a).x - DRF(b).x,
+      y = DRF(a).y - DRF(b).y,
+      z = DRF(a).z - DRF(b).z
+    );
+  }
+  
+  func Vec3 add(PTR[Vec3] a, PTR[Vec3] b) {
+    done Vec3(
+      x = DRF(a).x + DRF(b).x,
+      y = DRF(a).y + DRF(b).y,
+      z = DRF(a).z + DRF(b).z
+    );
+  }
+  
+  func Vec3 add(PTR[Vec3] a, real32 s) {
+    done Vec3(
+      x = DRF(a).x + s,
+      y = DRF(a).y + s,
+      z = DRF(a).z + s
+    );
   }
   
   func add(PTR[Vec3] this, Vec3 v) {

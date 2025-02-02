@@ -131,13 +131,16 @@ package mogroft/Controls {
 
 package mogroft/InputHandlerFly {
 
-  use mogroft/Controls;
-  use mogroft/algebra/Vec3;
   use sus/System;
   use sus/native/Win;
+  
+  use mogroft/Controls;
+  use mogroft/algebra/Vec3;
   use mogroft/world/World;
   use mogroft/world/Player;
   use mogroft/Mogroft;
+  use mogroft/world/Physics;
+  use mogroft/world/Hitbox;
   
   use mogroft/Settings;
 
@@ -194,20 +197,55 @@ package mogroft/InputHandlerFly {
     
     Vec3/rotate(this: REF(wanted), angle: yaw, v: Vec3(x=0.0, y = 1.0,z=0.0)); 
     
-    
     if (Controls/isDown(vk: Win/VK_SHIFT))  wanted.y  = wanted.y - 1.0;
     if (Controls/isDown(vk: Win/VK_SPACE))  wanted.y  = wanted.y + 1.0;
     
     real32 speed = 10.0;
     if (Controls/isDown(vk: Win/VK_CONTROL)) speed = speed * 10.0;
     
-    DRF(world).player.position.z = DRF(world).player.position.z + (dt * speed * wanted.z);
-    DRF(world).player.position.y = DRF(world).player.position.y + (dt * speed * wanted.y);
-    DRF(world).player.position.x = DRF(world).player.position.x + (dt * speed * wanted.x);
+    if (Settings/inst.collision) {
+      Vec3 delta = Vec3(x=(dt * speed * wanted.x),
+                        y=(dt * speed * wanted.y),
+                        z=(dt * speed * wanted.z));
+    
+      Vec3 down = Vec3(x=0.0, y=-2.0, z=0.0);
+      Vec3 colPos = Vec3/add(a: REF(DRF(world).player.position), b: REF(down));
+      
+      Vec3 collisions = Physics/tryMove(
+        world: world,
+        position: REF(colPos),
+        delta: REF(delta),
+        hitbox: RTP[PTR[Hitbox]](0)
+      );
+      
+      DRF(world).player.position = colPos;
+      Vec3/add(this: REF(DRF(world).player.position), v: Vec3(x=0.0, y=2.0, z=0.0));
+      
+      if (
+        (collisions.x > 0.0) ||
+        (collisions.y > 0.0) ||
+        (collisions.z > 0.0) 
+      ) {
+        System/println(s: STR"collision: ");
+        System/print(s: STR"  ");
+        System/print(r: collisions.x);
+        System/print(s: STR", ");
+        System/print(r: collisions.y);
+        System/print(s: STR", ");
+        System/print(r: collisions.z);
+        System/println();
+      }
+    } else {
+      DRF(world).player.position.z = DRF(world).player.position.z + (dt * speed * wanted.z);
+      DRF(world).player.position.y = DRF(world).player.position.y + (dt * speed * wanted.y);
+      DRF(world).player.position.x = DRF(world).player.position.x + (dt * speed * wanted.x);
+    }
   }
   
   func press(int32 vk) {
     int32 vkL = 76;
+    int32 vkC = 67;
+    int32 vkT = 84;
     if (vk == vkL) {
       Settings/inst.lighting = Settings/inst.lighting == no;
       #Settings/inst.lighting = yes;
@@ -215,12 +253,16 @@ package mogroft/InputHandlerFly {
       #  pointer: RTP[PTR[int8]](REF(Settings/inst.lighting)),
       #  count: 4
       #);
-      System/print(s: STR"LIGHTING: ");
-      System/print(b: Settings/inst.lighting);
+      #System/print(s: STR"LIGHTING: ");
+      #System/print(b: Settings/inst.lighting);
       #System/println(b: Settings/inst.lighting);
       #System/print(b: yes);
       #System/print(b: no);
       #System/println();
+    } else if (vk == vkC) {
+      Settings/inst.collision = Settings/inst.collision == no;
+    } else if (vk == vkT) {
+      Debug/test();
     }
   }
   

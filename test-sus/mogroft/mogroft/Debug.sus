@@ -4,10 +4,13 @@ package Debug {
   use sus/List;
   use sus/System;
   use sus/Memory;
+  use sus/Math;
 
   use mogroft/Mogroft;
   
   use mogroft/world/World;
+  use mogroft/world/Block;
+  use mogroft/world/Blocks;
   use mogroft/world/Chunk;
   use mogroft/world/WorldManager;
   
@@ -22,6 +25,37 @@ package Debug {
   
   static PTR[Debug] data = RTP[PTR[Debug]](0);
   
+  func test() {
+    PTR[MogroftState] mogroft = Mogroft/_mogroft;
+    PTR[WorldManager] worldManager = REF(DRF(mogroft).worldManager);
+    PTR[World] world = DRF(worldManager).world;
+  
+    int32 bx = Math/floori(x: DRF(world).player.position.x);
+    int32 by = Math/floori(x: DRF(world).player.position.y) - 2;
+    int32 bz = Math/floori(x: DRF(world).player.position.z);
+    
+    PTR[Block] block = World/tryGet(this: world, x: bx, y: by, z: bz);
+
+    System/print(s: STR"Current Block: (");
+    System/print(i: bx);
+    System/print(s: STR",");
+    System/print(i: by);
+    System/print(s: STR",");
+    System/print(i: bz);
+    System/print(s: STR") ");
+    
+    if (RTP[int32](block) == 0)
+      System/print(s: STR"*null*");
+    else {
+      System/print(s: STR"ID=");
+      System/print(i: cast[int32](DRF(block).id));
+    }
+    
+    System/println();
+    System/println();
+  
+  }
+  
   func init() {
     data = RTP[PTR[Debug]](Memory/malloc(bytes: size[Debug]()));
     DRF(data) = Debug(
@@ -31,19 +65,16 @@ package Debug {
 
   func tick(real32 dt) {
     Time now = Time/now();
-    Time delta = Time/sub(a: now, b: timeReport);
     
-    if (delta._high != cast[nat32](0)) {
+    if (Time/greater(t: Time/sub(a: now, b: timeReport), ms: REPORT_INTERVAL_MS)) {
+      doReport();
       timeReport = now;
-    } else {
-      if (Time/mu(t: delta) > (REPORT_INTERVAL_MS * 1000)) {
-        doReport();
-        timeReport = now;
-      }
     }
   }
   
   func doReport() {
+    done;
+    
     PTR[MogroftState] mogroft = Mogroft/_mogroft;
     PTR[WorldManager] worldManager = REF(DRF(mogroft).worldManager);
     PTR[World] world = DRF(worldManager).world;

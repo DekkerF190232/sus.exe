@@ -8,7 +8,7 @@ package Main {
     
     Test/runTest();
     
-    System/println(s:STR"Starting mogroft written in sus.exe\n");
+    System/println(s: STR"Starting mogroft written in sus.exe\n");
     
     mogroft/Mogroft/runMogroft();
     
@@ -52,13 +52,32 @@ package Test {
  
   
   func doTest() {
-    testBoo();
+    #testFloorDiv();
+    #testBoo();
     #testCalc();
     #testList();
     #testNoise();
     #while (yes) testTime();
     #testHash();
   }
+  
+  #func testFloorDiv() {
+  #  System/print(s: STR"-5/8: ");
+  #  System/print(i: -5/8);
+  #  System/println();
+  #  
+  #  System/print(s: STR"5/8: ");
+  #  System/print(i: 5/8);
+  #  System/println();
+  #  
+  #  System/print(s: STR"floor div: -5/8: ");
+  #  System/print(i: Math/floor_divi(x: -5, y: 8));
+  #  System/println();
+  #  
+  #  System/print(s: STR"floor div: 5/8: ");
+  #  System/print(i: Math/floor_divi(x: 5, y: 8));
+  #  System/println();
+  #}
   
   func testBoo() {
     #ASM {

@@ -177,6 +177,7 @@ package sus/Gl {
   func CON(stdcall) glEnable(int32 cap) EXT;
   func CON(stdcall) glDisable(int32 cap) EXT;
   func CON(stdcall) glBlendFunc(int32 sfactor, int32 dfactor) EXT;
+  func CON(stdcall) glLineWidth(real32 width) EXT;
   
   # matrices
   func CON(stdcall) glMatrixMode(int32 mode) EXT;

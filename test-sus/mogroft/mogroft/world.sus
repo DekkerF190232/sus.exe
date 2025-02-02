@@ -1,11 +1,16 @@
 
 package mogroft/world/World {
+  
+  use sus/Memory;
+  use sus/System;
+  use sus/Math;
 
   use mogroft/world/ChunkList;
   use mogroft/world/Player;
-  use mogroft/world/Player;
+  use mogroft/world/Chunk;
+  use mogroft/world/Block;
+  use mogroft/world/Blocks;
   use mogroft/algebra/Vec3;
-  use sus/Memory;
 
   struct World (
     Player player,
@@ -18,6 +23,37 @@ package mogroft/world/World {
     DRF(this).chunkList = ChunkList/new();
 
     done this;
+  }
+  
+  func PTR[Block] tryGet(PTR[World] this, int32 x, int32 y, int32 z) {
+    ChunkCoord chunkCoord = ChunkCoord(
+      x = Math/floor_divi(x: x, y: Chunk/SIZE),
+      y = Math/floor_divi(x: y, y: Chunk/SIZE),
+      z = Math/floor_divi(x: z, y: Chunk/SIZE)
+    );
+    #System/print(s: STR"  tryget: chunk coord: ");
+    #System/print(i: chunkCoord.x);
+    #System/print(s: STR",");
+    #System/print(i: chunkCoord.y);
+    #System/print(s: STR",");
+    #System/print(i: chunkCoord.z);
+    #System/println();
+    
+    PTR[Chunk] chunk = ChunkList/find(
+      this: REF(DRF(this).chunkList),
+      chunkCoord: chunkCoord
+    );
+    
+    if (RTP[int32](chunk) == 0) done RTP[PTR[Block]](0);
+    
+    if (DRF(chunk).isAir) done REF(Blocks/BLOCK_AIR);
+    
+    PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));
+    
+    done blocks +
+         ((z - (chunkCoord.z * Chunk/SIZE)) * Chunk/SIZE * Chunk/SIZE) +
+         ((y - (chunkCoord.y * Chunk/SIZE)) * Chunk/SIZE) +
+          (x - (chunkCoord.x * Chunk/SIZE));
   }
   
 }

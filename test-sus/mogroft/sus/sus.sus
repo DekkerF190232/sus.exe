@@ -5,9 +5,11 @@ package sus/c/CMath {
   #func CON(cdecl) real64 cos(real64 x) EXT;
   
   func CON(cdecl) real64 floor(real64 x) EXT;
+  func CON(cdecl) real64 ceil(real64 x) EXT;
   func CON(cdecl) real64 tan(real64 x) EXT;
   func CON(cdecl) real64 sin(real64 x) EXT;
   func CON(cdecl) real64 cos(real64 x) EXT;
+  func CON(cdecl) real64 sqrt(real64 x) EXT;
   
 }
 
@@ -22,6 +24,11 @@ package sus/Math {
   func real32 absf(real32 x) {
     if (x < 0.0) done 0.0 - x;
     done x;
+  }
+  
+  func real32 normf(real32 x) {
+    if (x < 0.0) done -1.0;
+    done 1.0;
   }
   
   func int32 absi(int32 x) {
@@ -54,15 +61,21 @@ package sus/Math {
     done x;
   }
   
+  func int32 floori(real32 x) {
+    done cast[int32](floorf(x: x));
+  }
+  
   func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
   
   func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
   func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
   func CON(cdecl) real32 remainderf(real32 x, real32 y) EXT;
-  func CON(cdecl) real32 sqrtf(real32 x) EXT;
   
   func real32 floorf(real32 x) {
     done cast[real32](CMath/floor(x: cast[real64](x)));
+  }
+  func real32 ceilf(real32 x) {
+    done cast[real32](CMath/ceil(x: cast[real64](x)));
   }
   func real32 tanf(real32 x) {
     done cast[real32](CMath/tan(x: cast[real64](x)));
@@ -72,6 +85,9 @@ package sus/Math {
   }
   func real32 cosf(real32 x) {
     done cast[real32](CMath/cos(x: cast[real64](x)));
+  }
+  func real32 sqrtf(real32 x) {
+    done cast[real32](CMath/sqrt(x: cast[real64](x)));
   }
   
 }
@@ -885,6 +901,16 @@ package sus/Time {
   
   func printDuration(Time start, Time end) {
     System/print(r: cast[real32](Time/diff_mu(a: end, b: start)) / 1000000.0, digits: 6);
+  }
+  
+  func boo greater(Time t, int32 ms) {
+    if (t._high != cast[nat32](0)) done yes;
+    done Time/mu(t: t) > (ms * 1000);
+  }
+  
+  func boo lesser(Time t, int32 ms) {
+    if (t._high != cast[nat32](0)) done no;
+    done Time/mu(t: t) < (ms * 1000);
   }
   
   func Time add(Time a, Time b) {

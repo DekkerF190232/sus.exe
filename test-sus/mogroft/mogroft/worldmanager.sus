@@ -19,6 +19,7 @@ package mogroft/world/WorldManager {
   
   struct WorldManager (
     PTR[World] world,
+    Time tmEnqueue,
     ChunkEventHandler chunkEventHandler,
     ChunkCoordList _queue,
     Mutex _mtxQueue,
@@ -34,6 +35,7 @@ package mogroft/world/WorldManager {
   func WorldManager new(ChunkEventHandler chunkEventHandler) {
     done WorldManager(
       world = RTP[PTR[World]](0),
+      tmEnqueue = Time/zero(),
       chunkEventHandler = chunkEventHandler,
       # generator
       _queue = ChunkCoordList/alloc(), 
@@ -46,24 +48,6 @@ package mogroft/world/WorldManager {
   func loadExample(PTR[WorldManager] this) {
     PTR[World] world = World/alloc();
     DRF(this).world = world;
-
-    DRF(world).player.position.z = 10.0;
-    
-    
-    #callGenerateRange(this: this, x: 0, y: 0, z: 0, flatRange: 3, yRange: 4);
-
-    ## Generate limited number of chunks
-    #funcptr[(PTR[Chunk] chunk)] onLoadedFunc = DRF(this).chunkEventHandler.onLoaded;
-    #PTR[ChunkList] chunkList = REF(DRF(world).chunkList);
-    #PTR[Chunk] newChunk = RTP[PTR[Chunk]](0);
-    #newChunk = ChunkList/add(this: chunkList);
-    #DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = 0, z = 0);
-    #generateChunk(chunk: newChunk);
-    #onLoadedFunc(chunk: newChunk);
-    #newChunk = ChunkList/add(this: chunkList);
-    #DRF(newChunk).chunkCoord = ChunkCoord(x = 0, y = -1, z = 0);
-    #generateChunk(chunk: newChunk);
-    #onLoadedFunc(chunk: newChunk); 
   }
   
   func init(PTR[WorldManager] this) {
@@ -196,9 +180,11 @@ package mogroft/world/WorldManager {
       # transfer over chunk coord queue to this thread
       Mutex/lock(this: REF(DRF(this)._mtxQueue));
       
-      List/clear(this: REF(localQueue.list));
-      List/addAll(this: REF(localQueue.list), other: REF(DRF(queue).list));
-      List/clear(this: REF(DRF(queue).list));
+      if (DRF(queue).list.length > 0) {
+        List/clear(this: REF(localQueue.list));
+        List/addAll(this: REF(localQueue.list), other: REF(DRF(queue).list));
+        List/clear(this: REF(DRF(queue).list));
+      }
       
       Mutex/unlock(this: REF(DRF(this)._mtxQueue));
       
@@ -239,7 +225,7 @@ package mogroft/world/WorldManager {
       Mutex/unlock(this: REF(DRF(this)._mtxBuffer));
       ###
 
-      Thread/sleep(ms: 5);
+      Thread/sleep(ms: 10);
     }
   }
   
@@ -269,7 +255,15 @@ package mogroft/world/WorldManager {
     System/print(i: DRF(chunkCoord).z);
   }
   
+  static int32 ENQUEUE_INTERVAL_MS = 100;
+  
   func _enqueueToGenerate(PTR[WorldManager] this) {
+    Time now = Time/now();
+    Time delta = Time/sub(a: now, b: DRF(this).tmEnqueue);
+    if (Time/lesser(t: delta, ms: ENQUEUE_INTERVAL_MS)) 
+      done;
+    DRF(this).tmEnqueue = now;
+  
     # generation box center: player chunk coordinates
     int32 x = (cast[int32](DRF(DRF(this).world).player.position.x) + (Chunk/SIZE / 2)) / Chunk/SIZE;
     int32 y = (cast[int32](DRF(DRF(this).world).player.position.y) + (Chunk/SIZE / 2)) / Chunk/SIZE;
@@ -333,6 +327,10 @@ package mogroft/world/WorldManager {
     #int32 totalHeight = (31* (31 * hash(x: ) 
   }
   
+  func boo willBeAir(PTR[ChunkCoord] chunkCoord) {
+    done DRF(chunkCoord).y >= 0;
+  }
+  
   func generateChunk(PTR[Chunk] chunk) {
     int32 seed = 1;
   
@@ -343,7 +341,7 @@ package mogroft/world/WorldManager {
     #Time timePerlin = Time/zero();
     #int32 countPerlin = 0;
     
-    DRF(chunk).isAir = DRF(chunk).chunkCoord.y >= 0;
+    DRF(chunk).isAir = willBeAir(chunkCoord: REF(DRF(chunk).chunkCoord));
     if (DRF(chunk).isAir) done;
     
     PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));

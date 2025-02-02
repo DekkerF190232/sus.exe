@@ -2,7 +2,7 @@ package mogroft/Settings {
   
   static Settings inst = Settings(
     collision = yes,
-    lighting = yes
+    lighting = no
   );
   
   struct Settings (

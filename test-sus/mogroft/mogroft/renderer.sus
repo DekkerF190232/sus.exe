@@ -22,6 +22,14 @@ package mogroft/Renderer {
     WorldRender worldRender
   );
   
+  static int32 lastListId = 0;
+  static int32 lstCube = 0;
+  
+  func int32 getNewListId() {
+    lastListId = lastListId + 1;
+    done lastListId;
+  }
+  
   func RendererState new_RendererState() {
     done RendererState(
       width = 0,
@@ -44,6 +52,70 @@ package mogroft/Renderer {
   # game loop events
   func init(PTR[RendererState] this) {
     WorldRender/init(this: REF(DRF(this).worldRender), renderer: this);
+    
+    initCube();
+  }
+  
+  func drawCube(real32 x, real32 y, real32 z) {
+    Gl/glPushMatrix();
+    
+    Gl/glTranslatef(
+      x: x,
+      y: y,
+      z: z
+    );
+    
+    Gl/glCallList(lists: lstCube);
+    
+    Gl/glPopMatrix();
+  }
+  
+  func initCube() {
+    lstCube = getNewListId();
+    
+    Gl/glNewList(lists: lstCube, mode: Gl/GL_COMPILE);
+    
+    Gl/glBegin(mode: Gl/GL_QUADS);
+    
+    # front
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 1.0);
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 1.0);
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 1.0);
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 1.0);
+    
+    # back
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0);
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0);
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0);
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0);
+    
+    ## left
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0);
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0);
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 1.0);
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 1.0);
+    
+    # right
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 1.0);
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 1.0);
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0);
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0);
+    
+    # up
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0);
+    Gl/glVertex3f(x: 0.0, y: 1.0, z: 1.0);
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 1.0);
+    Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0);
+    
+    # down
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0);
+    Gl/glVertex3f(x: 1.0, y: 0.0, z: 1.0);
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 1.0);
+    Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0);
+    
+    Gl/glEnd();
+    
+    Gl/glEndList();
   }
   
   func render(PTR[RendererState] this, real32 dt) {
@@ -93,50 +165,6 @@ package mogroft/Renderer {
     Gl/glMultMatrixf(matrix: matrix);
     
     Gl/glMatrixMode(mode: Gl/GL_MODELVIEW);
-  }
-  
-  # draw 1,1,1-sized cube at 0,0,0
-  func drawCube() {
-    color(rgba: @ffffffff);
-    
-    Gl/glEnable(cap: Gl/GL_TEXTURE_2D);
-    Gl/glEnable(cap: Gl/GL_DEPTH_TEST);
-    Gl/glBindTexture(target: Gl/GL_TEXTURE_2D, texture: Texture/txTile1);
-  
-    Gl/glBegin(mode: Gl/GL_QUADS);
-    
-    # order front
-    #
-    #   0--3
-    #   |  | 
-    #   1--2
-    
-    # front face
-    Gl/glTexCoord2f(u: 0.0, v: 1.0);
-    Gl/glVertex3f(x: 0.0, y: 1.0, z: 1.0); # left top
-    Gl/glTexCoord2f(u: 0.0, v: 0.0);
-    Gl/glVertex3f(x: 0.0, y: 0.0, z: 1.0); # left bottom
-    Gl/glTexCoord2f(u: 1.0, v: 0.0);
-    Gl/glVertex3f(x: 1.0, y: 0.0, z: 1.0); # right bottom
-    Gl/glTexCoord2f(u: 1.0, v: 1.0);
-    Gl/glVertex3f(x: 1.0, y: 1.0, z: 1.0); # right top
-    
-    # order front
-    #
-    #   3--0
-    #   |  | 
-    #   2--1
-    
-    # back face
-    Gl/glVertex3f(x: 1.0, y: 1.0, z: 0.0); # right top
-    Gl/glVertex3f(x: 1.0, y: 0.0, z: 0.0); # right bottom
-    Gl/glVertex3f(x: 0.0, y: 0.0, z: 0.0); # left bottom
-    Gl/glVertex3f(x: 0.0, y: 1.0, z: 0.0); # left top
-    
-    Gl/glEnd();
-    
-    Gl/glDisable(cap: Gl/GL_DEPTH_TEST);
-    Gl/glDisable(cap: Gl/GL_TEXTURE_2D);
   }
   
   # user events
@@ -239,13 +267,33 @@ package mogroft/render/WorldRender {
     
     Gl/glPushMatrix();
     
+    Gl/glEnable(cap: Gl/GL_DEPTH_TEST);
+    
     setWorldCamera();
     
     setupLights();
     
-    #Renderer/drawCube();
-    
     ChunkRender/render(this: REF(DRF(this).chunkRender), renderer: renderer, dt: dt);
+    
+    Gl/glDisable(cap: Gl/GL_LIGHTING);
+    Gl/glDisable(cap: Gl/GL_DEPTH_TEST);
+
+    PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
+    real32 bx = Math/floorf(x: DRF(world).player.position.x);
+    real32 by = Math/floorf(x: DRF(world).player.position.y);
+    real32 bz = Math/floorf(x: DRF(world).player.position.z);
+ 
+    Renderer/color(rgba: @ffffff40);
+    Renderer/drawCube(x: 0.0, y: 0.0, z: 0.0);
+    
+    Gl/glPolygonMode(face: Gl/GL_FRONT_AND_BACK, mode: Gl/GL_LINE);
+    Gl/glLineWidth(width: 2.0);
+    
+    Renderer/color(rgba: @800080ff);
+    Renderer/drawCube(x: bx, y: by - 2.0, z: bz);
+    
+    Gl/glLineWidth(width: 1.0);
+    Gl/glPolygonMode(face: Gl/GL_FRONT_AND_BACK, mode: Gl/GL_FILL);
     
     Gl/glPopMatrix();
   }
@@ -267,7 +315,7 @@ package mogroft/render/WorldRender {
     
     PTR[real32] specular = ARR[real32](4);
     DRF(specular)      = 1.0;
-    DRF(specular + 4)  = 0.5;
+    DRF(specular + 4)  = 0.3;
     DRF(specular + 8)  = 0.1;
     DRF(specular + 12) = 1.0;
     Gl/glLightfv(light: Gl/GL_LIGHT1, pname: Gl/GL_SPECULAR, params: specular);
@@ -279,7 +327,7 @@ package mogroft/render/WorldRender {
     DRF(ambient + 12) = 1.0;
     Gl/glLightfv(light: Gl/GL_LIGHT1, pname: Gl/GL_AMBIENT, params: ambient);
     
-    Gl/glLightf(light: Gl/GL_LIGHT1, pname: Gl/GL_QUADRATIC_ATTENUATION, param: 0.1);
+    Gl/glLightf(light: Gl/GL_LIGHT1, pname: Gl/GL_QUADRATIC_ATTENUATION, param: 0.01);
     
     PTR[real32] pos = ARR[real32](4);
     DRF(pos)      = (DRF(world).player.position.x);
@@ -493,8 +541,6 @@ package mogroft/render/ChunkRender {
     done RTP[PTR[ChunkCoord]](0);
   }
   
-  static int32 listCounter = 1; # note: i have my own list id counter, because glgenlist does not work for deleting in same frame i guess.
-  
   func onChunkUnloaded(PTR[ChunkRender] this, PTR[RendererState] renderer, PTR[ChunkCoord] chunkCoord) {
     PTR[ChunkCoord] queueElement = findChunkCoord(
       list: REF(DRF(this).chunkQueue),
@@ -543,8 +589,6 @@ package mogroft/render/ChunkRender {
   }
 
   func render(PTR[ChunkRender] this, PTR[RendererState] renderer, real32 dt) {
-    #Renderer/drawCube();
-    
     chooseRebuilds(this: this, renderer: renderer);
 
     renderBuilds(this: this, renderer: renderer);
@@ -561,8 +605,6 @@ package mogroft/render/ChunkRender {
     ));
  
     boo isWireFrame = no;
-    
-    Renderer/drawCube();
     
     Gl/glEnable(cap: Gl/GL_TEXTURE_2D);
     Gl/glEnable(cap: Gl/GL_DEPTH_TEST);
@@ -651,8 +693,7 @@ package mogroft/render/ChunkRender {
       Gl/glDeleteLists(lists: DRF(existing).listId, range: 1);
     }
     
-    int32 newList = listCounter; #Gl/glGenLists(range: 1);
-    listCounter = listCounter + 1;
+    int32 newList = Renderer/getNewListId(); #Gl/glGenLists(range: 1);
     
     Gl/glNewList(lists: newList, mode: Gl/GL_COMPILE);
     
@@ -683,8 +724,7 @@ package mogroft/render/ChunkRender {
       Gl/glDeleteLists(lists: DRF(existing).listId, range: 1);
     }
     
-    int32 newList = listCounter; #Gl/glGenLists(range: 1);
-    listCounter = listCounter + 1;
+    int32 newList = Renderer/getNewListId(); #Gl/glGenLists(range: 1);
     
     Gl/glNewList(lists: newList, mode: Gl/GL_COMPILE);
     

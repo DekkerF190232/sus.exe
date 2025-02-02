@@ -1,0 +1,87 @@
+package mogroft/world/Hitbox {
+
+  use mogroft/algebra/Vec3;
+  
+  struct Hitbox (
+    Vec3 dimensions,
+    Vec3 center
+  );
+
+}
+
+package mogroft/world/Physics {
+  
+  use sus/Math;
+  use sus/System;
+  
+  use mogroft/algebra/Vec3;
+  use mogroft/world/World;
+  use mogroft/world/Block;
+  use mogroft/world/Blocks;
+  use mogroft/world/Chunk;
+  use mogroft/world/Hitbox;
+  
+  #func rayTrace(PTR[Vec3] position, PTR[Vec3] normal, real32 range, PTR[BlockCoord] result) {
+  #  Vec3 current = DRF(position);
+  #  
+  #  
+  #}
+  
+  func boo isSolid(PTR[World] world, PTR[Vec3] v) {
+    PTR[Block] block = World/tryGet(
+      this: world, 
+      x: cast[int32](Math/floorf(x: DRF(v).x)),
+      y: cast[int32](Math/floorf(x: DRF(v).y)),
+      z: cast[int32](Math/floorf(x: DRF(v).z))    
+    );
+    if (RTP[int32](block) == 0) done yes;
+    done Block/isSolid(block: block);
+  }
+  
+  # limits amount to move by, in order to not enter a block when moving an object. 
+  # if the starting position already is inside a block this always returns 0 and yes.
+  # assumes delta does not cross multiple blocks. (e.g by going diagonally, or having a length > 1.)
+  # returns yes, if there was a limit
+  func boo limitDelta(PTR[World] world, PTR[Vec3] position, PTR[Vec3] delta, PTR[Vec3] deltaLimited) {
+    if (isSolid(world: world, v: position)) {
+      DRF(deltaLimited) = Vec3/new();
+      done yes;
+    }
+    
+    Vec3 to = Vec3/add(a: position, b: delta);
+    if (isSolid(world: world, v: REF(to)) == no) done no;
+    
+    real32 epsilon = 0.0001;
+    
+    real32 distance = 0.00011;
+    
+    if      (DRF(delta).x > epsilon) DRF(deltaLimited).x =  Math/ceilf(x: DRF(position).x) - distance - DRF(position).x;
+    else if (DRF(delta).x < epsilon) DRF(deltaLimited).x = Math/floorf(x: DRF(position).x) + distance - DRF(position).x;
+    if      (DRF(delta).y > epsilon) DRF(deltaLimited).y =  Math/ceilf(x: DRF(position).y) - distance - DRF(position).y;
+    else if (DRF(delta).y < epsilon) DRF(deltaLimited).y = Math/floorf(x: DRF(position).y) + distance - DRF(position).y;
+    if      (DRF(delta).z > epsilon) DRF(deltaLimited).z =  Math/ceilf(x: DRF(position).z) - distance - DRF(position).z;
+    else if (DRF(delta).z < epsilon) DRF(deltaLimited).z = Math/floorf(x: DRF(position).z) + distance - DRF(position).z;
+    
+    done yes;
+  }
+  
+  func Vec3 tryMove(PTR[World] world, PTR[Vec3] position, PTR[Vec3] delta, PTR[Hitbox] hitbox) {
+    Vec3 col = Vec3/new();
+    
+    Vec3 dx = Vec3(x = DRF(delta).x, y = 0.0, z = 0.0);
+    Vec3 dy = Vec3(x = 0.0, y = DRF(delta).y, z = 0.0);
+    Vec3 dz = Vec3(x = 0.0, y = 0.0, z = DRF(delta).z);
+    
+    if (limitDelta(world: world, position: position, delta: REF(dx), deltaLimited: REF(dx)))
+      col.x = Math/normf(x: dx.x);
+    if (limitDelta(world: world, position: position, delta: REF(dy), deltaLimited: REF(dy)))
+      col.y = Math/normf(x: dy.y);
+    if (limitDelta(world: world, position: position, delta: REF(dz), deltaLimited: REF(dz)))
+      col.z = Math/normf(x: dz.z);
+    
+    Vec3/add(this: position, v: Vec3(x=dx.x, y=dy.y, z=dz.z));
+    
+    done Vec3/new();
+  }
+
+}
