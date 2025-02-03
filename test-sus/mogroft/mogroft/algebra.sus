@@ -1,4 +1,8 @@
-
+package mogroft/algebra/Vec3i {
+  
+  struct Vec3i(int32 x, int32 y, int32 z);
+  
+}
 
 package mogroft/algebra/Vec3 {
 
@@ -21,7 +25,23 @@ package mogroft/algebra/Vec3 {
          (DRF(this).y * DRF(this).y) +
          (DRF(this).z * DRF(this).z)
     );
-    
+    DRF(this).x = DRF(this).x / length;
+    DRF(this).y = DRF(this).y / length;
+    DRF(this).z = DRF(this).z / length;
+  }
+  
+  func real32 length(PTR[Vec3] this) {
+    done Math/sqrtf(
+      x: (DRF(this).x * DRF(this).x) +
+         (DRF(this).y * DRF(this).y) +
+         (DRF(this).z * DRF(this).z)
+    );
+  }
+  
+  func real32 lengthSq(PTR[Vec3] this) {
+    done (DRF(this).x * DRF(this).x) +
+         (DRF(this).y * DRF(this).y) +
+         (DRF(this).z * DRF(this).z);
   }
   
   # https://stackoverflow.com/a/42422624

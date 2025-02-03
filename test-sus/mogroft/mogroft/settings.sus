@@ -1,13 +1,20 @@
 package mogroft/Settings {
   
+  static int32 PERSPECTIVE_POV = 0;
+  static int32 PERSPECTIVE_BEHIND = 1;
+  
   static Settings inst = Settings(
     collision = yes,
-    lighting = no
+    lighting = no,
+    perspective = 0,
+    debugGizmos = no
   );
   
   struct Settings (
     boo collision,
-    boo lighting
+    boo lighting,
+    boo debugGizmos,
+    int32 perspective
   );
 
 }

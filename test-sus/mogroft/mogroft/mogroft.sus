@@ -13,10 +13,12 @@ package mogroft/Mogroft {
   use mogroft/world/WorldManager;
   use mogroft/Settings;
   
+  use mogroft/PlayerController;
 
   struct MogroftState (
     RendererState rendererState,
-    WorldManager worldManager
+    WorldManager worldManager,
+    PlayerController playerController
   );
   
   static PTR[MogroftState] _mogroft = RTP[PTR[MogroftState]](0);
@@ -27,7 +29,8 @@ package mogroft/Mogroft {
       worldManager = WorldManager/new(chunkEventHandler: ChunkEventHandler(
         onLoaded = funcref(onChunkLoaded),
         onUnloaded = funcref(onChunkUnloaded)
-      ))
+      )),
+      playerController = PlayerController/new()
     );
     _mogroft = REF(theInst);
     WorldManager/loadExample(this: REF(theInst.worldManager));
@@ -60,6 +63,7 @@ package mogroft/Mogroft {
     Debug/tick(dt: dt);
     Controls/tick(dt: dt);
     WorldManager/tick(this: REF(DRF(_mogroft).worldManager), dt: dt);
+    PlayerController/tick(this: REF(DRF(_mogroft).playerController), dt: dt);
   }
   
   func init() {

@@ -3431,7 +3431,7 @@ function compile(state) {
       //  console.log('hi');
       //}
       let sig = resolveFuncSig(symbol, paramNames, addressScope);
-      if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol);
+      if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol + '(' + paramNames.join(', ') + ')');
       let asmName = sig.asmName;
       if (state.name !== sig.unitPath && !tableExternals.includes(asmName)) {
         tableExternals.push(asmName);
@@ -3558,6 +3558,12 @@ function compile(state) {
       r += line(`finit`);
       r += line(`fild    dword [esp]`);
       r += line(`fst     dword [esp]`);
+    } else if (wanted === 'real32' && actual === 'nat32') {
+      // https://www.felixcloutier.com/x86/vcvtusi2ss
+      // mmx and sse: https://chatgpt.com/c/67a0c0a5-f564-800a-9bfc-e5ed51cecac8
+      r += line(`pxor    xmm0, xmm0`);
+      r += line(`cvtsi2ss xmm0, dword [esp]`);
+      r += line(`movss   dword [esp], xmm0`);
     } else if (wanted === 'int32' && actual === 'real64') {
       r += line(`finit`);
       r += line(`fld     qword [esp]`);

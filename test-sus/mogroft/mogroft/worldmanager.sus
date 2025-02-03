@@ -6,6 +6,8 @@ package mogroft/world/WorldManager {
   use sus/Time;
   use sus/Thread;
   use sus/Mutex;
+  
+  use mogroft/algebra/Vec3i;
 
   use mogroft/Noise2DFractal;
   use mogroft/Noise2D;
@@ -91,19 +93,6 @@ package mogroft/world/WorldManager {
       int32 dy = Math/absi(x: DRF(current).chunkCoord.y - y);
       
       if ((dx > flatRange) || (dz > flatRange) || (dy > yRange)) {
-        #System/print(s: STR" removing: ");
-        #System/print(i: DRF(current).chunkCoord.x);
-        #System/print(s: STR" ");
-        #System/print(i: DRF(current).chunkCoord.y);
-        #System/print(s: STR" ");
-        #System/print(i: DRF(current).chunkCoord.z);
-        #System/print(s: STR" ");
-        #System/print(i: dx);
-        #System/print(s: STR" ");
-        #System/print(i: dy);
-        #System/print(s: STR" ");
-        #System/print(i: dz);
-        #System/println();
         onUnloadedFunc(chunkCoord: REF(DRF(current).chunkCoord));
         List/remove(this: chunkListList, index: RTP[PTR[ptr]](current));
         done;
@@ -345,18 +334,36 @@ package mogroft/world/WorldManager {
     if (DRF(chunk).isAir) done;
     
     PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));
-    int32 y = 0;
-    while (y < Chunk/SIZE) {
-      int32 z = 0;
-      while (z < Chunk/SIZE) {
-        int32 x = 0;
-        while (x < Chunk/SIZE) {
-          
+    
+    int32 z = 0;
+    while (z < Chunk/SIZE) {
+      int32 x = 0;
+      while (x < Chunk/SIZE) {
+        int32 bx = DRF(chunk).chunkCoord.x * Chunk/SIZE + x;
+        
+        real32 stoneHeight = 50.0;
+        real32 dirtHeight = 5.0;
+        real32 totalHeight = stoneHeight + dirtHeight;
+        
+        int32 bz = DRF(chunk).chunkCoord.z * Chunk/SIZE + z;
+              
+        int32 stoney = cast[int32]((0.0 - totalHeight) + (Noise2DFractal/noise(
+          x: cast[real32](bx) * 0.07,
+          y: cast[real32](bz) * 0.07,
+          seed: seed,
+          levels: 2
+        ) * stoneHeight));
+        
+        int32 dirty = stoney + cast[int32]((Noise2D/perlin(
+          x: cast[real32](bx) * 0.07,
+          y: cast[real32](bz) * 0.07,
+          seed: seed
+        ) * dirtHeight));
+      
+        int32 y = 0;
+        while (y < Chunk/SIZE) {
           PTR[Block] block = blocks + (z * Chunk/SIZE * Chunk/SIZE) + (y * Chunk/SIZE) + x;
-          
-          int32 bx = DRF(chunk).chunkCoord.x * Chunk/SIZE + x;
           int32 by = DRF(chunk).chunkCoord.y * Chunk/SIZE + y;
-          int32 bz = DRF(chunk).chunkCoord.z * Chunk/SIZE + z;
           
           if (by >= 0) {
             # generate above zero
@@ -368,24 +375,7 @@ package mogroft/world/WorldManager {
           
           # generate below zero
           
-          real32 stoneHeight = 50.0;
-          real32 dirtHeight = 5.0;
-          real32 totalHeight = stoneHeight + dirtHeight;
-          
           #Time t1 = Time/now();
-          
-          int32 stoney = cast[int32]((0.0 - totalHeight) + (Noise2DFractal/noise(
-            x: cast[real32](bx) * 0.07,
-            y: cast[real32](bz) * 0.07,
-            seed: seed,
-            levels: 2
-          ) * stoneHeight));
-          
-          int32 dirty = stoney + cast[int32]((Noise2D/perlin(
-            x: cast[real32](bx) * 0.07,
-            y: cast[real32](bz) * 0.07,
-            seed: seed
-          ) * dirtHeight));
           
           #countPerlin = countPerlin + 1;
           #Time t2 = Time/now();
@@ -401,13 +391,13 @@ package mogroft/world/WorldManager {
           } else {
             DRF(block) = Blocks/BLOCK_AIR;
           }
-          
-          x = x + 1;
+        
+          y = y + 1;
         }
         
-        z = z + 1;
+        x = x + 1;
       }
-      y = y + 1;
+      z = z + 1;
     }
     
     #System/print(s: STR"  perlin count: ");

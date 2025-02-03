@@ -10,6 +10,7 @@ package mogroft/Renderer {
   use mogroft/Texture;
   use mogroft/Mogroft;
   use mogroft/world/World;
+  use mogroft/world/Player;
   use mogroft/world/Chunk;
   use mogroft/world/WorldManager;
 
@@ -54,6 +55,17 @@ package mogroft/Renderer {
     WorldRender/init(this: REF(DRF(this).worldRender), renderer: this);
     
     initCube();
+  }
+  
+  func drawCube(real32 x, real32 y, real32 z, real32 width, real32 height) {
+    Gl/glPushMatrix();
+    
+    Gl/glTranslatef(x: x, y: y, z: z);
+    Gl/glScalef(x: width, y: height, z: width);
+    
+    Gl/glCallList(lists: lstCube);
+    
+    Gl/glPopMatrix();
   }
   
   func drawCube(real32 x, real32 y, real32 z) {
@@ -226,17 +238,21 @@ package mogroft/render/WorldRender {
 
   use sus/Gl;
   use sus/System;
+  use sus/Time;
   use sus/Math;
   use sus/StringStream;
   
   use mogroft/Texture;
   use mogroft/Mogroft;
   
+  use mogroft/algebra/Vec3;
   use mogroft/world/World;
   use mogroft/world/Chunk;
+  use mogroft/world/Player;
   use mogroft/world/ChunkList;
   use mogroft/world/WorldManager;
 
+  use mogroft/PlayerController;
   use mogroft/Renderer;
   use mogroft/render/ChunkRender;
   use mogroft/render/BlockSpriteSheet;
@@ -276,26 +292,87 @@ package mogroft/render/WorldRender {
     ChunkRender/render(this: REF(DRF(this).chunkRender), renderer: renderer, dt: dt);
     
     Gl/glDisable(cap: Gl/GL_LIGHTING);
+    
+    renderGizmos();
+    
     Gl/glDisable(cap: Gl/GL_DEPTH_TEST);
-
+    
+    renderDebugGizmos();
+    
+    Gl/glPopMatrix();
+  }
+  
+  func renderGizmos() {
     PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
-    real32 bx = Math/floorf(x: DRF(world).player.position.x);
-    real32 by = Math/floorf(x: DRF(world).player.position.y);
-    real32 bz = Math/floorf(x: DRF(world).player.position.z);
- 
+    PTR[PlayerController] playerController = REF(DRF(Mogroft/_mogroft).playerController);
+    PTR[Player] player = REF(DRF(world).player);
+    PTR[Vec3] pos = REF(DRF(player).position);
+    
+    Time now = Time/now();
+    real32 glowPerSecond = 1.0;
+    real32 shine = 0.08 + (Math/sinf(x: Math/PI * cast[real32](cast[int32](now._low) & @7fffffff) / 10000000.0  * glowPerSecond) * 0.02);
+    
+    # hovered block
+    
+    if (DRF(playerController).hoverState == PlayerController/HOVER_BLOCK) {
+      Renderer/color(rgba: @60ffff00 | cast[int32](cast[real32](@ff) * shine));
+      Renderer/drawCube(
+        x: cast[real32](DRF(playerController).hoveredBlock.x),
+        y: cast[real32](DRF(playerController).hoveredBlock.y),
+        z: cast[real32](DRF(playerController).hoveredBlock.z)
+      );
+    }
+  }
+  
+  func renderDebugGizmos() {
+    if (Settings/inst.debugGizmos == no) done;
+  
+    PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
+    PTR[PlayerController] playerController = REF(DRF(Mogroft/_mogroft).playerController);
+    PTR[Player] player = REF(DRF(world).player);
+    PTR[Vec3] pos = REF(DRF(player).position);
+    
+    # origin cube
     Renderer/color(rgba: @ffffff40);
     Renderer/drawCube(x: 0.0, y: 0.0, z: 0.0);
     
-    Gl/glPolygonMode(face: Gl/GL_FRONT_AND_BACK, mode: Gl/GL_LINE);
+    real32 mx = DRF(pos).x - (DRF(player).hitbox.width / 2.0);
+    real32 mz = DRF(pos).z - (DRF(player).hitbox.width / 2.0);
+    real32 my = DRF(pos).y - DRF(player).hitbox.eyey;
+    
+    # coordinates
+    
+    real32 s = 0.3;
+    
     Gl/glLineWidth(width: 2.0);
     
-    Renderer/color(rgba: @800080ff);
-    Renderer/drawCube(x: bx, y: by - 2.0, z: bz);
+    Gl/glBegin(mode: Gl/GL_LINES);
     
-    Gl/glLineWidth(width: 1.0);
+    Renderer/color(rgba: @ff0000ff);
+    Gl/glVertex3f(x: DRF(pos).x, y: DRF(pos).y, z: DRF(pos).z);
+    Gl/glVertex3f(x: DRF(pos).x + s, y: DRF(pos).y, z: DRF(pos).z);
+    
+    
+    Renderer/color(rgba: @00ff00ff);
+    Gl/glVertex3f(x: DRF(pos).x, y: DRF(pos).y, z: DRF(pos).z);
+    Gl/glVertex3f(x: DRF(pos).x, y: DRF(pos).y + s, z: DRF(pos).z);
+    
+    
+    Renderer/color(rgba: @2040ffff);
+    Gl/glVertex3f(x: DRF(pos).x, y: DRF(pos).y, z: DRF(pos).z);
+    Gl/glVertex3f(x: DRF(pos).x, y: DRF(pos).y, z: DRF(pos).z + s);
+    
+    Gl/glEnd();
+    
+    # player hitbox
+    Gl/glPolygonMode(face: Gl/GL_FRONT_AND_BACK, mode: Gl/GL_LINE);
+    
+    Gl/glLineWidth(width: 2.0);
+    
+    Renderer/color(rgba: @ffffffff);
+    Renderer/drawCube(x: mx, y: my, z: mz, width: DRF(player).hitbox.width, height: DRF(player).hitbox.height);
+    
     Gl/glPolygonMode(face: Gl/GL_FRONT_AND_BACK, mode: Gl/GL_FILL);
-    
-    Gl/glPopMatrix();
   }
   
   func setupLights() {
@@ -350,6 +427,12 @@ package mogroft/render/WorldRender {
     PTR[World] world = DRF(Mogroft/_mogroft).worldManager.world;
     if (RTP[int32](world) == 0) done;
 
+    if (Settings/inst.perspective == Settings/PERSPECTIVE_BEHIND) Gl/glTranslatef(
+      x: 0.0,
+      y: 0.0,
+      z: -5.0
+    );
+
     Gl/glRotatef(
       angle: 0.0 - DRF(world).player.pitch,
       x: 1.0, y: 0.0, z: 0.0
@@ -370,6 +453,9 @@ package mogroft/render/WorldRender {
 }
 
 package mogroft/render/BlockSpriteSheet {
+
+
+  use mogroft/algebra/Vec3i;
 
   use mogroft/world/Blocks;
   use mogroft/world/Block;

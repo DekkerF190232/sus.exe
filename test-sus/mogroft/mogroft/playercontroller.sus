@@ -1,0 +1,54 @@
+package mogroft/PlayerController {
+
+  use mogroft/Mogroft;
+  
+  use mogroft/algebra/Vec3i;
+  use mogroft/algebra/Vec3;
+  use mogroft/world/Physics;
+  
+  use mogroft/world/WorldManager;
+  use mogroft/world/World;
+  use mogroft/world/Player;
+  use mogroft/world/Chunk;
+  use mogroft/world/Block;
+  use mogroft/world/Blocks;
+
+  static int32 HOVER_NONE = 0;
+  static int32 HOVER_BLOCK = 1;
+
+  struct PlayerController (
+    int32 hoverState,
+    Vec3i hoveredBlock
+  );
+  
+  func PlayerController new() {
+    done PlayerController(
+      hoverState = HOVER_NONE,
+      hoveredBlock = Vec3i(x=0,y=0,z=0)
+    );
+  }
+  
+  func tick(PTR[PlayerController] this, real32 dt) {
+    PTR[MogroftState] mogroft = Mogroft/_mogroft;
+    PTR[WorldManager] worldManager = REF(DRF(mogroft).worldManager);
+    PTR[World] world = DRF(worldManager).world;
+    PTR[Player] player = REF(DRF(world).player);
+    
+    Vec3 step = Vec3(x=0.0,y=0.0,z=-0.1);
+    Vec3/rotate(this: REF(step), angle: DRF(player).pitch, v: Vec3(x=1.0, y=0.0, z=0.0));
+    Vec3/rotate(this: REF(step), angle: DRF(player).yaw, v: Vec3(x=0.0, y=1.0, z=0.0));
+    
+    if (Physics/rayCast(
+      world: world,
+      position: REF(DRF(player).position),
+      step: REF(step),
+      length: 4.0,
+      blockCoord: REF(DRF(this).hoveredBlock)
+    )) {
+      DRF(this).hoverState = HOVER_BLOCK;
+    } else {
+      DRF(this).hoverState = HOVER_NONE;
+    }
+  }
+
+}

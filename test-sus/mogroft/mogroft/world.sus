@@ -4,6 +4,8 @@ package mogroft/world/World {
   use sus/Memory;
   use sus/System;
   use sus/Math;
+  
+  use mogroft/algebra/Vec3i;
 
   use mogroft/world/ChunkList;
   use mogroft/world/Player;
@@ -31,13 +33,15 @@ package mogroft/world/World {
       y = Math/floor_divi(x: y, y: Chunk/SIZE),
       z = Math/floor_divi(x: z, y: Chunk/SIZE)
     );
-    #System/print(s: STR"  tryget: chunk coord: ");
-    #System/print(i: chunkCoord.x);
-    #System/print(s: STR",");
-    #System/print(i: chunkCoord.y);
-    #System/print(s: STR",");
-    #System/print(i: chunkCoord.z);
-    #System/println();
+    if (Debug/critical) {
+      System/print(s: STR"  tryget: blockcoord: ");
+      System/print(i: x);
+      System/print(s: STR",");
+      System/print(i: y);
+      System/print(s: STR",");
+      System/print(i: z);
+      System/println();
+    }
     
     PTR[Chunk] chunk = ChunkList/find(
       this: REF(DRF(this).chunkList),
@@ -59,8 +63,6 @@ package mogroft/world/World {
 }
 
 package mogroft/world/Block {
-  
-  struct BlockCoord(int32 x, int32 y, int32 z);
 
   struct Block (
     int8 id
@@ -80,12 +82,12 @@ package mogroft/world/Blocks {
   
   use mogroft/world/Block;
   
-  static Block BLOCK_AIR   = Block(id=cast[int8](1));
-  static Block BLOCK_STONE = Block(id=cast[int8](2));
-  static Block BLOCK_GRASS = Block(id=cast[int8](3));
-  static Block BLOCK_DIRT  = Block(id=cast[int8](4));
-  static Block BLOCK_LOG   = Block(id=cast[int8](5));
-  static Block BLOCK_WOOD  = Block(id=cast[int8](6));
+  static Block BLOCK_AIR   = Block(id = cast[int8](1));
+  static Block BLOCK_STONE = Block(id = cast[int8](2));
+  static Block BLOCK_GRASS = Block(id = cast[int8](3));
+  static Block BLOCK_DIRT  = Block(id = cast[int8](4));
+  static Block BLOCK_LOG   = Block(id = cast[int8](5));
+  static Block BLOCK_WOOD  = Block(id = cast[int8](6));
   
   static int32 BLOCK_COUNT = 6;
 
@@ -96,6 +98,8 @@ package mogroft/world/Blocks {
 }
 
 package mogroft/world/Chunk {
+  
+  use mogroft/algebra/Vec3i;
   
   use mogroft/world/Block;
   use mogroft/world/Chunk;
@@ -225,12 +229,14 @@ package mogroft/world/ChunkCoordList {
 package mogroft/world/Player {
   
   use mogroft/algebra/Vec3;
+  use mogroft/world/Hitbox;
   use sus/Math;
 
   struct Player (
     Vec3 position, # [blocks]
     real32 yaw, # [deg]
-    real32 pitch # [deg]
+    real32 pitch, # [deg]
+    Hitbox hitbox
   );
   
   func lookDelta(PTR[Player] this, real32 dyaw, real32 dpitch) {
@@ -245,7 +251,8 @@ package mogroft/world/Player {
     done Player(
       position = Vec3/new(),
       yaw = 0.0,
-      pitch = 0.0
+      pitch = 0.0,
+      hitbox = Hitbox(width=0.5, height=1.8, eyey=1.6)
     );
   }
 }

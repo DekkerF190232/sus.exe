@@ -3,9 +3,13 @@ package mogroft/world/Hitbox {
   use mogroft/algebra/Vec3;
   
   struct Hitbox (
-    Vec3 dimensions,
-    Vec3 center
+    real32 width,
+    real32 height,
+    # distance from eye (position) to bottom
+    real32 eyey
   );
+  
+  # top of position and hitbox = position.y + center.y - dimensions.y / 2
 
 }
 
@@ -15,24 +19,20 @@ package mogroft/world/Physics {
   use sus/System;
   
   use mogroft/algebra/Vec3;
+  use mogroft/algebra/Vec3i;
+  
   use mogroft/world/World;
   use mogroft/world/Block;
   use mogroft/world/Blocks;
   use mogroft/world/Chunk;
   use mogroft/world/Hitbox;
   
-  #func rayTrace(PTR[Vec3] position, PTR[Vec3] normal, real32 range, PTR[BlockCoord] result) {
-  #  Vec3 current = DRF(position);
-  #  
-  #  
-  #}
-  
   func boo isSolid(PTR[World] world, PTR[Vec3] v) {
     PTR[Block] block = World/tryGet(
       this: world, 
-      x: cast[int32](Math/floorf(x: DRF(v).x)),
-      y: cast[int32](Math/floorf(x: DRF(v).y)),
-      z: cast[int32](Math/floorf(x: DRF(v).z))    
+      x: Math/floori(x: DRF(v).x),
+      y: Math/floori(x: DRF(v).y),
+      z: Math/floori(x: DRF(v).z)    
     );
     if (RTP[int32](block) == 0) done yes;
     done Block/isSolid(block: block);
@@ -42,14 +42,43 @@ package mogroft/world/Physics {
   # if the starting position already is inside a block this always returns 0 and yes.
   # assumes delta does not cross multiple blocks. (e.g by going diagonally, or having a length > 1.)
   # returns yes, if there was a limit
-  func boo limitDelta(PTR[World] world, PTR[Vec3] position, PTR[Vec3] delta, PTR[Vec3] deltaLimited) {
+  func boo limitDelta(PTR[World] world, PTR[Vec3] position, PTR[Vec3] delta, PTR[Vec3] deltaLimited, PTR[Vec3i] blockCoord) {
     if (isSolid(world: world, v: position)) {
+      DRF(blockCoord) = Vec3i(
+        x = Math/floori(x: DRF(position).x),
+        y = Math/floori(x: DRF(position).y),
+        z = Math/floori(x: DRF(position).z)
+      );
+      #if (Debug/ritical) {
+      #  System/print(s: STR"colliding with unloaded block: ");
+      #  System/print(i: DRF(blockCoord).x);
+      #  System/print(s: STR", ");
+      #  System/print(i: DRF(blockCoord).y);
+      #  System/print(s: STR", ");
+      #  System/print(i: DRF(blockCoord).z);
+      #  System/println();
+      #}
       DRF(deltaLimited) = Vec3/new();
       done yes;
     }
     
     Vec3 to = Vec3/add(a: position, b: delta);
     if (isSolid(world: world, v: REF(to)) == no) done no;
+    
+    DRF(blockCoord) = Vec3i(
+      x = Math/floori(x: to.x),
+      y = Math/floori(x: to.y),
+      z = Math/floori(x: to.z)
+    );
+    #if (Debug/ritical) {
+    #  System/print(s: STR"colliding with solid block: ");
+    #  System/print(i: DRF(blockCoord).x);
+    #  System/print(s: STR", ");
+    #  System/print(i: DRF(blockCoord).y);
+    #  System/print(s: STR", ");
+    #  System/print(i: DRF(blockCoord).z);
+    #  System/println();
+    #}
     
     real32 epsilon = 0.0001;
     
@@ -65,23 +94,114 @@ package mogroft/world/Physics {
     done yes;
   }
   
-  func Vec3 tryMove(PTR[World] world, PTR[Vec3] position, PTR[Vec3] delta, PTR[Hitbox] hitbox) {
-    Vec3 col = Vec3/new();
+  # limits delta using all positions of a hitbox, delta must meet requirements of limitDelta
+  func boo limitDeltaHitbox(PTR[World] world, PTR[Vec3] position, PTR[Hitbox] hitbox, PTR[Vec3] delta, PTR[Vec3] deltaLimited, PTR[Vec3i] blockCoord) {
+    real32 miny = DRF(position).y - DRF(hitbox).eyey;
+    real32 minx = DRF(position).x - (DRF(hitbox).width / 2.0);
+    real32 minz = DRF(position).z - (DRF(hitbox).width / 2.0);
+    
+    real32 maxy = DRF(position).y + DRF(hitbox).height;
+    real32 maxx = DRF(position).x + (DRF(hitbox).width / 2.0);
+    real32 maxz = DRF(position).z + (DRF(hitbox).width / 2.0);
+    
+    Vec3 pos = Vec3/new();
+    # bottom left back
+    pos.y = miny;
+    pos.x = minx;
+    pos.z = minz;
+    if (limitDelta(world: world, position: REF(pos), delta: delta, deltaLimited: deltaLimited, blockCoord: blockCoord)) done yes;
+    
+    # bottom right back
+    pos.y = miny;
+    pos.x = maxx;
+    pos.z = minz;
+    if (limitDelta(world: world, position: REF(pos), delta: delta, deltaLimited: deltaLimited, blockCoord: blockCoord)) done yes;
+    
+    # bottom left front
+    pos.y = miny;
+    pos.x = minx;
+    pos.z = maxz;
+    if (limitDelta(world: world, position: REF(pos), delta: delta, deltaLimited: deltaLimited, blockCoord: blockCoord)) done yes;
+    
+    # bottom right front
+    pos.y = miny;
+    pos.x = maxx;
+    pos.z = maxz;
+    if (limitDelta(world: world, position: REF(pos), delta: delta, deltaLimited: deltaLimited, blockCoord: blockCoord)) done yes;
+    
+    # top left back
+    pos.y = maxy;
+    pos.x = minx;
+    pos.z = minz;
+    if (limitDelta(world: world, position: REF(pos), delta: delta, deltaLimited: deltaLimited, blockCoord: blockCoord)) done yes;
+    
+    # top right back
+    pos.y = maxy;
+    pos.x = maxx;
+    pos.z = minz;
+    if (limitDelta(world: world, position: REF(pos), delta: delta, deltaLimited: deltaLimited, blockCoord: blockCoord)) done yes;
+    
+    # top left front
+    pos.y = maxy;
+    pos.x = minx;
+    pos.z = maxz;
+    if (limitDelta(world: world, position: REF(pos), delta: delta, deltaLimited: deltaLimited, blockCoord: blockCoord)) done yes;
+    
+    # top right front
+    pos.y = maxy;
+    pos.x = maxx;
+    pos.z = maxz;
+    if (limitDelta(world: world, position: REF(pos), delta: delta, deltaLimited: deltaLimited, blockCoord: blockCoord)) done yes;
+    
+    done no;
+  }
+  
+  func Vec3i tryMove(PTR[World] world, PTR[Vec3] position, PTR[Vec3] delta, PTR[Hitbox] hitbox, PTR[Vec3i] blockCoord) {
+    Vec3i col = Vec3i(x=0,y=0,z=0);
     
     Vec3 dx = Vec3(x = DRF(delta).x, y = 0.0, z = 0.0);
     Vec3 dy = Vec3(x = 0.0, y = DRF(delta).y, z = 0.0);
     Vec3 dz = Vec3(x = 0.0, y = 0.0, z = DRF(delta).z);
     
-    if (limitDelta(world: world, position: position, delta: REF(dx), deltaLimited: REF(dx)))
-      col.x = Math/normf(x: dx.x);
-    if (limitDelta(world: world, position: position, delta: REF(dy), deltaLimited: REF(dy)))
-      col.y = Math/normf(x: dy.y);
-    if (limitDelta(world: world, position: position, delta: REF(dz), deltaLimited: REF(dz)))
-      col.z = Math/normf(x: dz.z);
+    if (limitDeltaHitbox(world: world, position: position, hitbox: hitbox, delta: REF(dx), deltaLimited: REF(dx), blockCoord: blockCoord))
+      col.x = Math/normfi(x: DRF(delta).x);
+    if (limitDeltaHitbox(world: world, position: position, hitbox: hitbox, delta: REF(dy), deltaLimited: REF(dy), blockCoord: blockCoord))
+      col.y = Math/normfi(x: DRF(delta).y);
+    if (limitDeltaHitbox(world: world, position: position, hitbox: hitbox, delta: REF(dz), deltaLimited: REF(dz), blockCoord: blockCoord))
+      col.z = Math/normfi(x: DRF(delta).z);
     
     Vec3/add(this: position, v: Vec3(x=dx.x, y=dy.y, z=dz.z));
     
-    done Vec3/new();
+    done col;
+  }
+  
+  # expects delta to be normalized
+  # gives yes, when a block was hit.
+  func boo rayCast(PTR[World] world, PTR[Vec3] position, PTR[Vec3] step, real32 length, PTR[Vec3i] blockCoord) {
+    real32 stepLength = Vec3/length(this: step);
+    Hitbox hitbox = Hitbox(
+      width = stepLength * 1.5,
+      height = stepLength * 1.5,
+      eyey = stepLength * 1.5 * 0.5
+    );
+
+    Vec3 current = DRF(position);
+    real32 d = 0.0 - stepLength;
+    while (d < length) {
+      Vec3i col = tryMove(world: world, position: REF(current), delta: step, hitbox: REF(hitbox), blockCoord: blockCoord);
+      
+      if (col.x != 0 ||
+         (col.y != 0) ||
+         (col.z != 0)
+      ) {
+        done yes;
+      }
+      
+      # Vec3/add(this: REF(current), v: DRF(step));
+      d = d + stepLength;
+    }
+    
+    done no;
   }
 
 }

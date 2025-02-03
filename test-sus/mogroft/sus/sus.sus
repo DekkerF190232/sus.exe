@@ -31,6 +31,11 @@ package sus/Math {
     done 1.0;
   }
   
+  func int32 normfi(real32 x) {
+    if (x < 0.0) done -1;
+    done 1;
+  }
+  
   func int32 absi(int32 x) {
     if (x < 0) done 0 - x;
     done x;
@@ -1482,6 +1487,10 @@ package sus/System {
   }
 
   func exit(int32 code) {
+    boo _1 = Win/FlushFileBuffers(
+      handle: Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE)
+    );
+  
     Win/ExitProcess(code: code);
   }
 

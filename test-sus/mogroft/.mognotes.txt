@@ -1,3 +1,18 @@
+issues
+
+  lag after loading and unloading a bunch of chunk
+  
+next up
+
+  raycast
+  
+  mining + chunk updates
+  
+  gravity + movement + jump
+  
+  slow mining
+
+
 planed features:
 
 
