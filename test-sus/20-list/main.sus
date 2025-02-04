@@ -38,10 +38,13 @@ package Main {
 
     int32 i = 0;
 
+    PTR[ptr] _added1 = List/add(this: REF(int32List), i: 0);
+    DRF(RTP[PTR[int32]](_added1)) = 1111;
+
     int32 v = 123;
-    List/add(this: REF(int32List), element: RTP[ptr](REF(v)));
+    PTR[ptr] _1 = List/add(this: REF(int32List), element: RTP[ptr](REF(v)));
     while (i < 1000) {
-      List/add(this: REF(int32List), element: RTP[ptr](REF(i)));
+      PTR[ptr] _2 = List/add(this: REF(int32List), element: RTP[ptr](REF(i)));
       i = i + 1;
     }
 
@@ -49,6 +52,9 @@ package Main {
     List/remove(this: REF(int32List), i: 1);
     List/remove(this: REF(int32List), i: 1);
     List/remove(this: REF(int32List), i: 1);
+
+    PTR[ptr] _added2 = List/add(this: REF(int32List), i: 3);
+    DRF(RTP[PTR[int32]](_added2)) = 333;
 
     if (doOutput) {
       printIntList(intList: REF(int32List));

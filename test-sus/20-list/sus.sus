@@ -1,14 +1,99 @@
 
+package sus/c/CMath {
+  
+  #func CON(cdecl) real64 sin(real64 x) EXT;
+  #func CON(cdecl) real64 cos(real64 x) EXT;
+  
+  func CON(cdecl) real64 floor(real64 x) EXT;
+  func CON(cdecl) real64 ceil(real64 x) EXT;
+  func CON(cdecl) real64 tan(real64 x) EXT;
+  func CON(cdecl) real64 sin(real64 x) EXT;
+  func CON(cdecl) real64 cos(real64 x) EXT;
+  func CON(cdecl) real64 sqrt(real64 x) EXT;
+  
+}
+
 package sus/Math {
+
+  use sus/c/CMath;
 
   static real32 PI = 3.14159265359;
   static real32 2PI = 6.28318530718;
-
-  func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
-  func CON(cdecl) real32 tan(real32 x) EXT;
-  func CON(cdecl) real32 sinf(real32 x) EXT;
-  func CON(cdecl) real32 cosf(real32 x) EXT;
+  static real32 SQRT2 = 1.41421356237;
+  
+  func real32 absf(real32 x) {
+    if (x < 0.0) done 0.0 - x;
+    done x;
+  }
+  
+  func real32 normf(real32 x) {
+    if (x < 0.0) done -1.0;
+    done 1.0;
+  }
+  
+  func int32 normfi(real32 x) {
+    if (x < 0.0) done -1;
+    done 1;
+  }
+  
+  func int32 absi(int32 x) {
+    if (x < 0) done 0 - x;
+    done x;
+    #done x & @7fffffff;
+  }
+  
+  func int32 floor_divi(int32 x, int32 y) {
+    # http://blog.pkh.me/p/36-figuring-out-round%2C-floor-and-ceil-with-integer-division.html
+    
+    ASM {
+      ; eax:edx = dividend
+      mov     eax, SUS{x}
+      cdq
+      
+      ; eax = quotient
+      ; edx = remainder
+      idiv    dword SUS{y}
+      
+      ; sub one, when there is a remainder and the result is negative.
+      sar     edx, 31
+      and     edx, 1
+      sub     eax, edx
+      
+      mov     SUS{x}, eax
+    }
+    
+    # x was reused as result
+    done x;
+  }
+  
+  func int32 floori(real32 x) {
+    done cast[int32](floorf(x: x));
+  }
+  
   func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+  
+  func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
+  func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
+  func CON(cdecl) real32 remainderf(real32 x, real32 y) EXT;
+  
+  func real32 floorf(real32 x) {
+    done cast[real32](CMath/floor(x: cast[real64](x)));
+  }
+  func real32 ceilf(real32 x) {
+    done cast[real32](CMath/ceil(x: cast[real64](x)));
+  }
+  func real32 tanf(real32 x) {
+    done cast[real32](CMath/tan(x: cast[real64](x)));
+  }
+  func real32 sinf(real32 x) {
+    done cast[real32](CMath/sin(x: cast[real64](x)));
+  }
+  func real32 cosf(real32 x) {
+    done cast[real32](CMath/cos(x: cast[real64](x)));
+  }
+  func real32 sqrtf(real32 x) {
+    done cast[real32](CMath/sqrt(x: cast[real64](x)));
+  }
   
 }
 
@@ -21,11 +106,13 @@ package sus/native/Win {
   # strings
   func CON(cdecl) int32 strnlen(PTR[int8] buffer, int32 size) EXT;
   func CON(cdecl) _itoa_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) EXT;
+  func CON(cdecl) int32 _i64toa_s(LargeInteger value, PTR[int8] buffer, nat32 bufferSize, int32 radix) EXT;
 
   # stdout
   static int32 STD_OUTPUT_HANDLE = -11;
   func CON(stdcall) ExitProcess(int32 code) EXT;
   func CON(stdcall) int32 GetStdHandle(int32 handle) EXT;
+  func CON(stdcall) boo FlushFileBuffers(int32 handle) EXT;
   func CON(stdcall) boo WriteFile(int32 file, PTR[int8] buffer, int32 length, PTR[int32] written, PTR[ptr] overlapped) EXT;
 
   # errors
@@ -34,6 +121,15 @@ package sus/native/Win {
 
   # threads
   func CON(stdcall) Sleep(int32 ms) EXT;
+  
+  # time
+  struct FileTime(
+    nat32 low,
+    nat32 high
+  );
+  func CON(stdcall) GetSystemTimeAsFileTime(
+    PTR[FileTime] fileTime100Ns
+  ) EXT;
   
   # windows
   
@@ -349,6 +445,8 @@ package sus/native/Win {
   
   static int32 ATTACH_PARENT_PROCESS = -1;
   func CON(stdcall) boo AttachConsole(int32 processId) EXT;
+  func CON(stdcall) boo AllocConsole() EXT;
+  func CON(stdcall) boo IsDebuggerPresent() EXT;
   
   func CON(stdcall) IconHandle LoadIconA(InstanceHandle instance, PTR[int8] iconName) EXT;
 
@@ -408,6 +506,7 @@ package sus/native/Win {
   }
   
   static int32 WM_CREATE         = @0001;
+  static int32 WM_INPUT          = @00ff;
   static int32 WM_PAINT          = @000f;
   static int32 WM_SIZE           = @0005;
   static int32 WM_KILLFOCUS      = @0008;
@@ -416,9 +515,22 @@ package sus/native/Win {
   static int32 WM_KEYDOWN        = @0100;
   static int32 WM_KEYUP          = @0101;
   static int32 WM_TIMER          = @0113;
+  static int32 WM_MOUSEMOVE      = @0200;
+  
+  static int32 WM_LBUTTONDOWN                  = @0201;
+  static int32 WM_LBUTTONUP                    = @0202;
+  static int32 WM_RBUTTONDOWN                  = @0204;
+  static int32 WM_RBUTTONUP                    = @0205;
 
-  func CON(stdcall) boo GetMessageA(PTR[WindowMessage] message, WindowHandle handle, int32 filterMin, int32 filterMax) EXT;
+  func CON(stdcall) boo GetMessageA(
+    PTR[WindowMessage] message,
+    WindowHandle handle,
+    int32 filterMin,
+    int32 filterMax) EXT;
 
+  func CON(stdcall) boo ReleaseCapture() EXT;
+  func CON(stdcall) WindowHandle SetCapture(WindowHandle handle) EXT;
+  
   func CON(stdcall) boo UpdateWindow(WindowHandle handle) EXT;
   func CON(stdcall) boo TranslateMessage(PTR[WindowMessage] message) EXT;
   func CON(stdcall) int32 DispatchMessageA(PTR[WindowMessage] message) EXT;
@@ -539,7 +651,10 @@ package sus/native/Win {
   func CON(stdcall) DeviceContextHandle BeginPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
   func CON(stdcall) DeviceContextHandle EndPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
 
-  
+  func CON(stdcall) boo ClipCursor(PTR[Rectangle] rectangle) EXT;
+  func CON(stdcall) int32 ShowCursor(boo show) EXT;
+  func CON(stdcall) boo GetClientRect(WindowHandle handle, PTR[Rectangle] rectangle) EXT;
+  func CON(stdcall) boo ClientToScreen(WindowHandle handle, PTR[Point] point) EXT;
   
   # files
   
@@ -588,7 +703,300 @@ package sus/native/Win {
     int32 file,
     PTR[LargeInteger] fileSize
   ) EXT;
+  
+  struct RawInputDevice (
+    int16 usagePage,
+    int16 usage,
+    int32 flags,
+    WindowHandle targetHandle
+  );
+  
+  static int16 HID_USAGE_PAGE_GENERIC     = cast[int16](@01);
+  static int16 HID_USAGE_GENERIC_MOUSE    = cast[int16](@02);
+  
+  static int32 RIM_TYPEMOUSE       = 0;
+  
+  func CON(stdcall) boo RegisterRawInputDevices(
+    PTR[RawInputDevice] devices,
+    int32 length,
+    int32 rawInputDeviceSize
+  ) EXT;
+  
+  struct RawInputHandle(int32 _unused);
+  
+  static int32 RID_HEADER = @10000005;
+  static int32 RID_INPUT = @10000003;
+  
+  struct RawInputHeader(
+    int32 type,
+    int32 length,
+    int32 deviceHandle,
+    int32 param
+  );
+  
+  struct RawInput(
+    RawInputHeader header,
+    array[int8, 24] data # may be RawInputDataMouse
+  );
+  
+  struct RawInputDataMouse (
+    int16 flags,
+    int32 buttons,
+    int32 rawButtons,
+    int32 lastX,
+    int32 lastY,
+    int32 extraInformation
+  );
+  
+  func CON(stdcall) int32 GetRawInputData(
+    RawInputHandle handle,
+    int32 uiCommand,
+    ptr data,
+    PTR[int32] dataSize,
+    int32 headerSize
+  ) EXT;
+  
+  # threads
+  
+  func CON(stdcall) int32 CreateThread(
+    ptr securityAttributes,     # can be 0
+    nat32 stackSize,            # can be 0
+    funcptr[(ptr param)] routine,
+    ptr argument,               # can be 0
+    int32 flags,                # can be 0
+    PTR[int32] threadId         # can be 0
+  ) EXT;
+  
+  struct CriticalSection (
+    array[int8, 24] _data # i'm not declaring all of that
+  );
+  
+  func CON(stdcall) InitializeCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) EnterCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) LeaveCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) DeleteCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
 
+}
+
+package sus/AtomicBoo {
+
+  use sus/Mutex;
+  
+  struct AtomicBoo(
+    Mutex _mutex,
+    boo _value
+  );
+  
+  func AtomicBoo alloc(boo value) {
+    done AtomicBoo(
+      _mutex = Mutex/alloc(),
+      _value = value
+    );
+  }
+  
+  func boo get(PTR[AtomicBoo] this) {
+    boo value = no;
+    Mutex/lock(this: REF(DRF(this)._mutex));
+    value = DRF(this)._value;
+    Mutex/unlock(this: REF(DRF(this)._mutex));
+    done value;
+  }
+  
+  func set(PTR[AtomicBoo] this, boo value) {
+    Mutex/lock(this: REF(DRF(this)._mutex));
+    DRF(this)._value = value;
+    Mutex/unlock(this: REF(DRF(this)._mutex));
+  }
+  
+}
+
+package sus/Mutex {
+  
+  use sus/native/Win;
+  use sus/Memory;
+  
+  struct Mutex(
+    PTR[CriticalSection] _criticalSection
+  );
+  
+  func Mutex alloc() {
+    PTR[CriticalSection] criticalSection = RTP[PTR[CriticalSection]](
+      Memory/malloc(bytes: size[CriticalSection]())
+    );
+    Win/InitializeCriticalSection(criticalSection: criticalSection);
+    done Mutex(_criticalSection = criticalSection);
+  }
+  
+  func lock(PTR[Mutex] this) {
+    Win/EnterCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+  func unlock(PTR[Mutex] this) {
+    Win/LeaveCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+  func free(PTR[Mutex] this) {
+    Win/DeleteCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+}
+
+package sus/Thread {
+
+  use sus/native/Win;
+
+  struct Thread(int32 _handle);
+  
+  func Thread new(funcptr[(ptr param)] run, ptr arg) {
+    int32 result = Win/CreateThread(
+      securityAttributes: RTP[ptr](0),
+      stackSize:          cast[nat32](0),
+      routine:            run,
+      argument:           arg,
+      flags:              0,
+      threadId:           RTP[PTR[int32]](0)
+    );
+    done Thread(_handle = result);
+  }
+  
+  func sleep(int32 ms) {
+    Win/Sleep(ms: ms);
+  }
+  
+}
+
+package sus/Time {
+
+  use sus/native/Win;
+  use sus/System;
+  
+  #struct FileTime(
+  #  nat32 low,
+  #  nat32 high
+  #);
+  #func CON(stdcall) GetSystemTimeAsFileTime(
+  #  PTR[FileTime] fileTime100Ns
+  #) EXT;
+  
+  struct Time (
+    nat32 _low,
+    nat32 _high
+  );
+  
+  func Time zero() {
+    done Time(_low = cast[nat32](0), _high = cast[nat32](0));
+  }
+  
+  func Time now() {
+    Time res = Time(_low=cast[nat32](0), _high=cast[nat32](0));
+    Win/GetSystemTimeAsFileTime(fileTime100Ns: RTP[PTR[FileTime]](REF(res)));
+    done res;
+  }
+  
+  func printDuration(Time start, Time end) {
+    System/print(r: cast[real32](Time/diff_mu(a: end, b: start)) / 1000000.0, digits: 6);
+  }
+  
+  func boo greater(Time t, int32 ms) {
+    if (t._high != cast[nat32](0)) done yes;
+    done Time/mu(t: t) > (ms * 1000);
+  }
+  
+  func boo lesser(Time t, int32 ms) {
+    if (t._high != cast[nat32](0)) done no;
+    done Time/mu(t: t) < (ms * 1000);
+  }
+  
+  func Time add(Time a, Time b) {
+    Time r = Time(
+      _low = a._low + b._low,
+      _high = a._high + b._high);
+    if (r._low < a._low) r._high = r._high + cast[nat32](1);
+    done r;
+  }
+  
+  func Time sub(Time a, Time b) {
+    Time r = Time(_low=cast[nat32](0), _high=cast[nat32](0));
+    r._low = a._low - b._low;
+    nat32 borrow = cast[nat32](0);
+    if (a._low < b._low) borrow = cast[nat32](1);
+    r._high = a._high - b._high - borrow;
+  
+    done r;
+  }
+  
+  # note: this causes an error for big time differences, as a int32
+  # of microseconds can not be above somewhere over 35 minutes,
+  # additionally negative values where not tested.
+  func int32 mu(Time t) {
+    # perform x86 64-bit division of a: a / 10
+    ASM {
+      lea     ebx, SUS{t}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10              ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](t._low);
+  }
+  
+  func int32 ms(Time t) {
+    ASM {
+      lea     ebx, SUS{t}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10000           ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](t._low);
+  }
+  
+  func int32 diff_mu(Time a, Time b) {
+    a = sub(a: a, b: b);
+    ASM {
+      lea     ebx, SUS{a}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10              ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](a._low);
+  }
+  
+  func int32 diff_ms(Time a, Time b) {
+    a = sub(a: a, b: b);
+    ASM {
+      lea     ebx, SUS{a}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10000           ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](a._low);
+  }
+  
+  func print(Time t) {
+    PTR[int8] buffer = ARR[int8](32);
+    int32 _1 = Win/_i64toa_s(value: RTP[LargeInteger](t), buffer: buffer, bufferSize: cast[nat32](32), radix: 10);
+    #int32 len = Win/strnlen(buffer: buffer, size: 32);
+    System/print(s: buffer);
+  }
+  
 }
 
 package sus/Limits {
@@ -618,6 +1026,7 @@ package sus/List {
 
   struct List(
     PTR[ptr] _memory,
+    PTR[ptr] _memBlock,
     int32 _elementSize,
     int32 _capacity,
     int32 length
@@ -628,16 +1037,157 @@ package sus/List {
   }
 
   func List alloc(int32 elementSize, int32 capacity) {
+    PTR[ptr] memory = RTP[PTR[ptr]](Memory/malloc(bytes: elementSize * capacity));
     done List(
-      _memory = RTP[PTR[ptr]](Memory/malloc(bytes: elementSize * capacity)),
+      _memory = memory,
+      _memBlock = memory,
       _elementSize = elementSize,
       _capacity = capacity,
       length = 0
     );
   }
+  
+  func int32 _partition(
+    PTR[List]                                 this,
+    int32                                     low,
+    int32                                     high, 
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)]   compare
+  ) {
+    PTR[ptr] pivot = DRF(this)._memory + (high * DRF(this)._elementSize);
+    int32 i = low - 1;
+    
+    PTR[int8] swapBuffer = ARR[int8](DRF(this)._elementSize);
+    
+    int32 j = low;
+    while (j < high) {
+      PTR[ptr] elementj = DRF(this)._memory + (j * DRF(this)._elementSize);
+      
+      #funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] comp = compare;
+      int32 c = 0;
+      c = compare(a: elementj, b: pivot);
+      
+      #System/print(s: STR" compare: ");
+      #System/print(i_0x: DRF(RTP[PTR[int32]](elementj)));
+      #System/print(s: STR", ");
+      #System/print(i_0x: DRF(RTP[PTR[int32]](pivot)));
+      #System/print(s: STR" = ");
+      #System/print(i: c);
+      #System/println();
+      
+      if (c < 0) {
+        i = i + 1;
+        PTR[ptr] elementi = DRF(this)._memory + (i * DRF(this)._elementSize);
+        
+        swap(
+          a: RTP[ptr](elementi),
+          b: RTP[ptr](elementj),
+          buffer: RTP[ptr](swapBuffer),
+          bytes: DRF(this)._elementSize
+        );
+        
+        #System/print(i: i - 1);
+        #System/print(s: STR", ");
+        #System/print(i: j);
+        # System/println();
+        #System/println(s: STR" {");
+        #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+        #System/println(s: STR"}");
+      }
+      
+      j = j + 1;
+    }
+    
+    PTR[ptr] elementi1 = DRF(this)._memory + ((i + 1) * DRF(this)._elementSize);
+    PTR[ptr] elementh = DRF(this)._memory + ((high) * DRF(this)._elementSize);
+    
+    swap(a: RTP[ptr](elementi1), b: RTP[ptr](elementh), buffer: RTP[ptr](swapBuffer), bytes: DRF(this)._elementSize);
+    
+    done i + 1;
+  }
+  
+  func swap(ptr a, ptr b, ptr buffer, int32 bytes) {
+    if (RTP[int32](a) == RTP[int32](b)) done;
+    
+    int32 _1 = Memory/memcpy_s(
+      dest:     buffer,
+      destSize: Limits/INT32_MAX,
+      source:   b,
+      bytes:    bytes
+    );
+    int32 _2 = Memory/memcpy_s(
+      dest:     b,
+      destSize: Limits/INT32_MAX,
+      source:   a,
+      bytes:    bytes
+    );
+    int32 _3 = Memory/memcpy_s(
+      dest:     a,
+      destSize: Limits/INT32_MAX,
+      source:   buffer,
+      bytes:    bytes
+    );
+  }
+  
+  func sort(
+    PTR[List]                               this,
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] compare
+  ) {
+    sort(this: this, low: 0, high: DRF(this).length - 1, compare: compare); 
+  }
+  
+  func sort(
+    PTR[List]                               this,
+    int32                                   low,
+    int32                                   high,
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] compare
+  ) {
+    if (low < high) {
+      #System/print(s: STR" sort: ");
+      #System/print(i: low);
+      #System/print(s: STR", ");
+      #System/print(i: high);
+      #System/println();
+
+      #System/println(s: STR" [");
+      #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+      #System/println(s: STR"]");
+      
+      int32 pi = _partition(this: this, high: high, low: low, compare: compare);
+      
+      #System/println(s: STR"{");
+      #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+      #System/println(s: STR"}");
+      sort(this: this, low: low,    high: pi - 1, compare: compare);
+      sort(this: this, low: pi + 1, high: high,   compare: compare);
+    }
+  }
+
+  func addAll(PTR[List] this, PTR[List] other) {
+    if (DRF(this)._elementSize != DRF(other)._elementSize)
+      System/fatal(reason: STR"incompatible element sizes");
+    
+    checkGrow(this: this, amount: DRF(other).length);
+    
+    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    int32 _0 = Memory/memcpy_s(
+      dest:     RTP[ptr](end),
+      destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
+      source:   RTP[ptr](DRF(other)._memory),
+      bytes:    DRF(this)._elementSize * DRF(other).length
+    );
+    DRF(this).length = DRF(this).length + DRF(other).length;
+  }
 
   func free(PTR[List] this) {
-    Memory/free(pointer: RTP[ptr](DRF(this)._memory));
+    Memory/free(pointer: RTP[ptr](DRF(this)._memBlock));
+  }
+  
+  func removeFirst(PTR[List] this, int32 count) {
+    int32 newLength = DRF(this).length - count;
+    if (newLength < 0) System/fatal(reason: STR"removed negative count");
+    DRF(this)._memory = DRF(this)._memory + (count * DRF(this)._elementSize);
+    DRF(this).length = newLength;
+    DRF(this)._capacity = DRF(this)._capacity - count;
   }
   
   # expands the list, if (amount) items do not fit.
@@ -658,23 +1208,50 @@ package sus/List {
     );
 
     # remove old memory
-    Memory/free(pointer: RTP[ptr](DRF(this)._memory));
+    Memory/free(pointer: RTP[ptr](DRF(this)._memBlock));
 
     DRF(this)._memory = newMemory;
+    DRF(this)._memBlock = newMemory;
   }
+  
+  func PTR[ptr] add(PTR[List] this, int32 i) {
+    if (i > DRF(this).length) System/fatal(reason: STR"i > length");
 
-  func add(PTR[List] this, ptr element) {
+    checkGrow(this: this, amount: 1);
+
+    DRF(this).length = DRF(this).length + 1;
+    PTR[ptr] index = DRF(this)._memory + (i * DRF(this)._elementSize);
+    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    # move 1 element to the right, beginning from i
+    if (RTP[int32](index) < RTP[int32](end)) {
+      int32 _0 = Memory/memmove_s(
+        dest: RTP[ptr](index + DRF(this)._elementSize),
+        destSize: Limits/INT32_MAX, # hihi
+        source: RTP[ptr](index),
+        bytes: RTP[int32](end) - RTP[int32](index)
+      );
+    }
+    
+    done index;
+  }
+  
+  # adds element at the pointer *element* and returns pointer to the copy made into the list.
+  # *element* may be 0
+  func PTR[ptr] add(PTR[List] this, ptr element) {
     checkGrow(this: this, amount: 1);
 
     PTR[ptr] index = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
     DRF(this).length = DRF(this).length + 1;
     
+    if (RTP[int32](element) == 0) done index;
+
     int32 _0 = Memory/memcpy_s(
       dest:     RTP[ptr](index),
       destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
       source:   element,
       bytes:    DRF(this)._elementSize
     );
+    done index;
   }
 
   # removes the *i*th element
@@ -886,6 +1463,18 @@ package sus/System {
   use sus/native/Win;
   use sus/StringStream;
   
+  # required, when using subsystem: windows, to redirect std out to parent console
+  # if given, or have no console when opening program without console.
+  #
+  # if a debugger is attached the process will allocate it's own console window.
+  func initConsole() {
+    if (Win/IsDebuggerPresent()) {
+      boo _1 = Win/AllocConsole();
+    } else {
+      boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+    }
+  }
+  
   func fatal(PTR[int8] reason) {
     System/print(s: STR"A FATAL ERROR OCCURRED: ");
     System/print(s: reason);
@@ -896,13 +1485,17 @@ package sus/System {
 
   func print(PTR[StringStream] stream) {
     int32 i = 0;
-    boo _r = Win/WriteFile(
-	    file:       Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE),
+    int32 file = Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE);
+    boo _1 = Win/WriteFile(
+	    file:       file,
 	    buffer:     DRF(stream).buffer,
 	    length:     DRF(stream).position,
 	    written:    RTP[PTR[int32]](0),
 	    overlapped: RTP[PTR[ptr]](0)
 	  );
+    boo _2 = Win/FlushFileBuffers(
+      handle: file
+    );
   }
   
   func println(PTR[StringStream] stream) {
@@ -915,6 +1508,10 @@ package sus/System {
   }
 
   func exit(int32 code) {
+    boo _1 = Win/FlushFileBuffers(
+      handle: Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE)
+    );
+  
     Win/ExitProcess(code: code);
   }
 
@@ -930,6 +1527,7 @@ package sus/System {
 	    written:    RTP[PTR[int32]](0),
 	    overlapped: RTP[PTR[ptr]](0)
 	  );
+    
   }
 
   func print(real32 r) {
@@ -972,13 +1570,13 @@ package sus/System {
   }
 
   func print(boo b) {
-    if (b) print(s:STR"1");
-    else print(s:STR"0");
+    if (b) print(s: STR"yes");
+    else print(s: STR"no");
   }
 
   func println(boo b) {
-    if (b) print(s:STR"1\n");
-    else print(s:STR"0\n");
+    if (b) print(s: STR"yes\n");
+    else print(s: STR"no\n");
   }
 
   func print(int32 i_0x) {
