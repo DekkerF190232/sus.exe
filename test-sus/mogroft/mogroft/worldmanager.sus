@@ -4,6 +4,7 @@ package mogroft/world/WorldManager {
   use sus/Math;
   use sus/List;
   use sus/Time;
+  use sus/Memory;
   use sus/Thread;
   use sus/Mutex;
   
@@ -31,6 +32,7 @@ package mogroft/world/WorldManager {
   
   struct ChunkEventHandler(
     funcptr[(PTR[Chunk] chunk)] onLoaded,
+    funcptr[(PTR[Vec3i] blockCoord)] onBlockChange,
     funcptr[(PTR[ChunkCoord] chunkCoord)] onUnloaded
   );
 
@@ -52,6 +54,39 @@ package mogroft/world/WorldManager {
     DRF(this).world = world;
   }
   
+  func boo trySet(PTR[WorldManager] this, int32 x, int32 y, int32 z, Block block) {
+    ChunkCoord chunkCoord = ChunkCoord(
+      x = Math/floor_divi(x: x, y: Chunk/SIZE),
+      y = Math/floor_divi(x: y, y: Chunk/SIZE),
+      z = Math/floor_divi(x: z, y: Chunk/SIZE)
+    );
+    
+    PTR[Chunk] chunk = ChunkList/find(
+      this: REF(DRF(DRF(this).world).chunkList),
+      chunkCoord: chunkCoord
+    );
+    
+    if (RTP[int32](chunk) == 0) done no;
+    
+    if (cast[int32](block.id) != cast[int32](Blocks/BLOCK_AIR.id))
+      DRF(chunk).isAir = no;
+    
+    PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));
+    
+    PTR[Block] blockTarget = blocks +
+         ((z - (chunkCoord.z * Chunk/SIZE)) * Chunk/SIZE * Chunk/SIZE) +
+         ((y - (chunkCoord.y * Chunk/SIZE)) * Chunk/SIZE) +
+          (x - (chunkCoord.x * Chunk/SIZE));
+          
+    DRF(blockTarget) = block;
+    
+    funcptr[(PTR[Vec3i] blockCoord)] onBlockChangeFunc = DRF(this).chunkEventHandler.onBlockChange;
+    Vec3i blockCoord = Vec3i(x=x,y=y,z=z);
+    onBlockChangeFunc(blockCoord: REF(blockCoord));
+    
+    done yes;
+  }
+  
   func init(PTR[WorldManager] this) {
     Thread genThread = Thread/new(
       run: RTP[funcptr[(ptr param)]](funcref(_runGenerator)),
@@ -71,8 +106,8 @@ package mogroft/world/WorldManager {
     int32 y = (cast[int32](DRF(DRF(this).world).player.position.y) + (Chunk/SIZE / 2)) / Chunk/SIZE;
     int32 z = (cast[int32](DRF(DRF(this).world).player.position.z) + (Chunk/SIZE / 2)) / Chunk/SIZE;
     
-    int32 flatRange = 6;
-    int32 yRange = 6;
+    int32 flatRange = 5;
+    int32 yRange = 4;
     
     PTR[List] chunkListList = REF(DRF(DRF(this).world).chunkList.list);
     PTR[ChunkList] chunkList = REF(DRF(DRF(this).world).chunkList);
@@ -194,12 +229,12 @@ package mogroft/world/WorldManager {
         PTR[Chunk] newChunk = ChunkList/add(this: REF(localChunks));
         DRF(newChunk).chunkCoord = DRF(chunkCoord);
         generateChunk(chunk: newChunk);
-        if (DRF(newChunk).isAir == no) {
+        #if (DRF(newChunk).isAir == no) {
           #System/print(s: STR"generated real: ");
           #print(chunkCoord: REF(DRF(newChunk).chunkCoord));
           #System/println();
           realGenerated = realGenerated + 1;
-        }
+        #}
         i = i + 1;
       }
       #System/println(s: STR"generated chunks");
@@ -258,8 +293,8 @@ package mogroft/world/WorldManager {
     int32 y = (cast[int32](DRF(DRF(this).world).player.position.y) + (Chunk/SIZE / 2)) / Chunk/SIZE;
     int32 z = (cast[int32](DRF(DRF(this).world).player.position.z) + (Chunk/SIZE / 2)) / Chunk/SIZE;
     
-    int32 flatRange = 4;
-    int32 yRange = 3;
+    int32 flatRange = 3;
+    int32 yRange = 2;
     
     PTR[ChunkList] chunkList = REF(DRF(DRF(this).world).chunkList);
     PTR[ChunkCoordList] queue = REF(DRF(this)._queue);
@@ -330,10 +365,19 @@ package mogroft/world/WorldManager {
     #Time timePerlin = Time/zero();
     #int32 countPerlin = 0;
     
-    DRF(chunk).isAir = willBeAir(chunkCoord: REF(DRF(chunk).chunkCoord));
-    if (DRF(chunk).isAir) done;
-    
     PTR[Block] blocks = RTP[PTR[Block]](REF(DRF(chunk).blocks));
+    
+    DRF(chunk).isAir = willBeAir(chunkCoord: REF(DRF(chunk).chunkCoord));
+    if (DRF(chunk).isAir) {
+      # set to 1 for air
+      #int32 s = Chunk/SIZE * Chunk/SIZE * Chunk/SIZE;
+      #int32 i = 0;
+      #while (i < s) {
+      #  DRF(blocks + (s * size[Block]())) = Blocks/BLOCK_AIR;
+      #  i = i + 1;
+      #}
+      done;
+    }
     
     int32 z = 0;
     while (z < Chunk/SIZE) {

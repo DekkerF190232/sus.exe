@@ -1015,6 +1015,219 @@ package sus/Memory {
 
 }
 
+package sus/Map {
+
+  use sus/Memory;
+  use sus/List;
+  use sus/System;
+  use sus/Math;
+  
+  static real32 MAX_LOAD_FACTOR = 3.0;
+  static real32 RESIZE_LOAD_FACTOR = 1.0;
+  
+  static int32 INITIAL_CAPACITY = 32;
+
+  struct Map(
+    PTR[HashBucket] _buckets,
+    int32 length,
+    int32 _capacity,
+    funcptr[int32 (ptr key)] _hash,
+    funcptr[boo (ptr keya, ptr keyb)] equals
+  );
+  
+  struct HashBucket(List list);
+  
+  struct HashEntry(ptr key, ptr value);
+  
+  # _i = bucket index, _j = entry index
+  struct Pos(int32 _i, int32 _j);
+  
+  func Map alloc(
+    funcptr[int32 (ptr key)] hash,
+    funcptr[boo (ptr keya, ptr keyb)] equals
+  ) {
+    done Map/alloc(hash:hash, equals:equals, capacity: INITIAL_CAPACITY);
+  }
+  
+  func Map alloc(
+    funcptr[int32 (ptr key)] hash,
+    funcptr[boo (ptr keya, ptr keyb)] equals,
+    int32 capacity
+  ) {
+    done Map(
+      length = 0,
+      _buckets = allocateBuckets(capacity: capacity),
+      _capacity = capacity,
+      _hash = hash,
+      equals = equals
+    );
+  }
+  
+  func Pos first(PTR[Map] this) {
+    Pos pos = Pos(_i = 0, _j = 0);
+    while (pos._i < DRF(this)._capacity) {
+      PTR[HashBucket] bucket = DRF(this)._buckets + (pos._i * size[HashBucket]());
+      if (DRF(bucket).list.length > 0)
+        done pos;
+      pos._i = pos._i + 1;
+    }
+    done pos;
+  }
+  
+  # advances pos and gives element at the position
+  # if pos is out of bounds entry will be 0.
+  func iterate(PTR[Map] this, PTR[Pos] pos, PTR[PTR[HashEntry]] entry) {
+    DRF(entry) = RTP[PTR[HashEntry]](0);
+    if (DRF(pos)._i >= DRF(this)._capacity) 
+      done;
+    
+    PTR[HashBucket] bucket = DRF(this)._buckets +
+                        (DRF(pos)._i * size[HashBucket]());
+    DRF(entry) = RTP[PTR[HashEntry]](DRF(bucket).list._memory) +
+                    (DRF(pos)._j * size[HashEntry]());
+    
+    #System/println(s: STR"wt3");
+              
+    if (DRF(pos)._j < (DRF(bucket).list.length - 1)) {
+      # advance bucket entry index
+      DRF(pos)._j = DRF(pos)._j + 1;
+      done;
+    }
+
+    # advance bucket index
+    DRF(pos)._i = DRF(pos)._i + 1;
+    DRF(pos)._j  = 0;
+    while (DRF(pos)._i < DRF(this)._capacity) {
+      PTR[HashBucket] nextBucket = DRF(this)._buckets + (DRF(pos)._i * size[HashBucket]());
+      if (DRF(nextBucket).list.length > 0)
+        done;
+      DRF(pos)._i = DRF(pos)._i + 1;
+    }
+  }
+  
+  func PTR[HashBucket] allocateBuckets(int32 capacity) {
+    PTR[HashBucket] buckets = RTP[PTR[HashBucket]](
+      Memory/malloc(bytes: size[HashBucket]() * capacity
+    ));
+    PTR[HashBucket] bucket = buckets;
+    PTR[HashBucket] end = bucket + (size[HashBucket]() * capacity);
+    while (RTP[int32](bucket) != RTP[int32](end)) {
+      DRF(bucket) = HashBucket(
+        list = List/alloc(elementSize: size[HashEntry](), capacity: 16)
+      );
+      bucket = bucket + (size[HashBucket]());
+    }
+    done buckets;
+  }
+  
+  func free(PTR[Map] this) {
+    PTR[HashBucket] bucket = DRF(this)._buckets;
+    PTR[HashBucket] end = bucket + (size[HashBucket]() * DRF(this)._capacity);
+    while (RTP[int32](bucket) != RTP[int32](end)) {
+      List/free(this: REF(DRF(bucket).list));
+      bucket = bucket + (size[HashBucket]());
+    }
+    Memory/free(pointer: RTP[ptr](DRF(this)._buckets));
+  }
+  
+  func checkRehash(PTR[Map] this, int32 inserted) {
+    real32 loadFactor = cast[real32](DRF(this).length + inserted) / cast[real32](DRF(this)._capacity);
+    if (loadFactor < MAX_LOAD_FACTOR) done;
+    
+    Map backup = DRF(this);
+    
+    # resize buckets
+    DRF(this)._capacity = cast[int32](cast[real32](DRF(this).length + inserted) / RESIZE_LOAD_FACTOR) + 1; # length / loadFactor = capacity
+    DRF(this)._buckets = allocateBuckets(capacity: DRF(this)._capacity);
+    
+    # transfer the entries
+    Pos pos = Map/first(this: REF(backup));
+    PTR[HashEntry] entry = RTP[PTR[HashEntry]](0);
+    Map/iterate(this: REF(backup), pos: REF(pos), entry: REF(entry));
+    while (RTP[int32](entry) != 0) {
+      ptr _1 = Map/put(this: this, key: DRF(entry).key, value: DRF(entry).value);
+      Map/iterate(this: REF(backup), pos: REF(pos), entry: REF(entry));
+    }
+    
+    Map/free(this: REF(backup));
+  }
+  
+  func PTR[HashEntry] findEntry(PTR[Map] this, PTR[HashBucket] bucket, ptr key) {
+    funcptr[boo (ptr keya, ptr keyb)] equalsFunc = DRF(this).equals;
+    PTR[HashEntry] entry = RTP[PTR[HashEntry]](DRF(bucket).list._memory);
+    PTR[HashEntry] end = entry + (DRF(bucket).list.length * size[HashEntry]());
+    while (RTP[int32](entry) != RTP[int32](end)) {
+      if (equalsFunc(keya: key, keyb: DRF(entry).key)) done entry;
+      entry = entry + size[HashEntry]();
+    }
+    done RTP[PTR[HashEntry]](0);
+  }
+  
+  # gets value or 0 if not found
+  func ptr get(PTR[Map] this, ptr key) {
+    funcptr[int32 (ptr key)] hashFunc = DRF(this)._hash;
+    int32 i = Math/absi(x: hashFunc(key: key)) % DRF(this)._capacity;
+    
+    PTR[HashBucket] bucket = DRF(this)._buckets + (size[HashBucket]() * i);
+    
+    PTR[HashEntry] entry = findEntry(this: this, bucket: bucket, key: key);
+    if (RTP[int32](entry) == 0) done RTP[ptr](0);
+    
+    done DRF(entry).value;
+  }
+  
+  # removes and returns value or 0 if not found
+  func ptr remove(PTR[Map] this, ptr key) {
+    funcptr[int32 (ptr key)] hashFunc = DRF(this)._hash;
+    int32 i = Math/absi(x: hashFunc(key: key)) % DRF(this)._capacity;
+    
+    PTR[HashBucket] bucket = DRF(this)._buckets + (size[HashBucket]() * i);
+    
+    PTR[HashEntry] entry = findEntry(this: this, bucket: bucket, key: key);
+    if (RTP[int32](entry) == 0) done RTP[ptr](0);
+    
+    List/remove(this: REF(DRF(bucket).list), index: RTP[PTR[ptr]](entry));
+    DRF(this).length = 0;
+    
+    done DRF(entry).value;
+  }
+  
+  func clear(PTR[Map] this) {
+    PTR[HashBucket] bucket = DRF(this)._buckets;
+    PTR[HashBucket] end    = bucket + (size[HashBucket]() * DRF(this)._capacity);
+    while (RTP[int32](bucket) != RTP[int32](end)) {
+      List/clear(this: REF(DRF(bucket).list));
+      bucket = bucket + (size[HashBucket]());
+    }
+    DRF(this).length = 0;
+  }
+  
+  # inserts or overwrites value assigned to key
+  # returns old value, if existant. 0 otherwise
+  func ptr put(PTR[Map] this, ptr key, ptr value) {
+    checkRehash(this: this, inserted: 1);
+    
+    funcptr[int32 (ptr key)] hashFunc = DRF(this)._hash;
+    int32 i = Math/absi(x: hashFunc(key: key)) % DRF(this)._capacity;
+    PTR[HashBucket] bucket = DRF(this)._buckets + (size[HashBucket]() * i);
+    
+    PTR[HashEntry] entry = findEntry(this: this, bucket: bucket, key: key);
+    ptr existant = RTP[ptr](0);
+    if (RTP[int32](entry) == 0) {
+      entry = RTP[PTR[HashEntry]](
+        List/add(this: REF(DRF(bucket).list), element: RTP[ptr](0))
+      );
+      DRF(this).length = DRF(this).length + 1;
+    } else
+      existant = DRF(entry).value;
+    
+    DRF(entry) = HashEntry(key = key, value = value);
+    
+    done existant;
+  }
+
+}
+
 package sus/List {
 
   static int32 INITIAL_CAPACITY = 16;

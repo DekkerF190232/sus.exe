@@ -4,6 +4,8 @@ package mogroft/Mogroft {
 
   use sus/System;
   
+  use mogroft/algebra/Vec3i;
+  
   use mogroft/Window;
   use mogroft/Renderer;
   use mogroft/Controls;
@@ -28,6 +30,7 @@ package mogroft/Mogroft {
       rendererState = Renderer/new_RendererState(),
       worldManager = WorldManager/new(chunkEventHandler: ChunkEventHandler(
         onLoaded = funcref(onChunkLoaded),
+        onBlockChange = funcref(onBlockChange),
         onUnloaded = funcref(onChunkUnloaded)
       )),
       playerController = PlayerController/new()
@@ -55,6 +58,10 @@ package mogroft/Mogroft {
   
   func onChunkLoaded(PTR[Chunk] chunk) {
     Renderer/onChunkLoaded(this: REF(DRF(_mogroft).rendererState), chunk: chunk);
+  }
+  
+  func onBlockChange(PTR[Vec3i] blockCoord) {
+    Renderer/onBlockChange(this: REF(DRF(_mogroft).rendererState), blockCoord: blockCoord);
   }
   
   # game loop events

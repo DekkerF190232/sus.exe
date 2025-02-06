@@ -41,6 +41,8 @@ FEATURE EVALUATION
     - no initialization code
 
 BUGS
+  - System/println(b: equals(keya: RTP[ptr](STR""), keyb: RTP[ptr](STR""))); # does not parse
+
   - if scope is null (bc in static expression) some expression compilations result in js errors
   - "struct not found", but no error location because of context builder
   - no duplicate symbol checking for static variables or functions, maybe not even structs

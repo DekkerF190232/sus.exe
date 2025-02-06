@@ -33,15 +33,15 @@ package mogroft/world/World {
       y = Math/floor_divi(x: y, y: Chunk/SIZE),
       z = Math/floor_divi(x: z, y: Chunk/SIZE)
     );
-    if (Debug/critical) {
-      System/print(s: STR"  tryget: blockcoord: ");
-      System/print(i: x);
-      System/print(s: STR",");
-      System/print(i: y);
-      System/print(s: STR",");
-      System/print(i: z);
-      System/println();
-    }
+    #if (Debug/ritical) {
+    #  System/print(s: STR"  tryget: blockcoord: ");
+    #  System/print(i: x);
+    #  System/print(s: STR",");
+    #  System/print(i: y);
+    #  System/print(s: STR",");
+    #  System/print(i: z);
+    #  System/println();
+    #}
     
     PTR[Chunk] chunk = ChunkList/find(
       this: REF(DRF(this).chunkList),

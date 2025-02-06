@@ -136,6 +136,7 @@ package mogroft/InputHandlerFly {
   
   use mogroft/Controls;
   use mogroft/Mogroft;
+  use mogroft/PlayerController;
   
   use mogroft/algebra/Vec3;
   use mogroft/algebra/Vec3i;
@@ -246,6 +247,12 @@ package mogroft/InputHandlerFly {
       Settings/inst.collision = Settings/inst.collision == no;
     } else if (vk == vkT) {
       Debug/test();
+    } else if (vk == Win/VK_LBUTTON) {
+      PTR[PlayerController] playerController = REF(DRF(Mogroft/_mogroft).playerController);
+      PlayerController/initiateAttack(this: playerController);
+    } else if (vk == Win/VK_RBUTTON) {
+      PTR[PlayerController] playerController = REF(DRF(Mogroft/_mogroft).playerController);
+      PlayerController/initiateInteract(this: playerController);
     }
   }
   

@@ -1,0 +1,108 @@
+package Main {
+
+  use sus/System;
+  use sus/Map;
+
+  func int32 hash(ptr key) {
+    #PTR[int8] string = RTP[PTR[int8]](key);
+    # https://stackoverflow.com/questions/7666509/hash-function-for-string
+    int32 hash = 5381;
+    PTR[int8] char = RTP[PTR[int8]](key);
+    while (RTP[int32](DRF(char)) != 0) {
+      hash = ((hash << cast[int8](8)) + hash) + cast[int32](DRF(char)); 
+      char = char + 1;
+    }
+    done hash;
+  }
+  
+  func boo equals(ptr keya, ptr keyb) {
+    if (RTP[int32](keya) == RTP[int32](keyb))
+      done yes;
+    
+    PTR[int8] chara = RTP[PTR[int8]](keya);
+    PTR[int8] charb = RTP[PTR[int8]](keyb);
+    while (RTP[int32](DRF(chara)) != 0 && (RTP[int32](DRF(charb)) != 0)) {
+      if (cast[int32](DRF(chara)) != cast[int32](DRF(charb))) done no;
+      
+      chara = chara + 1;
+      charb = charb + 1;
+    }
+    done cast[int32](DRF(chara)) == cast[int32](DRF(charb));
+  }
+
+  main {
+    System/initConsole();
+    
+    Pos p = Pos(_i = 0, _j = 0);
+    
+    #testEquals();
+    #testHash();
+    testMap();
+
+    System/println(s: STR"done.");
+
+    System/exit(code: 0);
+  }
+  
+  func testMap() {
+    Map map = Map/alloc(hash: funcref(hash), equals: funcref(equals), capacity: 1);
+    
+    ptr _3 = Map/put(this: REF(map), key: RTP[ptr](STR "c"), value: RTP[ptr](STR"value 3"));
+    ptr _1 = Map/put(this: REF(map), key: RTP[ptr](STR "a"), value: RTP[ptr](STR"value 1"));
+    ptr _2 = Map/put(this: REF(map), key: RTP[ptr](STR "b"), value: RTP[ptr](STR"value 2"));
+    ptr _4 = Map/put(this: REF(map), key: RTP[ptr](STR "nword"), value: RTP[ptr](STR"value of nword"));
+    ptr _5 = Map/put(this: REF(map), key: RTP[ptr](STR "when the imposter is sus"), value: RTP[ptr](STR"value of nword lol"));
+    ptr _6 = Map/put(this: REF(map), key: RTP[ptr](STR "when the imposter is sus"), value: RTP[ptr](STR"nvm just sussy"));
+    
+    ptr _3_removed = Map/remove(this: REF(map), key: RTP[ptr](STR "c"));
+    
+    PTR[int8] valueNword = RTP[PTR[int8]](Map/get(this: REF(map), key: RTP[ptr](STR "when the imposter is sus")));
+    System/print(s: STR"wtis=");
+    System/println(s: valueNword);
+    
+    
+    int32 valueNotFound = RTP[int32](Map/get(this: REF(map), key: RTP[ptr](STR "when the imposter is NOT IN FACT sus")));
+    System/println(i_0x: valueNotFound);
+    
+    Pos pos = Map/first(this: REF(map));
+    PTR[HashEntry] entry = RTP[PTR[HashEntry]](0);
+    Map/iterate(this: REF(map), pos: REF(pos), entry: REF(entry));
+    while (RTP[int32](entry) != 0) {
+      PTR[int8] key = RTP[PTR[int8]](DRF(entry).key);
+      PTR[int8] value = RTP[PTR[int8]](DRF(entry).value);
+      System/print(s: key);
+      System/print(s: STR" -> ");
+      System/print(s: value);
+      System/println();
+      Map/iterate(this: REF(map), pos: REF(pos), entry: REF(entry));
+    }
+  }
+  
+  func testHash() {
+    System/println(s: STR"expecting mostly different values:");
+    
+    System/println(i_0x: hash(key: RTP[ptr](STR"")));
+    System/println(i_0x: hash(key: RTP[ptr](STR"a")));
+    System/println(i_0x: hash(key: RTP[ptr](STR"b")));
+    System/println(i_0x: hash(key: RTP[ptr](STR"bc")));
+    System/println(i_0x: hash(key: RTP[ptr](STR"abcd")));
+    System/println(i_0x: hash(key: RTP[ptr](STR"abf")));
+    System/println(i_0x: hash(key: RTP[ptr](STR"rdartsab remmud")));
+  }
+  
+  func testEquals() {
+    System/println(s: STR"expecting only yes:");
+    
+    System/println(b: equals(keya: RTP[ptr](STR"asdf"), keyb: RTP[ptr](STR"asdf")));
+    
+    int32 empty = 0;
+    System/println(b: equals(keya: RTP[ptr](STR""), keyb: RTP[ptr](REF(empty))));
+    
+    System/println(b: equals(keya: RTP[ptr](STR"asdf"), keyb: RTP[ptr](STR"bdf")) == no);
+    
+    System/println(b: equals(keya: RTP[ptr](STR"bdf"), keyb: RTP[ptr](STR"asdf")) == no);
+    
+    System/println();
+  }
+
+}

@@ -28,6 +28,36 @@ package mogroft/PlayerController {
     );
   }
   
+  func initiateAttack(PTR[PlayerController] this) {
+    PTR[MogroftState] mogroft = Mogroft/_mogroft;
+    PTR[WorldManager] worldManager = REF(DRF(mogroft).worldManager);
+    PTR[World] world = DRF(worldManager).world;
+    PTR[Player] player = REF(DRF(world).player);
+    
+    if (DRF(this).hoverState == HOVER_BLOCK) {
+      boo _1 = WorldManager/trySet(this: worldManager,
+        x: DRF(this).hoveredBlock.x,
+        y: DRF(this).hoveredBlock.y,
+        z: DRF(this).hoveredBlock.z,
+        block: Blocks/BLOCK_AIR);
+    }
+  }
+  
+  func initiateInteract(PTR[PlayerController] this) {
+    PTR[MogroftState] mogroft = Mogroft/_mogroft;
+    PTR[WorldManager] worldManager = REF(DRF(mogroft).worldManager);
+    PTR[World] world = DRF(worldManager).world;
+    PTR[Player] player = REF(DRF(world).player);
+    
+    if (DRF(this).hoverState == HOVER_BLOCK) {
+      boo _1 = WorldManager/trySet(this: worldManager,
+        x: DRF(this).hoveredBlock.x,
+        y: DRF(this).hoveredBlock.y,
+        z: DRF(this).hoveredBlock.z,
+        block: Blocks/BLOCK_STONE);
+    }
+  }
+  
   func tick(PTR[PlayerController] this, real32 dt) {
     PTR[MogroftState] mogroft = Mogroft/_mogroft;
     PTR[WorldManager] worldManager = REF(DRF(mogroft).worldManager);

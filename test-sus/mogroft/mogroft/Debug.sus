@@ -84,7 +84,7 @@ package Debug {
   }
   
   func doReport() {
-    done;
+    #done;
     
     PTR[MogroftState] mogroft = Mogroft/_mogroft;
     PTR[WorldManager] worldManager = REF(DRF(mogroft).worldManager);

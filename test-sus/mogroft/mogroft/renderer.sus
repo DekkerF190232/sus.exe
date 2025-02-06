@@ -7,6 +7,8 @@ package mogroft/Renderer {
   use sus/Memory;
   use sus/StringStream;
   
+  use mogroft/algebra/Vec3i;
+  
   use mogroft/Texture;
   use mogroft/Mogroft;
   use mogroft/world/World;
@@ -48,6 +50,10 @@ package mogroft/Renderer {
   
   func onChunkUnloaded(PTR[RendererState] this, PTR[ChunkCoord] chunkCoord) {
     ChunkRender/onChunkUnloaded(this: REF(DRF(this).worldRender.chunkRender), renderer: this, chunkCoord: chunkCoord);
+  }
+  
+  func onBlockChange(PTR[RendererState] this, PTR[Vec3i] blockCoord) {
+    ChunkRender/onBlockChange(this: REF(DRF(this).worldRender.chunkRender), renderer: this, blockCoord: blockCoord);
   }
   
   # game loop events
@@ -577,6 +583,7 @@ package mogroft/render/ChunkRender {
   use mogroft/Texture;
   use mogroft/Mogroft;
   use mogroft/algebra/Vec3;
+  use mogroft/algebra/Vec3i;
   
   use mogroft/world/World;
   use mogroft/world/Chunk;
@@ -668,6 +675,18 @@ package mogroft/render/ChunkRender {
     
     ChunkCoord coord = DRF(chunk).chunkCoord;
     
+    PTR[ptr] _1 = List/add(
+      this:     REF(DRF(this).chunkQueue),
+      element:  RTP[ptr](REF(coord))
+    );
+  }
+  
+  func onBlockChange(PTR[ChunkRender] this, PTR[RendererState] renderer, PTR[Vec3i] blockCoord) {
+    ChunkCoord coord = ChunkCoord(
+      x = Math/floor_divi(x: DRF(blockCoord).x, y: Chunk/SIZE),
+      y = Math/floor_divi(x: DRF(blockCoord).y, y: Chunk/SIZE),
+      z = Math/floor_divi(x: DRF(blockCoord).z, y: Chunk/SIZE)
+    );
     PTR[ptr] _1 = List/add(
       this:     REF(DRF(this).chunkQueue),
       element:  RTP[ptr](REF(coord))
