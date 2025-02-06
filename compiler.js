@@ -1041,16 +1041,16 @@ function parse(state) {
           let first = true;
           while (!eat(/^\>/)) {
             if (eof()) throw err('unexpected eof');
-  
+
             if (!first) {
               eatPicky(',');
               eatEmpty();
             }
             first = false;
-  
+
             let symbol = eatSymbol();
             state.n.props.names.push(symbol);
-            eatEmpty(); 
+            eatEmpty();
           }
           eatEmpty();
         });
@@ -1235,14 +1235,14 @@ function parse(state) {
           let first = true;
           while (!eat(/^\>/)) {
             if (eof()) throw err('unexpected eol');
-            
+
             if (!first && !eat(/^,/)) return;
             eatEmpty();
 
             let t = tryParseType();
             if (!t) return;
             args.push(t);
-            
+
             first = false;
           }
           eatEmpty();
@@ -2577,7 +2577,7 @@ function compile(state) {
     if (sig) {
       for (const param of sig.params) {
         if (findSymTableLoc(scope, param.name))
-          throw makeErr(param.i, 'duplicate symbol: ' + param.name);
+          throw makeErr(listIns.i, 'duplicate symbol: ' + param.name);
         let size = evalSize4(param.type);
         table.rows.push(makeSymTableRow(param.name, param.type, argOff, size));
         argOff += size;
@@ -3093,7 +3093,7 @@ function compile(state) {
 
         let off = symRow.off + chain.off;
 
-        r += compileCopy1('esp', 0, 'ebp', off, memberSizeBytes);
+        r += compileCopy1('esp', 0, symRes.register, off, memberSizeBytes);
         r += line(`add     esp, ${memberSizeBytes}`);
 
         r += line();
@@ -3431,7 +3431,15 @@ function compile(state) {
       //  console.log('hi');
       //}
       let sig = resolveFuncSig(symbol, paramNames, addressScope);
-      if (!sig) throw makeErr(expr.i, 'could not find function ' + symbol + '(' + paramNames.join(', ') + ')');
+      if (!sig)
+        throw makeErr(
+          expr.i,
+          'could not find function ' +
+            symbol +
+            '(' +
+            paramNames.join(', ') +
+            ')'
+        );
       let asmName = sig.asmName;
       if (state.name !== sig.unitPath && !tableExternals.includes(asmName)) {
         tableExternals.push(asmName);
@@ -4094,7 +4102,8 @@ function compile(state) {
     switch (op) {
       // http://unixwiz.net/techtips/x86-jumps.html
       case '==':
-        if (exprATypeName === 'boo') return compileExprOpCompBoo(exprOp, scope, addressScope, 'sete');
+        if (exprATypeName === 'boo')
+          return compileExprOpCompBoo(exprOp, scope, addressScope, 'sete');
         return compileExprOpComp(exprOp, scope, addressScope, 'sete');
       case '!=':
         return compileExprOpComp(exprOp, scope, addressScope, 'setne');
@@ -4295,7 +4304,7 @@ function compile(state) {
     r += line(`fst     dword [esp]`);
     return r;
   }
-  
+
   function compileExprOpCompBoo(exprOp, scope, addressScope, inst) {
     let a = exprOp.kids[0];
     let b = exprOp.kids[1];
@@ -4313,7 +4322,6 @@ function compile(state) {
 
     return asm;
   }
-  
 
   function compileExprOpComp(exprOp, scope, addressScope, inst) {
     let a = exprOp.kids[0];
