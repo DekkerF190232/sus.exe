@@ -1,0 +1,53 @@
+package test/Main {
+
+  use sus/System;
+  use sus/File;
+  use sus/Prof;
+  use sus/List;
+  use sus/Thread;
+  use sus/c/CString;
+
+  main {
+    System/initConsole();
+    Prof/init();
+    
+    mainFunc();
+
+    System/println(s: STR"making report...");
+    List report = Prof/createReport(thread: Thread/current());
+    System/println(s: STR"made report.");
+    
+    File/write(file: STR"report.txt", data: RTP[PTR[int8]](report._memory), length: report.length);
+    List/free(this: REF(report));
+
+    System/exit(code: 0);
+  }
+
+  func mainFunc() {
+    Prof/begin(name: $HERE);
+    call(n: 6);
+    Prof/end(name: $HERE);
+  }
+
+  func call(int32 n) {
+    if (n == 0) done;
+    
+    Prof/begin(name: $HERE);
+    while (n > 0) {
+      doMethod(n: n);
+      n = n - 1;
+    }
+    Prof/end(name: $HERE);
+  }
+
+  func doMethod(int32 n) {
+    Prof/begin(name: $HERE);
+    Thread/sleep(ms: (n + (n % 2)) * 50);
+    Prof/end(name: $HERE);
+  }
+
+  func doTest2() {
+    System/println(s: $HERE);
+  }
+  
+}

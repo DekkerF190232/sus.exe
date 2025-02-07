@@ -1,0 +1,2198 @@
+
+package sus/c/CMath {
+  
+  #func CON(cdecl) real64 sin(real64 x) EXT;
+  #func CON(cdecl) real64 cos(real64 x) EXT;
+  
+  func CON(cdecl) real64 floor(real64 x) EXT;
+  func CON(cdecl) real64 ceil(real64 x) EXT;
+  func CON(cdecl) real64 tan(real64 x) EXT;
+  func CON(cdecl) real64 sin(real64 x) EXT;
+  func CON(cdecl) real64 cos(real64 x) EXT;
+  func CON(cdecl) real64 sqrt(real64 x) EXT;
+  
+}
+
+package sus/c/CString {
+
+  use sus/Limits;
+  use sus/native/Win;
+  
+  func int32 length(PTR[int8] string) {
+    done Win/strnlen(buffer: string, size: Limits/INT32_MAX);
+  }
+  
+  func toString(int32 i, PTR[int8] buffer, int32 length) {
+    Win/_itoa_s(value: i, buffer: buffer, size: length, radix: 10);
+  }
+  
+  func int32 hash(PTR[int8] string) {
+    # https://stackoverflow.com/questions/7666509/hash-function-for-string
+    int32 hash = 5381;
+    PTR[int8] char = string;
+    while (RTP[int32](DRF(char)) != 0) {
+      hash = ((hash << cast[int8](8)) + hash) + cast[int32](DRF(char)); 
+      char = char + 1;
+    }
+    done hash;
+  }
+  
+  func boo equals(PTR[int8] stringa, PTR[int8] stringb) {
+    if (RTP[int32](stringa) == RTP[int32](stringb))
+      done yes;
+    
+    PTR[int8] chara = stringa;
+    PTR[int8] charb = stringb;
+    while (RTP[int32](DRF(chara)) != 0 && (RTP[int32](DRF(charb)) != 0)) {
+      if (cast[int32](DRF(chara)) != cast[int32](DRF(charb))) done no;
+      chara = chara + 1;
+      charb = charb + 1;
+    }
+    done cast[int32](DRF(chara)) == cast[int32](DRF(charb));
+  }
+
+}
+
+package sus/Math {
+
+  use sus/c/CMath;
+
+  static real32 PI = 3.14159265359;
+  static real32 2PI = 6.28318530718;
+  static real32 SQRT2 = 1.41421356237;
+  
+  func real32 absf(real32 x) {
+    if (x < 0.0) done 0.0 - x;
+    done x;
+  }
+  
+  func real32 normf(real32 x) {
+    if (x < 0.0) done -1.0;
+    done 1.0;
+  }
+  
+  func int32 normfi(real32 x) {
+    if (x < 0.0) done -1;
+    done 1;
+  }
+  
+  func int32 absi(int32 x) {
+    if (x < 0) done 0 - x;
+    done x;
+    #done x & @7fffffff;
+  }
+  
+  func int32 floor_divi(int32 x, int32 y) {
+    # http://blog.pkh.me/p/36-figuring-out-round%2C-floor-and-ceil-with-integer-division.html
+    
+    ASM {
+      ; eax:edx = dividend
+      mov     eax, SUS{x}
+      cdq
+      
+      ; eax = quotient
+      ; edx = remainder
+      idiv    dword SUS{y}
+      
+      ; sub one, when there is a remainder and the result is negative.
+      sar     edx, 31
+      and     edx, 1
+      sub     eax, edx
+      
+      mov     SUS{x}, eax
+    }
+    
+    # x was reused as result
+    done x;
+  }
+  
+  func int32 floori(real32 x) {
+    done cast[int32](floorf(x: x));
+  }
+  
+  func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+  
+  func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
+  func CON(cdecl) real32 fmod(real32 x, real32 y) EXT;
+  func CON(cdecl) real32 remainderf(real32 x, real32 y) EXT;
+  
+  func real32 floorf(real32 x) {
+    done cast[real32](CMath/floor(x: cast[real64](x)));
+  }
+  func real32 ceilf(real32 x) {
+    done cast[real32](CMath/ceil(x: cast[real64](x)));
+  }
+  func real32 tanf(real32 x) {
+    done cast[real32](CMath/tan(x: cast[real64](x)));
+  }
+  func real32 sinf(real32 x) {
+    done cast[real32](CMath/sin(x: cast[real64](x)));
+  }
+  func real32 cosf(real32 x) {
+    done cast[real32](CMath/cos(x: cast[real64](x)));
+  }
+  func real32 sqrtf(real32 x) {
+    done cast[real32](CMath/sqrt(x: cast[real64](x)));
+  }
+  
+}
+
+package sus/native/Win {
+
+  # math
+  func CON(cdecl) real32 powf(real32 base, real32 power) EXT;
+  func CON(cdecl) int32 pow(int32 base, int32 power) EXT;
+
+  # strings
+  func CON(cdecl) int32 strnlen(PTR[int8] buffer, int32 size) EXT;
+  func CON(cdecl) _itoa_s(int32 value, PTR[int8] buffer, int32 size, int32 radix) EXT;
+  func CON(cdecl) int32 _i64toa_s(LargeInteger value, PTR[int8] buffer, nat32 bufferSize, int32 radix) EXT;
+
+  # stdout
+  static int32 STD_OUTPUT_HANDLE = -11;
+  func CON(stdcall) ExitProcess(int32 code) EXT;
+  func CON(stdcall) int32 GetStdHandle(int32 handle) EXT;
+  func CON(stdcall) boo FlushFileBuffers(int32 handle) EXT;
+  func CON(stdcall) boo WriteFile(int32 file, PTR[int8] buffer, int32 length, PTR[int32] written, PTR[ptr] overlapped) EXT;
+
+  # errors
+  func CON(stdcall) SetLastError(int32 code) EXT;
+  func CON(stdcall) int32 GetLastError() EXT;
+
+  # threads
+  func CON(stdcall) Sleep(int32 ms) EXT;
+  
+  # time
+  struct FileTime(
+    nat32 low,
+    nat32 high
+  );
+  func CON(stdcall) GetSystemTimeAsFileTime(
+    PTR[FileTime] fileTime100Ns
+  ) EXT;
+  
+  # windows
+  
+  #
+  # VK_0 - VK_9 are the same as ASCII '0' - '9' (0x30 - 0x39)
+  # 0x3A - 0x40 : unassigned
+  # VK_A - VK_Z are the same as ASCII 'A' - 'Z' (0x41 - 0x5A)
+  #
+  static int32 VK_LBUTTON        = @01;
+  static int32 VK_RBUTTON        = @02;
+  static int32 VK_CANCEL         = @03;
+  static int32 VK_MBUTTON        = @04;
+  static int32 VK_XBUTTON1       = @05;
+  static int32 VK_XBUTTON2       = @06;
+  static int32 VK_BACK           = @08;
+  static int32 VK_TAB            = @09;
+  static int32 VK_CLEAR          = @0C;
+  static int32 VK_RETURN         = @0D;
+  static int32 VK_SHIFT          = @10;
+  static int32 VK_CONTROL        = @11;
+  static int32 VK_MENU           = @12;
+  static int32 VK_PAUSE          = @13;
+  static int32 VK_CAPITAL        = @14;
+  static int32 VK_KANA           = @15;
+  static int32 VK_HANGEUL        = @15;
+  static int32 VK_HANGUL         = @15;
+  static int32 VK_IME_ON         = @16;
+  static int32 VK_JUNJA          = @17;
+  static int32 VK_FINAL          = @18;
+  static int32 VK_HANJA          = @19;
+  static int32 VK_KANJI          = @19;
+  static int32 VK_IME_OFF        = @1A;
+  static int32 VK_ESCAPE         = @1B;
+  static int32 VK_CONVERT        = @1C;
+  static int32 VK_NONCONVERT     = @1D;
+  static int32 VK_ACCEPT         = @1E;
+  static int32 VK_MODECHANGE     = @1F;
+  static int32 VK_SPACE          = @20;
+  static int32 VK_PRIOR          = @21;
+  static int32 VK_NEXT           = @22;
+  static int32 VK_END            = @23;
+  static int32 VK_HOME           = @24;
+  static int32 VK_LEFT           = @25;
+  static int32 VK_UP             = @26;
+  static int32 VK_RIGHT          = @27;
+  static int32 VK_DOWN           = @28;
+  static int32 VK_SELECT         = @29;
+  static int32 VK_PRINT          = @2A;
+  static int32 VK_EXECUTE        = @2B;
+  static int32 VK_SNAPSHOT       = @2C;
+  static int32 VK_INSERT         = @2D;
+  static int32 VK_DELETE         = @2E;
+  static int32 VK_HELP           = @2F;
+  static int32 VK_LWIN           = @5B;
+  static int32 VK_RWIN           = @5C;
+  static int32 VK_APPS           = @5D;
+  static int32 VK_SLEEP          = @5F;
+  static int32 VK_NUMPAD0        = @60;
+  static int32 VK_NUMPAD1        = @61;
+  static int32 VK_NUMPAD2        = @62;
+  static int32 VK_NUMPAD3        = @63;
+  static int32 VK_NUMPAD4        = @64;
+  static int32 VK_NUMPAD5        = @65;
+  static int32 VK_NUMPAD6        = @66;
+  static int32 VK_NUMPAD7        = @67;
+  static int32 VK_NUMPAD8        = @68;
+  static int32 VK_NUMPAD9        = @69;
+  static int32 VK_MULTIPLY       = @6A;
+  static int32 VK_ADD            = @6B;
+  static int32 VK_SEPARATOR      = @6C;
+  static int32 VK_SUBTRACT       = @6D;
+  static int32 VK_DECIMAL        = @6E;
+  static int32 VK_DIVIDE         = @6F;
+  static int32 VK_F1             = @70;
+  static int32 VK_F2             = @71;
+  static int32 VK_F3             = @72;
+  static int32 VK_F4             = @73;
+  static int32 VK_F5             = @74;
+  static int32 VK_F6             = @75;
+  static int32 VK_F7             = @76;
+  static int32 VK_F8             = @77;
+  static int32 VK_F9             = @78;
+  static int32 VK_F10            = @79;
+  static int32 VK_F11            = @7A;
+  static int32 VK_F12            = @7B;
+  static int32 VK_F13            = @7C;
+  static int32 VK_F14            = @7D;
+  static int32 VK_F15            = @7E;
+  static int32 VK_F16            = @7F;
+  static int32 VK_F17            = @80;
+  static int32 VK_F18            = @81;
+  static int32 VK_F19            = @82;
+  static int32 VK_F20            = @83;
+  static int32 VK_F21            = @84;
+  static int32 VK_F22            = @85;
+  static int32 VK_F23            = @86;
+  static int32 VK_F24            = @87;
+  static int32 VK_NAVIGATION_VIEW     = @88;
+  static int32 VK_NAVIGATION_MENU     = @89;
+  static int32 VK_NAVIGATION_UP       = @8A;
+  static int32 VK_NAVIGATION_DOWN     = @8B;
+  static int32 VK_NAVIGATION_LEFT     = @8C;
+  static int32 VK_NAVIGATION_RIGHT    = @8D;
+  static int32 VK_NAVIGATION_ACCEPT   = @8E;
+  static int32 VK_NAVIGATION_CANCEL   = @8F;
+  static int32 VK_NUMLOCK        = @90;
+  static int32 VK_SCROLL         = @91;
+  static int32 VK_OEM_NEC_EQUAL  = @92;
+  static int32 VK_OEM_FJ_JISHO   = @92;
+  static int32 VK_OEM_FJ_MASSHOU = @93;
+  static int32 VK_OEM_FJ_TOUROKU = @94;
+  static int32 VK_OEM_FJ_LOYA    = @95;
+  static int32 VK_OEM_FJ_ROYA    = @96;
+  static int32 VK_LSHIFT         = @A0;
+  static int32 VK_RSHIFT         = @A1;
+  static int32 VK_LCONTROL       = @A2;
+  static int32 VK_RCONTROL       = @A3;
+  static int32 VK_LMENU          = @A4;
+  static int32 VK_RMENU          = @A5;
+  static int32 VK_BROWSER_BACK        = @A6;
+  static int32 VK_BROWSER_FORWARD     = @A7;
+  static int32 VK_BROWSER_REFRESH     = @A8;
+  static int32 VK_BROWSER_STOP        = @A9;
+  static int32 VK_BROWSER_SEARCH      = @AA;
+  static int32 VK_BROWSER_FAVORITES   = @AB;
+  static int32 VK_BROWSER_HOME        = @AC;
+  static int32 VK_VOLUME_MUTE         = @AD;
+  static int32 VK_VOLUME_DOWN         = @AE;
+  static int32 VK_VOLUME_UP           = @AF;
+  static int32 VK_MEDIA_NEXT_TRACK    = @B0;
+  static int32 VK_MEDIA_PREV_TRACK    = @B1;
+  static int32 VK_MEDIA_STOP          = @B2;
+  static int32 VK_MEDIA_PLAY_PAUSE    = @B3;
+  static int32 VK_LAUNCH_MAIL         = @B4;
+  static int32 VK_LAUNCH_MEDIA_SELECT = @B5;
+  static int32 VK_LAUNCH_APP1         = @B6;
+  static int32 VK_LAUNCH_APP2         = @B7;
+  static int32 VK_OEM_1          = @BA;
+  static int32 VK_OEM_PLUS       = @BB;
+  static int32 VK_OEM_COMMA      = @BC;
+  static int32 VK_OEM_MINUS      = @BD;
+  static int32 VK_OEM_PERIOD     = @BE;
+  static int32 VK_OEM_2          = @BF;
+  static int32 VK_OEM_3          = @C0;
+  static int32 VK_GAMEPAD_A                         = @C3;
+  static int32 VK_GAMEPAD_B                         = @C4;
+  static int32 VK_GAMEPAD_X                         = @C5;
+  static int32 VK_GAMEPAD_Y                         = @C6;
+  static int32 VK_GAMEPAD_RIGHT_SHOULDER            = @C7;
+  static int32 VK_GAMEPAD_LEFT_SHOULDER             = @C8;
+  static int32 VK_GAMEPAD_LEFT_TRIGGER              = @C9;
+  static int32 VK_GAMEPAD_RIGHT_TRIGGER             = @CA;
+  static int32 VK_GAMEPAD_DPAD_UP                   = @CB;
+  static int32 VK_GAMEPAD_DPAD_DOWN                 = @CC;
+  static int32 VK_GAMEPAD_DPAD_LEFT                 = @CD;
+  static int32 VK_GAMEPAD_DPAD_RIGHT                = @CE;
+  static int32 VK_GAMEPAD_MENU                      = @CF;
+  static int32 VK_GAMEPAD_VIEW                      = @D0;
+  static int32 VK_GAMEPAD_LEFT_THUMBSTICK_BUTTON    = @D1;
+  static int32 VK_GAMEPAD_RIGHT_THUMBSTICK_BUTTON   = @D2;
+  static int32 VK_GAMEPAD_LEFT_THUMBSTICK_UP        = @D3;
+  static int32 VK_GAMEPAD_LEFT_THUMBSTICK_DOWN      = @D4;
+  static int32 VK_GAMEPAD_LEFT_THUMBSTICK_RIGHT     = @D5;
+  static int32 VK_GAMEPAD_LEFT_THUMBSTICK_LEFT      = @D6;
+  static int32 VK_GAMEPAD_RIGHT_THUMBSTICK_UP       = @D7;
+  static int32 VK_GAMEPAD_RIGHT_THUMBSTICK_DOWN     = @D8;
+  static int32 VK_GAMEPAD_RIGHT_THUMBSTICK_RIGHT    = @D9;
+  static int32 VK_GAMEPAD_RIGHT_THUMBSTICK_LEFT     = @DA;
+  static int32 VK_OEM_4          = @DB;
+  static int32 VK_OEM_5          = @DC;
+  static int32 VK_OEM_6          = @DD;
+  static int32 VK_OEM_7          = @DE;
+  static int32 VK_OEM_8          = @DF;
+  static int32 VK_OEM_AX         = @E1;
+  static int32 VK_OEM_102        = @E2;
+  static int32 VK_ICO_HELP       = @E3;
+  static int32 VK_ICO_00         = @E4;
+  static int32 VK_PROCESSKEY     = @E5;
+  static int32 VK_ICO_CLEAR      = @E6;
+  static int32 VK_PACKET         = @E7;
+  static int32 VK_OEM_RESET      = @E9;
+  static int32 VK_OEM_JUMP       = @EA;
+  static int32 VK_OEM_PA1        = @EB;
+  static int32 VK_OEM_PA2        = @EC;
+  static int32 VK_OEM_PA3        = @ED;
+  static int32 VK_OEM_WSCTRL     = @EE;
+  static int32 VK_OEM_CUSEL      = @EF;
+  static int32 VK_OEM_ATTN       = @F0;
+  static int32 VK_OEM_FINISH     = @F1;
+  static int32 VK_OEM_COPY       = @F2;
+  static int32 VK_OEM_AUTO       = @F3;
+  static int32 VK_OEM_ENLW       = @F4;
+  static int32 VK_OEM_BACKTAB    = @F5;
+  static int32 VK_ATTN           = @F6;
+  static int32 VK_CRSEL          = @F7;
+  static int32 VK_EXSEL          = @F8;
+  static int32 VK_EREOF          = @F9;
+  static int32 VK_PLAY           = @FA;
+  static int32 VK_ZOOM           = @FB;
+  static int32 VK_NONAME         = @FC;
+  static int32 VK_PA1            = @FD;
+  static int32 VK_OEM_CLEAR      = @FE;
+  
+  struct LargeInteger (
+    int32 low,
+    int32 high
+  );
+  func LargeInteger new_LargeInteger() {
+    done LargeInteger( low = 0, high = 0 );
+  }
+  
+  static int32 DPI_AWARENESS_CONTEXT_UNAWARE              = -1;
+  static int32 DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         = -2;
+  static int32 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    = -3;
+  static int32 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
+  static int32 DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED    = -5;
+  
+  func CON(stdcall) int32 SetThreadDpiAwarenessContext(int32 dpiAwarenessContext) EXT;
+  
+  func CON(stdcall) int32 SetTimer(
+    WindowHandle  handle,
+    int32         timerId,
+    int32         intervalMs,
+    funcptr[CON(stdcall) (WindowHandle handle, int32 _unnamed1, int32 _unnamed2, int32 _unnamed3)]
+                  timerFunc
+  ) EXT;
+  
+  func CON(stdcall) boo InvalidateRect(WindowHandle handle, PTR[Rectangle] rectangle, boo erase) EXT;
+
+  struct Rectangle (
+    int32 left,
+    int32 top,
+    int32 right,
+    int32 bottom
+  );
+
+  func CON(stdcall) boo AdjustWindowRect(PTR[Rectangle] rectangle, int32 style, boo menu) EXT;
+
+  func CON(stdcall) WindowHandle CreateWindowExA(
+    int32 extendedStyle,
+    PTR[int8] className,
+    PTR[int8] windowName,
+    int32 style,
+    int32 x,
+    int32 y,
+    int32 width,
+    int32 height,
+    WindowHandle parentHandle,
+    MenuHandle menu,
+    InstanceHandle instance,
+    ptr param) EXT;
+
+  static int32 WS_OVERLAPPED       = @00000000;
+  static int32 WS_POPUP            = @80000000;
+  static int32 WS_CHILD            = @40000000;
+  static int32 WS_MINIMIZE         = @20000000;
+  static int32 WS_VISIBLE          = @10000000;
+  static int32 WS_DISABLED         = @08000000;
+  static int32 WS_CLIPSIBLINGS     = @04000000;
+  static int32 WS_CLIPCHILDREN     = @02000000;
+  static int32 WS_MAXIMIZE         = @01000000;
+  static int32 WS_CAPTION          = @00C00000;
+  static int32 WS_BORDER           = @00800000;
+  static int32 WS_DLGFRAME         = @00400000;
+  static int32 WS_VSCROLL          = @00200000;
+  static int32 WS_HSCROLL          = @00100000;
+  static int32 WS_SYSMENU          = @00080000;
+  static int32 WS_THICKFRAME       = @00040000;
+  static int32 WS_GROUP            = @00020000;
+  static int32 WS_TABSTOP          = @00010000;
+  static int32 WS_MINIMIZEBOX      = @00020000;
+  static int32 WS_MAXIMIZEBOX      = @00010000;
+
+  func int32 fc_WS_OVERLAPPEDWINDOW() {
+    done WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+  }
+
+  static int32 CS_VREDRAW          = @0001;
+  static int32 CS_HREDRAW          = @0002;
+  static int32 CS_DBLCLKS          = @0008;
+  static int32 CS_OWNDC            = @0020;
+  static int32 CS_CLASSDC          = @0040;
+  static int32 CS_PARENTDC         = @0080;
+  static int32 CS_NOCLOSE          = @0200;
+  static int32 CS_SAVEBITS         = @0800;
+  static int32 CS_BYTEALIGNCLIENT  = @1000;
+  static int32 CS_BYTEALIGNWINDOW  = @2000;
+  static int32 CS_GLOBALCLASS      = @4000;
+
+  static int32 SWP_NOSIZE          = @0001;
+  static int32 SWP_NOMOVE          = @0002;
+  static int32 SWP_NOZORDER        = @0004;
+  static int32 SWP_NOREDRAW        = @0008;
+  static int32 SWP_NOACTIVATE      = @0010;
+  static int32 SWP_FRAMECHANGED    = @0020;
+  static int32 SWP_SHOWWINDOW      = @0040;
+  static int32 SWP_HIDEWINDOW      = @0080;
+  static int32 SWP_NOCOPYBITS      = @0100;
+  static int32 SWP_NOOWNERZORDER   = @0200;
+  static int32 SWP_NOSENDCHANGING  = @0400;
+ 
+  static int32 SW_SHOWNORMAL = 1;
+
+  struct InstanceHandle (int32 _unused);
+  struct WindowHandle (int32 _unused);
+  struct MenuHandle (int32 _unused);
+  struct IconHandle (int32 _unused);
+  struct CursorHandle (int32 _unused);
+  struct BrushHandle (int32 _unused);
+
+  func PTR[int8] fc_IDI_WINLOGO() { done RTP[PTR[int8]](32517); }
+  func PTR[int8] fc_IDC_ARROW() { done RTP[PTR[int8]](32512); }
+  
+  static int32 ATTACH_PARENT_PROCESS = -1;
+  func CON(stdcall) boo AttachConsole(int32 processId) EXT;
+  func CON(stdcall) boo AllocConsole() EXT;
+  func CON(stdcall) boo IsDebuggerPresent() EXT;
+  
+  func CON(stdcall) IconHandle LoadIconA(InstanceHandle instance, PTR[int8] iconName) EXT;
+
+  func CON(stdcall) CursorHandle LoadCursorA(InstanceHandle instance, PTR[int8] cursorName) EXT;
+
+  func CON(stdcall) int32 DefWindowProcA(WindowHandle handle, int32 message, int32 wParam, int32 lParam) EXT;
+
+  struct WindowClassExtendedAscii (
+    int32 cbSize,
+    int32 style,
+    funcptr[CON(stdcall) int32 (WindowHandle handle, int32 message, int32 wParam, int32 lParam)] 
+         windowProc,
+    int32 cbClsExt,
+    int32 cbWndExt,
+    InstanceHandle instance,
+    IconHandle icon,
+    CursorHandle cursor,
+    BrushHandle background,
+    PTR[int8] menuName,
+    PTR[int8] className,
+    IconHandle iconSmall
+  );
+  func CON(stdcall) boo ShowWindow(WindowHandle handle, int32 showCommand) EXT;
+  func CON(stdcall) int16 RegisterClassExA(PTR[WindowClassExtendedAscii] windowClass) EXT;
+
+  func CON(stdcall) boo SetWindowPos(
+      WindowHandle handle,
+      WindowHandle handleInsertAfter,
+      int32 x,
+      int32 y,
+      int32 cx,
+      int32 cy,
+      int32 flags) EXT;
+
+  struct Point (
+    int32 x,
+    int32 y
+  );
+
+  struct WindowMessage (
+    WindowHandle handle,
+    int32 message,
+    int32 wParam,
+    int32 lParam,
+    int32 time,
+    Point point
+  );
+  func WindowMessage new_WindowMessage() {
+    done WindowMessage(
+      handle = RTP[WindowHandle](0),
+      message = 0,
+      wParam = 0,
+      lParam = 0,
+      time = 0,
+      point = Point(x = 0, y = 0)
+    );
+  }
+  
+  static int32 WM_CREATE         = @0001;
+  static int32 WM_INPUT          = @00ff;
+  static int32 WM_PAINT          = @000f;
+  static int32 WM_SIZE           = @0005;
+  static int32 WM_KILLFOCUS      = @0008;
+  static int32 WM_CLOSE          = @0010;
+  static int32 WM_KEYFIRST       = @0100;
+  static int32 WM_KEYDOWN        = @0100;
+  static int32 WM_KEYUP          = @0101;
+  static int32 WM_TIMER          = @0113;
+  static int32 WM_MOUSEMOVE      = @0200;
+  
+  static int32 WM_LBUTTONDOWN                  = @0201;
+  static int32 WM_LBUTTONUP                    = @0202;
+  static int32 WM_RBUTTONDOWN                  = @0204;
+  static int32 WM_RBUTTONUP                    = @0205;
+
+  func CON(stdcall) boo GetMessageA(
+    PTR[WindowMessage] message,
+    WindowHandle handle,
+    int32 filterMin,
+    int32 filterMax) EXT;
+
+  func CON(stdcall) boo ReleaseCapture() EXT;
+  func CON(stdcall) WindowHandle SetCapture(WindowHandle handle) EXT;
+  
+  func CON(stdcall) boo UpdateWindow(WindowHandle handle) EXT;
+  func CON(stdcall) boo TranslateMessage(PTR[WindowMessage] message) EXT;
+  func CON(stdcall) int32 DispatchMessageA(PTR[WindowMessage] message) EXT;
+  
+  struct GlRenderContextHandle (ptr _unused);
+  
+  func CON(stdcall) GlRenderContextHandle wglCreateContext(DeviceContextHandle dch) EXT;
+  func CON(stdcall) boo wglMakeCurrent(DeviceContextHandle dch, GlRenderContextHandle glRenderContextHandle) EXT;
+  
+  func CON(stdcall) boo SetPixelFormat(DeviceContextHandle dch, int32 format, PTR[PixelFormatDescriptor] pfd) EXT;
+  
+  struct DeviceContextHandle(ptr _unused);
+
+  func CON(stdcall) DeviceContextHandle GetDC(WindowHandle handle) EXT;
+
+  struct PixelFormatDescriptor (
+    int16 size,
+    int16 version,
+    int32 flags,
+    int8 pixelType,
+    int8 colorBits,
+    int8 redBits,
+    int8 redShift,
+    int8 greenBits,
+    int8 greenShift,
+    int8 blueBits,
+    int8 blueShift,
+    int8 alphaBits,
+    int8 alphaShift,
+    int8 accumBits,
+    int8 accumRedBits,
+    int8 accumGreenBits,
+    int8 accumBlueBits,
+    int8 accumAlphaBits,
+    int8 depthBits,
+    int8 stencilBits,
+    int8 auxBuffers,
+    int8 layerType,
+    int8 reserved,
+    int32 layerMask,
+    int32 visibleMask,
+    int32 damageMask
+  );
+
+  func int8 fc_PFD_TYPE_RGBA() {
+    done cast[int8](0);
+  }
+
+  static int32 PFD_DRAW_TO_WINDOW          = @00000004;
+  static int32 PFD_SUPPORT_OPENGL          = @00000020;
+
+  func CON(stdcall) int32 ChoosePixelFormat(
+    DeviceContextHandle dch,
+    PTR[PixelFormatDescriptor] pfd
+  ) EXT;
+
+
+  func PixelFormatDescriptor new_PixelFormatDescriptor() {
+    done PixelFormatDescriptor (
+      size = cast[int16](0),
+      version = cast[int16](0),
+      flags = 0,
+      pixelType = cast[int8](0),
+      colorBits = cast[int8](0),
+      redBits = cast[int8](0),
+      redShift = cast[int8](0),
+      greenBits = cast[int8](0),
+      greenShift = cast[int8](0),
+      blueBits = cast[int8](0),
+      blueShift = cast[int8](0),
+      alphaBits = cast[int8](0),
+      alphaShift = cast[int8](0),
+      accumBits = cast[int8](0),
+      accumRedBits = cast[int8](0),
+      accumGreenBits = cast[int8](0),
+      accumBlueBits = cast[int8](0),
+      accumAlphaBits = cast[int8](0),
+      depthBits = cast[int8](0),
+      stencilBits = cast[int8](0),
+      auxBuffers = cast[int8](0),
+      layerType = cast[int8](0),
+      reserved = cast[int8](0),
+      layerMask = 0,
+      visibleMask = 0,
+      damageMask = 0
+    );
+  }
+
+  struct PaintStruct (
+    DeviceContextHandle dch,
+    boo erase,
+    Rectangle rectangle,
+    boo restore,
+    array[int8, 3] _padding1,
+    boo incUpdate,
+    array[int8, 3] _padding2,
+    array[int8, 32] rgbReserved
+  );
+  
+  func PaintStruct new_PaintStruct() {
+    done PaintStruct (
+      dch=RTP[DeviceContextHandle](0),
+      erase=no,
+      rectangle=Rectangle(
+        left=0,
+        top=0,
+        right=0,
+        bottom=0
+      ),
+      restore = no,
+      _padding1 = array[int8,3](cast[int8](0)),
+      incUpdate = no,
+      _padding2 = array[int8, 3](cast[int8](0)),
+      rgbReserved = array[int8, 32](cast[int8](0))
+    );
+  }
+  
+  func CON(stdcall) DeviceContextHandle BeginPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
+  func CON(stdcall) DeviceContextHandle EndPaint(WindowHandle handle, PTR[PaintStruct] paintStruct) EXT;
+
+  func CON(stdcall) boo ClipCursor(PTR[Rectangle] rectangle) EXT;
+  func CON(stdcall) int32 ShowCursor(boo show) EXT;
+  func CON(stdcall) boo GetClientRect(WindowHandle handle, PTR[Rectangle] rectangle) EXT;
+  func CON(stdcall) boo ClientToScreen(WindowHandle handle, PTR[Point] point) EXT;
+  
+  # files
+  
+  func CON(stdcall) boo CloseHandle(int32 handle) EXT;
+  
+  func CON(stdcall) boo ReadFile(
+    int32 fileHandle,
+    PTR[int8] buffer,
+    int32 toRead,
+    PTR[int32] actualRead,
+    ptr overlapped
+  ) EXT;
+  
+  # CreateFileA shareMode
+  static int32 FILE_SHARE_NONE                  = @00000000;  
+  static int32 FILE_SHARE_READ                  = @00000001;  
+  static int32 FILE_SHARE_WRITE                 = @00000002;  
+  static int32 FILE_SHARE_DELETE                = @00000004;
+  
+  # CreateFileA accessMode
+  static int32 GENERIC_READ                     = @80000000;
+  static int32 GENERIC_WRITE                    = @40000000;
+  static int32 GENERIC_EXECUTE                  = @20000000;
+  static int32 GENERIC_ALL                      = @10000000;
+  
+  # CreateFileAcreationMode
+  static int32 CREATE_NEW                       = 1;
+  static int32 CREATE_ALWAYS                    = 2;
+  static int32 OPEN_EXISTING                    = 3;
+  static int32 OPEN_ALWAYS                      = 4;
+  static int32 TRUNCATE_EXISTING                = 5;
+  
+  # CreateFileA flagsAndAttributes
+  
+  func CON(stdcall) int32 CreateFileA(
+    PTR[int8] fileName,
+    int32 accessMode,
+    int32 shareMode,
+    ptr securityAttributes,
+    int32 creationMode,
+    int32 flagsAndAttributes,
+    int32 templateFileHandle
+  ) EXT;
+  
+  func CON(stdcall) boo GetFileSizeEx(
+    int32 file,
+    PTR[LargeInteger] fileSize
+  ) EXT;
+  
+  struct RawInputDevice (
+    int16 usagePage,
+    int16 usage,
+    int32 flags,
+    WindowHandle targetHandle
+  );
+  
+  static int16 HID_USAGE_PAGE_GENERIC     = cast[int16](@01);
+  static int16 HID_USAGE_GENERIC_MOUSE    = cast[int16](@02);
+  
+  static int32 RIM_TYPEMOUSE       = 0;
+  
+  func CON(stdcall) boo RegisterRawInputDevices(
+    PTR[RawInputDevice] devices,
+    int32 length,
+    int32 rawInputDeviceSize
+  ) EXT;
+  
+  struct RawInputHandle(int32 _unused);
+  
+  static int32 RID_HEADER = @10000005;
+  static int32 RID_INPUT = @10000003;
+  
+  struct RawInputHeader(
+    int32 type,
+    int32 length,
+    int32 deviceHandle,
+    int32 param
+  );
+  
+  struct RawInput(
+    RawInputHeader header,
+    array[int8, 24] data # may be RawInputDataMouse
+  );
+  
+  struct RawInputDataMouse (
+    int16 flags,
+    int32 buttons,
+    int32 rawButtons,
+    int32 lastX,
+    int32 lastY,
+    int32 extraInformation
+  );
+  
+  func CON(stdcall) int32 GetRawInputData(
+    RawInputHandle handle,
+    int32 uiCommand,
+    ptr data,
+    PTR[int32] dataSize,
+    int32 headerSize
+  ) EXT;
+  
+  # threads
+  
+  func CON(stdcall) int32 CreateThread(
+    ptr securityAttributes,     # can be 0
+    nat32 stackSize,            # can be 0
+    funcptr[(ptr param)] routine,
+    ptr argument,               # can be 0
+    int32 flags,                # can be 0
+    PTR[int32] threadId         # can be 0
+  ) EXT;
+  
+  func CON(stdcall) int32 SetThreadDescription(
+    int32 handle,
+    PTR[int8] threadDescription
+  ) EXT;
+  
+  func CON(stdcall) int32 GetCurrentThread() EXT;
+  
+  func CON(stdcall) int32 GetThreadDescription(
+    int32 handle,
+    PTR[PTR[int8]] threadDescription
+  ) EXT;
+  
+  struct CriticalSection (
+    array[int8, 24] _data # i'm not declaring all of that
+  );
+  
+  func CON(stdcall) InitializeCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) EnterCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) LeaveCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+  
+  func CON(stdcall) DeleteCriticalSection(
+    PTR[CriticalSection] criticalSection
+  ) EXT;
+
+}
+
+package sus/AtomicBoo {
+
+  use sus/Mutex;
+  
+  struct AtomicBoo(
+    Mutex _mutex,
+    boo _value
+  );
+  
+  func AtomicBoo alloc(boo value) {
+    done AtomicBoo(
+      _mutex = Mutex/alloc(),
+      _value = value
+    );
+  }
+  
+  func boo get(PTR[AtomicBoo] this) {
+    boo value = no;
+    Mutex/lock(this: REF(DRF(this)._mutex));
+    value = DRF(this)._value;
+    Mutex/unlock(this: REF(DRF(this)._mutex));
+    done value;
+  }
+  
+  func set(PTR[AtomicBoo] this, boo value) {
+    Mutex/lock(this: REF(DRF(this)._mutex));
+    DRF(this)._value = value;
+    Mutex/unlock(this: REF(DRF(this)._mutex));
+  }
+  
+}
+
+package sus/Mutex {
+  
+  use sus/native/Win;
+  use sus/Memory;
+  
+  struct Mutex(
+    PTR[CriticalSection] _criticalSection
+  );
+  
+  func Mutex alloc() {
+    PTR[CriticalSection] criticalSection = RTP[PTR[CriticalSection]](
+      Memory/malloc(bytes: size[CriticalSection]())
+    );
+    Win/InitializeCriticalSection(criticalSection: criticalSection);
+    done Mutex(_criticalSection = criticalSection);
+  }
+  
+  func lock(PTR[Mutex] this) {
+    Win/EnterCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+  func unlock(PTR[Mutex] this) {
+    Win/LeaveCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+  func free(PTR[Mutex] this) {
+    Win/DeleteCriticalSection(criticalSection: DRF(this)._criticalSection);
+  }
+  
+}
+
+package sus/Thread {
+
+  use sus/native/Win;
+
+  struct Thread(int32 _handle);
+  
+  func Thread new(PTR[int8] name, funcptr[(ptr param)] run, ptr arg) {
+    int32 result = Win/CreateThread(
+      securityAttributes: RTP[ptr](0),
+      stackSize:          cast[nat32](0),
+      routine:            run,
+      argument:           arg,
+      flags:              0,
+      threadId:           RTP[PTR[int32]](0)
+    );
+    int32 _1 = Win/SetThreadDescription(
+      handle:            result,
+      threadDescription: name
+    );
+    done Thread(_handle = result);
+  }
+  
+  func Thread current() {
+    done Thread(_handle = Win/GetCurrentThread());
+  }
+  
+  func PTR[int8] getName(PTR[Thread] this) {
+    PTR[int8] name = RTP[PTR[int8]](0);
+    int32 _1 = Win/GetThreadDescription(
+      handle:            DRF(this)._handle,
+      threadDescription: REF(name)
+    );
+    done name;
+  }
+  
+  func sleep(int32 ms) {
+    Win/Sleep(ms: ms);
+  }
+  
+}
+
+package sus/Time {
+
+  use sus/native/Win;
+  use sus/System;
+  
+  #struct FileTime(
+  #  nat32 low,
+  #  nat32 high
+  #);
+  #func CON(stdcall) GetSystemTimeAsFileTime(
+  #  PTR[FileTime] fileTime100Ns
+  #) EXT;
+  
+  struct Time (
+    nat32 _low,
+    nat32 _high
+  );
+  
+  func Time zero() {
+    done Time(_low = cast[nat32](0), _high = cast[nat32](0));
+  }
+  
+  func Time now() {
+    Time res = Time(_low=cast[nat32](0), _high=cast[nat32](0));
+    Win/GetSystemTimeAsFileTime(fileTime100Ns: RTP[PTR[FileTime]](REF(res)));
+    done res;
+  }
+  
+  func printDuration(Time start, Time end) {
+    System/print(r: cast[real32](Time/diff_mu(a: end, b: start)) / 1000000.0, digits: 6);
+  }
+  
+  func boo greater(Time t, int32 ms) {
+    if (t._high != cast[nat32](0)) done yes;
+    done Time/mu(t: t) > (ms * 1000);
+  }
+  
+  func boo lesser(Time t, int32 ms) {
+    if (t._high != cast[nat32](0)) done no;
+    done Time/mu(t: t) < (ms * 1000);
+  }
+  
+  func Time add(Time a, Time b) {
+    Time r = Time(
+      _low = a._low + b._low,
+      _high = a._high + b._high);
+    if (r._low < a._low) r._high = r._high + cast[nat32](1);
+    done r;
+  }
+  
+  func Time sub(Time a, Time b) {
+    Time r = Time(_low=cast[nat32](0), _high=cast[nat32](0));
+    r._low = a._low - b._low;
+    nat32 borrow = cast[nat32](0);
+    if (a._low < b._low) borrow = cast[nat32](1);
+    r._high = a._high - b._high - borrow;
+  
+    done r;
+  }
+  
+  # note: this causes an error for big time differences, as a int32
+  # of microseconds can not be above somewhere over 35 minutes,
+  # additionally negative values where not tested.
+  func int32 mu(Time t) {
+    # perform x86 64-bit division of a: a / 10
+    ASM {
+      lea     ebx, SUS{t}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10              ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](t._low);
+  }
+  
+  func int32 ms(Time t) {
+    ASM {
+      lea     ebx, SUS{t}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10000           ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](t._low);
+  }
+  
+  func int32 diff_mu(Time a, Time b) {
+    a = sub(a: a, b: b);
+    ASM {
+      lea     ebx, SUS{a}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10              ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](a._low);
+  }
+  
+  func int32 diff_ms(Time a, Time b) {
+    a = sub(a: a, b: b);
+    ASM {
+      lea     ebx, SUS{a}
+      mov     eax, [ebx]           ; lower
+      mov     edx, [ebx + 4]       ; higher
+      mov     ecx, 10000           ; decimal
+      idiv    ecx
+      mov     [ebx], eax
+    }
+    done RTP[int32](a._low);
+  }
+  
+  func print(Time t) {
+    PTR[int8] buffer = ARR[int8](32);
+    int32 _1 = Win/_i64toa_s(value: RTP[LargeInteger](t), buffer: buffer, bufferSize: cast[nat32](32), radix: 10);
+    #int32 len = Win/strnlen(buffer: buffer, size: 32);
+    System/print(s: buffer);
+  }
+  
+}
+
+package sus/Limits {
+  
+  static int32 INT32_MAX = 2147483647;
+  static int32 INT32_MIN = -2147483648;
+  
+}
+
+package sus/Memory {
+  
+  func CON(cdecl) ptr malloc(int32 bytes) EXT;
+  func CON(cdecl) free(ptr pointer) EXT;
+  func CON(cdecl) int32 memcpy_s(ptr dest, int32 destSize, ptr source, int32 bytes) EXT;
+  func CON(cdecl) int32 memmove_s(ptr dest, int32 destSize, ptr source, int32 bytes) EXT;
+
+}
+
+package sus/Map {
+
+  use sus/Memory;
+  use sus/List;
+  use sus/System;
+  use sus/Math;
+  
+  static real32 MAX_LOAD_FACTOR = 3.0;
+  static real32 RESIZE_LOAD_FACTOR = 1.0;
+  
+  static int32 INITIAL_CAPACITY = 32;
+
+  struct Map(
+    PTR[HashBucket] _buckets,
+    int32 length,
+    int32 _capacity,
+    funcptr[int32 (ptr key)] _hash,
+    funcptr[boo (ptr keya, ptr keyb)] equals
+  );
+  
+  struct HashBucket(List list);
+  
+  struct HashEntry(ptr key, ptr value);
+  
+  # _i = bucket index, _j = entry index
+  struct Pos(int32 _i, int32 _j);
+  
+  func Map alloc(
+    funcptr[int32 (ptr key)] hash,
+    funcptr[boo (ptr keya, ptr keyb)] equals
+  ) {
+    done Map/alloc(hash:hash, equals:equals, capacity: INITIAL_CAPACITY);
+  }
+  
+  func Map alloc(
+    funcptr[int32 (ptr key)] hash,
+    funcptr[boo (ptr keya, ptr keyb)] equals,
+    int32 capacity
+  ) {
+    done Map(
+      length = 0,
+      _buckets = allocateBuckets(capacity: capacity),
+      _capacity = capacity,
+      _hash = hash,
+      equals = equals
+    );
+  }
+  
+  func Pos first(PTR[Map] this) {
+    Pos pos = Pos(_i = 0, _j = 0);
+    while (pos._i < DRF(this)._capacity) {
+      PTR[HashBucket] bucket = DRF(this)._buckets + (pos._i * size[HashBucket]());
+      if (DRF(bucket).list.length > 0)
+        done pos;
+      pos._i = pos._i + 1;
+    }
+    done pos;
+  }
+  
+  # advances pos and gives element at the position
+  # if pos is out of bounds entry will be 0.
+  func iterate(PTR[Map] this, PTR[Pos] pos, PTR[PTR[HashEntry]] entry) {
+    DRF(entry) = RTP[PTR[HashEntry]](0);
+    if (DRF(pos)._i >= DRF(this)._capacity) 
+      done;
+    
+    PTR[HashBucket] bucket = DRF(this)._buckets +
+                        (DRF(pos)._i * size[HashBucket]());
+    DRF(entry) = RTP[PTR[HashEntry]](DRF(bucket).list._memory) +
+                    (DRF(pos)._j * size[HashEntry]());
+    
+    #System/println(s: STR"wt3");
+              
+    if (DRF(pos)._j < (DRF(bucket).list.length - 1)) {
+      # advance bucket entry index
+      DRF(pos)._j = DRF(pos)._j + 1;
+      done;
+    }
+
+    # advance bucket index
+    DRF(pos)._i = DRF(pos)._i + 1;
+    DRF(pos)._j  = 0;
+    while (DRF(pos)._i < DRF(this)._capacity) {
+      PTR[HashBucket] nextBucket = DRF(this)._buckets + (DRF(pos)._i * size[HashBucket]());
+      if (DRF(nextBucket).list.length > 0)
+        done;
+      DRF(pos)._i = DRF(pos)._i + 1;
+    }
+  }
+  
+  func PTR[HashBucket] allocateBuckets(int32 capacity) {
+    PTR[HashBucket] buckets = RTP[PTR[HashBucket]](
+      Memory/malloc(bytes: size[HashBucket]() * capacity
+    ));
+    PTR[HashBucket] bucket = buckets;
+    PTR[HashBucket] end = bucket + (size[HashBucket]() * capacity);
+    while (RTP[int32](bucket) != RTP[int32](end)) {
+      DRF(bucket) = HashBucket(
+        list = List/alloc(elementSize: size[HashEntry](), capacity: 16)
+      );
+      bucket = bucket + (size[HashBucket]());
+    }
+    done buckets;
+  }
+  
+  func free(PTR[Map] this) {
+    PTR[HashBucket] bucket = DRF(this)._buckets;
+    PTR[HashBucket] end = bucket + (size[HashBucket]() * DRF(this)._capacity);
+    while (RTP[int32](bucket) != RTP[int32](end)) {
+      List/free(this: REF(DRF(bucket).list));
+      bucket = bucket + (size[HashBucket]());
+    }
+    Memory/free(pointer: RTP[ptr](DRF(this)._buckets));
+  }
+  
+  func checkRehash(PTR[Map] this, int32 inserted) {
+    real32 loadFactor = cast[real32](DRF(this).length + inserted) / cast[real32](DRF(this)._capacity);
+    if (loadFactor < MAX_LOAD_FACTOR) done;
+    
+    Map backup = DRF(this);
+    
+    # resize buckets
+    DRF(this)._capacity = cast[int32](cast[real32](DRF(this).length + inserted) / RESIZE_LOAD_FACTOR) + 1; # length / loadFactor = capacity
+    DRF(this)._buckets = allocateBuckets(capacity: DRF(this)._capacity);
+    
+    # transfer the entries
+    Pos pos = Map/first(this: REF(backup));
+    PTR[HashEntry] entry = RTP[PTR[HashEntry]](0);
+    Map/iterate(this: REF(backup), pos: REF(pos), entry: REF(entry));
+    while (RTP[int32](entry) != 0) {
+      ptr _1 = Map/put(this: this, key: DRF(entry).key, value: DRF(entry).value);
+      Map/iterate(this: REF(backup), pos: REF(pos), entry: REF(entry));
+    }
+    
+    Map/free(this: REF(backup));
+  }
+  
+  func PTR[HashEntry] findEntry(PTR[Map] this, PTR[HashBucket] bucket, ptr key) {
+    funcptr[boo (ptr keya, ptr keyb)] equalsFunc = DRF(this).equals;
+    PTR[HashEntry] entry = RTP[PTR[HashEntry]](DRF(bucket).list._memory);
+    PTR[HashEntry] end = entry + (DRF(bucket).list.length * size[HashEntry]());
+    while (RTP[int32](entry) != RTP[int32](end)) {
+      if (equalsFunc(keya: key, keyb: DRF(entry).key)) done entry;
+      entry = entry + size[HashEntry]();
+    }
+    done RTP[PTR[HashEntry]](0);
+  }
+  
+  # gets value or 0 if not found
+  func ptr get(PTR[Map] this, ptr key) {
+    funcptr[int32 (ptr key)] hashFunc = DRF(this)._hash;
+    int32 i = Math/absi(x: hashFunc(key: key)) % DRF(this)._capacity;
+    
+    PTR[HashBucket] bucket = DRF(this)._buckets + (size[HashBucket]() * i);
+    
+    PTR[HashEntry] entry = findEntry(this: this, bucket: bucket, key: key);
+    if (RTP[int32](entry) == 0) done RTP[ptr](0);
+    
+    done DRF(entry).value;
+  }
+  
+  # removes and returns value or 0 if not found
+  func ptr remove(PTR[Map] this, ptr key) {
+    funcptr[int32 (ptr key)] hashFunc = DRF(this)._hash;
+    int32 i = Math/absi(x: hashFunc(key: key)) % DRF(this)._capacity;
+    
+    PTR[HashBucket] bucket = DRF(this)._buckets + (size[HashBucket]() * i);
+    
+    PTR[HashEntry] entry = findEntry(this: this, bucket: bucket, key: key);
+    if (RTP[int32](entry) == 0) done RTP[ptr](0);
+    
+    List/remove(this: REF(DRF(bucket).list), index: RTP[PTR[ptr]](entry));
+    DRF(this).length = 0;
+    
+    done DRF(entry).value;
+  }
+  
+  func clear(PTR[Map] this) {
+    PTR[HashBucket] bucket = DRF(this)._buckets;
+    PTR[HashBucket] end    = bucket + (size[HashBucket]() * DRF(this)._capacity);
+    while (RTP[int32](bucket) != RTP[int32](end)) {
+      List/clear(this: REF(DRF(bucket).list));
+      bucket = bucket + (size[HashBucket]());
+    }
+    DRF(this).length = 0;
+  }
+  
+  # inserts or overwrites value assigned to key
+  # returns old value, if existant. 0 otherwise
+  func ptr put(PTR[Map] this, ptr key, ptr value) {
+    checkRehash(this: this, inserted: 1);
+    
+    funcptr[int32 (ptr key)] hashFunc = DRF(this)._hash;
+    int32 i = Math/absi(x: hashFunc(key: key)) % DRF(this)._capacity;
+    PTR[HashBucket] bucket = DRF(this)._buckets + (size[HashBucket]() * i);
+    
+    PTR[HashEntry] entry = findEntry(this: this, bucket: bucket, key: key);
+    ptr existant = RTP[ptr](0);
+    if (RTP[int32](entry) == 0) {
+      entry = RTP[PTR[HashEntry]](
+        List/add(this: REF(DRF(bucket).list), element: RTP[ptr](0))
+      );
+      DRF(this).length = DRF(this).length + 1;
+    } else
+      existant = DRF(entry).value;
+    
+    DRF(entry) = HashEntry(key = key, value = value);
+    
+    done existant;
+  }
+
+}
+
+package sus/List {
+
+  static int32 INITIAL_CAPACITY = 16;
+  static real32 GROWTH_FACTOR = 2.0;
+
+  use sus/Memory;
+  use sus/Limits;
+  use sus/System;
+
+  struct List(
+    PTR[ptr] _memory,
+    PTR[ptr] _memBlock,
+    int32 _elementSize,
+    int32 _capacity,
+    int32 length
+  );
+  
+  func List alloc(int32 elementSize) {
+    done alloc(elementSize: elementSize, capacity: INITIAL_CAPACITY);
+  }
+
+  func List alloc(int32 elementSize, int32 capacity) {
+    PTR[ptr] memory = RTP[PTR[ptr]](Memory/malloc(bytes: elementSize * capacity));
+    done List(
+      _memory = memory,
+      _memBlock = memory,
+      _elementSize = elementSize,
+      _capacity = capacity,
+      length = 0
+    );
+  }
+  
+  func int32 _partition(
+    PTR[List]                                 this,
+    int32                                     low,
+    int32                                     high, 
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)]   compare
+  ) {
+    PTR[ptr] pivot = DRF(this)._memory + (high * DRF(this)._elementSize);
+    int32 i = low - 1;
+    
+    PTR[int8] swapBuffer = ARR[int8](DRF(this)._elementSize);
+    
+    int32 j = low;
+    while (j < high) {
+      PTR[ptr] elementj = DRF(this)._memory + (j * DRF(this)._elementSize);
+      
+      #funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] comp = compare;
+      int32 c = 0;
+      c = compare(a: elementj, b: pivot);
+      
+      #System/print(s: STR" compare: ");
+      #System/print(i_0x: DRF(RTP[PTR[int32]](elementj)));
+      #System/print(s: STR", ");
+      #System/print(i_0x: DRF(RTP[PTR[int32]](pivot)));
+      #System/print(s: STR" = ");
+      #System/print(i: c);
+      #System/println();
+      
+      if (c < 0) {
+        i = i + 1;
+        PTR[ptr] elementi = DRF(this)._memory + (i * DRF(this)._elementSize);
+        
+        swap(
+          a: RTP[ptr](elementi),
+          b: RTP[ptr](elementj),
+          buffer: RTP[ptr](swapBuffer),
+          bytes: DRF(this)._elementSize
+        );
+        
+        #System/print(i: i - 1);
+        #System/print(s: STR", ");
+        #System/print(i: j);
+        # System/println();
+        #System/println(s: STR" {");
+        #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+        #System/println(s: STR"}");
+      }
+      
+      j = j + 1;
+    }
+    
+    PTR[ptr] elementi1 = DRF(this)._memory + ((i + 1) * DRF(this)._elementSize);
+    PTR[ptr] elementh = DRF(this)._memory + ((high) * DRF(this)._elementSize);
+    
+    swap(a: RTP[ptr](elementi1), b: RTP[ptr](elementh), buffer: RTP[ptr](swapBuffer), bytes: DRF(this)._elementSize);
+    
+    done i + 1;
+  }
+  
+  func swap(ptr a, ptr b, ptr buffer, int32 bytes) {
+    if (RTP[int32](a) == RTP[int32](b)) done;
+    
+    int32 _1 = Memory/memcpy_s(
+      dest:     buffer,
+      destSize: Limits/INT32_MAX,
+      source:   b,
+      bytes:    bytes
+    );
+    int32 _2 = Memory/memcpy_s(
+      dest:     b,
+      destSize: Limits/INT32_MAX,
+      source:   a,
+      bytes:    bytes
+    );
+    int32 _3 = Memory/memcpy_s(
+      dest:     a,
+      destSize: Limits/INT32_MAX,
+      source:   buffer,
+      bytes:    bytes
+    );
+  }
+  
+  func sort(
+    PTR[List]                               this,
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] compare
+  ) {
+    sort(this: this, low: 0, high: DRF(this).length - 1, compare: compare); 
+  }
+  
+  func sort(
+    PTR[List]                               this,
+    int32                                   low,
+    int32                                   high,
+    funcptr[int32 (PTR[ptr] a, PTR[ptr] b)] compare
+  ) {
+    if (low < high) {
+      #System/print(s: STR" sort: ");
+      #System/print(i: low);
+      #System/print(s: STR", ");
+      #System/print(i: high);
+      #System/println();
+
+      #System/println(s: STR" [");
+      #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+      #System/println(s: STR"]");
+      
+      int32 pi = _partition(this: this, high: high, low: low, compare: compare);
+      
+      #System/println(s: STR"{");
+      #System/printBytes(pointer: RTP[PTR[int8]](DRF(this)._memory), count: DRF(this).length * 4);
+      #System/println(s: STR"}");
+      sort(this: this, low: low,    high: pi - 1, compare: compare);
+      sort(this: this, low: pi + 1, high: high,   compare: compare);
+    }
+  }
+  
+  func addArray(PTR[List] this, ptr elements, int32 length) {
+    checkGrow(this: this, amount: length);
+    
+    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    int32 _0 = Memory/memcpy_s(
+      dest:     RTP[ptr](end),
+      destSize: Limits/INT32_MAX,
+      source:   elements,
+      bytes:    DRF(this)._elementSize * length
+    );
+    DRF(this).length = DRF(this).length + length;
+  }
+
+  func addAll(PTR[List] this, PTR[List] other) {
+    if (DRF(this)._elementSize != DRF(other)._elementSize)
+      System/fatal(reason: STR"sus/List/addAll(this, other): incompatible element sizes");
+    
+    checkGrow(this: this, amount: DRF(other).length);
+    
+    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    int32 _0 = Memory/memcpy_s(
+      dest:     RTP[ptr](end),
+      destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
+      source:   RTP[ptr](DRF(other)._memory),
+      bytes:    DRF(this)._elementSize * DRF(other).length
+    );
+    DRF(this).length = DRF(this).length + DRF(other).length;
+  }
+
+  func free(PTR[List] this) {
+    Memory/free(pointer: RTP[ptr](DRF(this)._memBlock));
+  }
+  
+  func removeFirst(PTR[List] this, int32 count) {
+    int32 newLength = DRF(this).length - count;
+    if (newLength < 0) System/fatal(reason: STR"removed negative count");
+    DRF(this)._memory = DRF(this)._memory + (count * DRF(this)._elementSize);
+    DRF(this).length = newLength;
+    DRF(this)._capacity = DRF(this)._capacity - count;
+  }
+  
+  # expands the list, if (amount) items do not fit.
+  func checkGrow(PTR[List] this, int32 amount) {
+    int32 newLength = DRF(this).length + amount;
+    if (newLength < DRF(this)._capacity) done;
+    
+    int32 newCapacity = cast[int32](
+      cast[real32](DRF(this)._elementSize) * cast[real32](newLength) * GROWTH_FACTOR
+    ) + 1;
+
+    PTR[ptr] newMemory = RTP[PTR[ptr]](Memory/malloc(bytes: newCapacity));
+    int32 _0 = Memory/memcpy_s(
+      dest:     RTP[ptr](newMemory),
+      destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
+      source:   RTP[ptr](DRF(this)._memory),
+      bytes:    DRF(this)._elementSize * DRF(this).length
+    );
+
+    # remove old memory
+    Memory/free(pointer: RTP[ptr](DRF(this)._memBlock));
+
+    DRF(this)._memory = newMemory;
+    DRF(this)._memBlock = newMemory;
+  }
+  
+  func PTR[ptr] add(PTR[List] this, int32 i) {
+    if (i > DRF(this).length) System/fatal(reason: STR"i > length");
+
+    checkGrow(this: this, amount: 1);
+
+    DRF(this).length = DRF(this).length + 1;
+    PTR[ptr] index = DRF(this)._memory + (i * DRF(this)._elementSize);
+    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    # move 1 element to the right, beginning from i
+    if (RTP[int32](index) < RTP[int32](end)) {
+      int32 _0 = Memory/memmove_s(
+        dest: RTP[ptr](index + DRF(this)._elementSize),
+        destSize: Limits/INT32_MAX, # hihi
+        source: RTP[ptr](index),
+        bytes: RTP[int32](end) - RTP[int32](index)
+      );
+    }
+    
+    done index;
+  }
+  
+  # adds element at the pointer *element* and returns pointer to the copy made into the list.
+  # *element* may be 0
+  func PTR[ptr] add(PTR[List] this, ptr element) {
+    checkGrow(this: this, amount: 1);
+
+    PTR[ptr] index = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    DRF(this).length = DRF(this).length + 1;
+    
+    if (RTP[int32](element) == 0) done index;
+
+    int32 _0 = Memory/memcpy_s(
+      dest:     RTP[ptr](index),
+      destSize: Limits/INT32_MAX, # HAHAHAHAHAHA
+      source:   element,
+      bytes:    DRF(this)._elementSize
+    );
+    done index;
+  }
+
+  # removes the *i*th element
+  func remove(PTR[List] this, int32 i) {
+    PTR[ptr] index = at(this: this, i: i);
+    remove(this: this, index: index);
+  }
+
+  # removes element at the pointer *index*
+  # does bounds checking, however no alignment checking.
+  func remove(PTR[List] this, PTR[ptr] index) {
+    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
+    int32 off = RTP[int32](index - DRF(this)._memory);
+
+    if (off < 0) System/fatal(reason: STR"removing to small list pointer");
+    if (index >= (end - DRF(this)._elementSize + 1)) System/fatal(reason: STR"removing to big list pointer");
+    
+    int32 after = RTP[int32](end - index - DRF(this)._elementSize);
+    PTR[ptr] src = index + DRF(this)._elementSize;
+
+    int32 _0 = Memory/memmove_s(
+      dest: RTP[ptr](index),
+      destSize: Limits/INT32_MAX, # ^^
+      source: RTP[ptr](src),
+      bytes: after
+    );
+
+    DRF(this).length = DRF(this).length - 1;
+  }
+
+  func clear(PTR[List] this) {
+    DRF(this).length = 0;
+  }
+
+  # returns pointer to element at i
+  func PTR[ptr] at(PTR[List] this, int32 i) {
+    done DRF(this)._memory + (i * DRF(this)._elementSize);
+  }
+  
+}
+
+package sus/StringStream {
+
+  use sus/Limits;
+  use sus/Memory;
+  use sus/System;
+  use sus/native/Win;
+
+  struct StringStream (
+    PTR[int8] buffer,
+    int32 length,
+    int32 position
+  );
+  
+  func append(PTR[StringStream] stream, PTR[int8] s) {
+    while (cast[int32](DRF(s)) != 0) {
+      if (DRF(stream).position >= DRF(stream).length) done;
+      
+      DRF(DRF(stream).buffer + DRF(stream).position) = DRF(s);
+      
+      DRF(stream).position = DRF(stream).position + 1;
+      s = s + 1;
+    }
+    #System/print(s: STR"Appended ");
+    #System/println(i: DRF(stream).position);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i_0x) {
+    append(stream: stream, i: i_0x, radix: 16);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i) {
+    append(stream: stream, i: i, radix: 10);
+  }
+  
+  func append(PTR[StringStream] stream, int32 i, int32 radix) {
+    PTR[int8] buffer = ARR[int8](16);
+    Win/_itoa_s(value: i, buffer: buffer, size: 16, radix: radix);
+    
+    append(stream: stream, s: buffer);
+  }
+  
+  func append(PTR[StringStream] stream, real32 r) {
+    append(stream: stream, r: r, digits: 10);
+  }
+    
+  func append(PTR[StringStream] stream, real32 r, int32 digits) {
+    boo neg = r < 0.0;
+    real32 digitMag = Win/powf(base: 10.0, power: cast[real32](digits));
+
+    if (neg) r = 0.0 - r;
+
+    int32 intPart = cast[int32](r);
+    int32 decPart = cast[int32]((r - cast[real32](intPart)) * digitMag);
+
+    if (neg) append(stream: stream, s: STR"-");
+    append(stream: stream, i: intPart);
+
+    if (digits > 0) {
+      append(stream: stream, s: STR".");
+
+      PTR[int8] buffer = ARR[int8](16);
+      Win/_itoa_s(value: decPart, buffer: buffer, size: 16, radix: 10);
+      int32 nonZeroCount = Win/strnlen(buffer: buffer, size: 16);
+      
+      int32 zeros = digits - nonZeroCount;
+      while (zeros > 0) {
+        append(stream: stream, s: STR"0");
+        zeros = zeros - 1;
+      }
+
+      append(stream:stream, s: buffer);
+    }
+  }
+  
+  #func append(PTR[StringStream] stream, int32 i) {
+  #  int32 zero = cast[int32](DRF(STR"0"));
+  #  
+  #  boo neg = i < 0;
+  #  if (neg) {
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = DRF(STR"-");
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #  }
+  #  if (i == 0) {
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = cast[int8](zero);
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #  }
+  #  while (i > 0) {
+  #    int32 code = zero + (i % 10);
+  #    
+  #    if (DRF(stream).position >= DRF(stream).length) done;
+  #    DRF(DRF(stream).buffer + DRF(stream).position) = cast[int8](code);
+  #    DRF(stream).position = DRF(stream).position + 1;
+  #    
+  #    i = i / 10;
+  #  }
+  #}
+  
+}
+
+package sus/File {
+
+  use sus/System;
+  use sus/Memory;
+  use sus/native/Win;
+
+  func write(PTR[int8] file, PTR[int8] data, int32 length) {
+    int32 handle = Win/CreateFileA(
+      fileName: file,
+      accessMode: Win/GENERIC_WRITE,
+      shareMode: Win/FILE_SHARE_NONE,
+      securityAttributes: RTP[ptr](0),
+      creationMode: Win/CREATE_ALWAYS,
+      flagsAndAttributes: 0,
+      templateFileHandle: 0
+    );
+    if (handle == 0) {
+      int32 err = Win/GetLastError();
+      System/print(s: STR"Error opening file \"");
+      System/print(s: file);
+      System/print(s: STR"\": ");
+      System/println(i: err);
+      System/exit(code: err);
+    }
+
+    boo writeSuccess = Win/WriteFile(
+	    file:       handle,
+	    buffer:     data,
+	    length:     length,
+	    written:    RTP[PTR[int32]](0),
+	    overlapped: RTP[PTR[ptr]](0)
+	  );
+    if (writeSuccess == no) {
+      int32 err = Win/GetLastError();
+      System/print(s: STR"Error writing to file \"");
+      System/print(s: file);
+      System/print(s: STR"\": ");
+      System/println(i: err);
+      System/exit(code: err);
+    }
+
+    boo _1 = Win/CloseHandle(handle: handle);
+  }
+
+  # gets file content of existing file or crashes if file does not exist
+  func int32 read(PTR[int8] file, PTR[PTR[int8]] data) {
+    #
+    # open file and get size
+    #
+    int32 handle = Win/CreateFileA(
+      fileName: file,
+      accessMode: Win/GENERIC_READ,
+      shareMode: Win/FILE_SHARE_READ,
+      securityAttributes: RTP[ptr](0),
+      creationMode: Win/OPEN_EXISTING,
+      flagsAndAttributes: 0,
+      templateFileHandle: 0
+    );
+    if (handle == 0) {
+      int32 err = Win/GetLastError();
+      System/print(s: STR"Error opening file \"");
+      System/print(s: file);
+      System/print(s: STR"\": ");
+      System/println(i: err);
+      System/exit(code: err);
+    }
+    LargeInteger fileSize = Win/new_LargeInteger();
+    boo gotSize = Win/GetFileSizeEx(
+      file: handle,
+      fileSize: REF(fileSize)
+    );
+    if (fileSize.high != 0) {
+      System/print(s: STR"Error opening file \"");
+      System/print(s: file);
+      System/print(s: STR"\": ");
+      System/println(s: STR"File to big.");
+      System/exit(code: 123);
+    }
+    
+    int32 readBytes = 0;
+    DRF(data) = RTP[PTR[int8]](Memory/malloc(bytes: fileSize.low));
+    boo read = Win/ReadFile(
+      fileHandle: handle,
+      buffer: DRF(data),
+      toRead: fileSize.low,
+      actualRead: REF(readBytes),
+      overlapped: RTP[ptr](0)
+    );
+    if (read == no) {
+      int32 err = Win/GetLastError();
+      System/print(s: STR"Error reading file \"");
+      System/print(s: file);
+      System/print(s: STR"\": ");
+      System/println(i: err);
+      System/exit(code: err);
+    }
+    boo _1 = Win/CloseHandle(handle: handle);
+    done readBytes;
+  }
+
+}
+
+package sus/System {
+
+  use sus/native/Win;
+  use sus/StringStream;
+  
+  # required, when using subsystem: windows, to redirect std out to parent console
+  # if given, or have no console when opening program without console.
+  #
+  # if a debugger is attached the process will allocate it's own console window.
+  func initConsole() {
+    if (Win/IsDebuggerPresent()) {
+      boo _1 = Win/AllocConsole();
+    } else {
+      boo _1 = Win/AttachConsole(processId: Win/ATTACH_PARENT_PROCESS);
+    }
+  }
+  
+  func fatal(PTR[int8] reason) {
+    System/print(s: STR"A FATAL ERROR OCCURRED: ");
+    System/print(s: reason);
+    System/println();
+
+    System/exit(code: 1);
+  }
+
+  func print(PTR[StringStream] stream) {
+    int32 i = 0;
+    int32 file = Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE);
+    boo _1 = Win/WriteFile(
+	    file:       file,
+	    buffer:     DRF(stream).buffer,
+	    length:     DRF(stream).position,
+	    written:    RTP[PTR[int32]](0),
+	    overlapped: RTP[PTR[ptr]](0)
+	  );
+    boo _2 = Win/FlushFileBuffers(
+      handle: file
+    );
+  }
+  
+  func println(PTR[StringStream] stream) {
+    print(stream: stream);
+    println();
+  }
+
+  func sleep(int32 ms) {
+    Win/Sleep(ms: ms);
+  }
+
+  func exit(int32 code) {
+    boo _1 = Win/FlushFileBuffers(
+      handle: Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE)
+    );
+  
+    Win/ExitProcess(code: code);
+  }
+
+  func print(PTR[int8] s) {
+    print(s: s, length: Win/strnlen(buffer: s, size: 2147483647));
+  }
+
+  func print(PTR[int8] s, int32 length) {
+    boo _r = Win/WriteFile(
+	    file:       Win/GetStdHandle(handle: Win/STD_OUTPUT_HANDLE),
+	    buffer:     s,
+	    length:     length,
+	    written:    RTP[PTR[int32]](0),
+	    overlapped: RTP[PTR[ptr]](0)
+	  );
+    
+  }
+
+  func print(real32 r) {
+    print(r: r, digits: 2);
+  }
+
+  func print(real32 r, int32 digits) {
+    boo neg = r < 0.0;
+    real32 digitMag = Win/powf(base: 10.0, power: cast[real32](digits));
+
+    if (neg) r = 0.0 - r;
+
+    int32 intPart = cast[int32](r);
+    int32 decPart = cast[int32]((r - cast[real32](intPart)) * digitMag);
+
+    if (neg) print(s: STR"-");
+    print(i: intPart);
+
+    if (digits > 0) {
+      print(s: STR".");
+
+      PTR[int8] buffer = ARR[int8](16);
+      Win/_itoa_s(value: decPart, buffer: buffer, size: 16, radix: 10);
+      int32 nonZeroCount = Win/strnlen(buffer: buffer, size: 16);
+      
+      int32 zeros = digits - nonZeroCount;
+      while (zeros > 0) {
+        print(s: STR"0");
+        zeros = zeros - 1;
+      }
+
+      print(s: buffer);
+    }
+  }
+
+  func print(int32 i) {
+    PTR[int8] buffer = ARR[int8](16);
+    Win/_itoa_s(value: i, buffer: buffer, size: 16, radix: 10);
+    print(s: buffer);
+  }
+
+  func print(boo b) {
+    if (b) print(s: STR"yes");
+    else print(s: STR"no");
+  }
+
+  func println(boo b) {
+    if (b) print(s: STR"yes\n");
+    else print(s: STR"no\n");
+  }
+
+  func print(int32 i_0x) {
+    PTR[int8] buffer = ARR[int8](16);
+    Win/_itoa_s(value: i_0x, buffer: buffer, size: 16, radix: 16);
+    print(s: buffer);
+  }
+
+  func println(int32 i_0x) {
+    print(i_0x: i_0x);
+    println();
+  }
+
+  func println(int32 i) {
+    print(i: i);
+    println();
+  }
+
+  func println(PTR[int8] s) {
+    print(s: s);
+    println();
+  }
+
+  func println() {
+    print(s: STR"\n");
+  }
+  
+  func printBytes(PTR[int8] pointer, int32 count) {
+    System/print(s: STR"  ");
+    int32 i = 0;
+    while (i < count) {
+      if (i > 0) {
+        if (i % 16 == 0) System/print(s: STR"\n  ");
+        else if (i % 8 == 0) System/print(s: STR" | ");
+        else if (i % 4 == 0) System/print(s: STR"  ");
+        else System/print(s: STR" ");
+      }
+
+      int8 byte = DRF(pointer + i);
+      if (cast[int32](byte) <= @f) System/print(s: STR"0");
+      System/print(i_0x: cast[int32](byte));
+
+      i = i + 1;
+    }
+
+    System/println();
+  }
+
+}
+
+package sus/Prof {
+
+  use sus/Thread;
+  use sus/Mutex;
+  use sus/AtomicBoo;
+  use sus/Memory;
+  use sus/Map;
+  use sus/List;
+  use sus/Time;
+  use sus/System;
+  use sus/StringStream;
+  use sus/c/CString;
+  
+  struct ProfileState(
+    ProfNode root,
+    PTR[ProfNode] current
+  );
+  
+  struct ProfNode(
+    PTR[ProfNode] parent,
+    PTR[int8] name,
+    Time start,
+    Time end,
+    # ProfNode
+    List children
+  );
+
+  # PTR[Thread] -> PTR[ProfileState]
+  static boo disabled = no;
+  static PTR[Map] _states = RTP[PTR[Map]](0);
+  static PTR[Mutex] _statesMtx = RTP[PTR[Mutex]](0);
+  
+  func int32 hashThread(ptr key) {
+    PTR[Thread] thread = RTP[PTR[Thread]](key);
+    done DRF(thread)._handle;
+  }
+  
+  func boo equalsThread(ptr keya, ptr keyb) {
+    PTR[Thread] threada = RTP[PTR[Thread]](keya);
+    PTR[Thread] threadb = RTP[PTR[Thread]](keyb);
+    done DRF(threada)._handle == DRF(threadb)._handle;
+  }
+  
+  func init() {
+    if (disabled) done;
+  
+    PTR[Map] map = RTP[PTR[Map]](Memory/malloc(bytes: size[Map]()));
+    DRF(map) = Map/alloc(hash: funcref(hashThread), equals: funcref(equalsThread));
+    _states = map;
+    
+    PTR[Mutex] statesMtx = RTP[PTR[Mutex]](Memory/malloc(bytes: size[Mutex]()));
+    DRF(statesMtx) = Mutex/alloc();
+    _statesMtx = statesMtx;
+  }
+  
+  # name: section name to start
+  func begin(PTR[int8] name) {
+    if (disabled) done;
+    
+    # get state of current thread
+    Thread currentThread = Thread/current();
+    PTR[int8] currentThreadName = Thread/getName(this: REF(currentThread));
+    Mutex/lock(this: _statesMtx);
+    PTR[ProfileState] state = RTP[PTR[ProfileState]](
+      Map/get(this: _states, key: RTP[ptr](currentThreadName))
+    );
+    if (RTP[int32](state) == 0) {
+      state = RTP[PTR[ProfileState]](Memory/malloc(bytes: size[ProfileState]()));
+      DRF(state) = ProfileState(
+        root = ProfNode(
+          parent = RTP[PTR[ProfNode]](0),
+          name = name,
+          start = Time/now(),
+          end = Time/zero(),
+          children = List/alloc(elementSize: size[ProfNode]())
+        ),
+        current = RTP[PTR[ProfNode]](0)
+      );
+      DRF(state).current = REF(DRF(state).root);
+      ptr _1 = Map/put(this: _states, key: RTP[ptr](currentThreadName), value: RTP[ptr](state));
+      
+      Mutex/unlock(this: _statesMtx);
+      done;
+    }
+    Mutex/unlock(this: _statesMtx);
+    
+    
+    #System/print(s: STR"adding.   curr, len: ");
+    #System/print(s: DRF(DRF(state).current).name);
+    #System/print(s: STR", ");
+    #System/println(i: DRF(DRF(state).current).children.length);
+    
+    PTR[ProfNode] added = RTP[PTR[ProfNode]](
+      List/add(this: REF(DRF(DRF(state).current).children), element: RTP[ptr](0))
+    );
+    DRF(added) = ProfNode(
+      parent = DRF(state).current,
+      name = name,
+      start = Time/now(),
+      end = Time/zero(),
+      children = List/alloc(elementSize: size[ProfNode]())
+    );
+    
+    #System/print(s: STR"  addd.   curr, len: ");
+    #System/print(s: DRF(DRF(state).current).name);
+    #System/print(s: STR", ");
+    #System/println(i: DRF(DRF(state).current).children.length);
+    DRF(state).current = added;
+    
+  }
+  
+  # name: section name to end
+  func end(PTR[int8] name) {
+    if (disabled) done;
+    
+    #System/print(s: $HERE);
+    #System/print(s: STR" ");
+    #System/print(s: name);
+    
+    Time now = Time/now();
+    
+    # get state of current thread
+    Thread currentThread = Thread/current();
+    PTR[int8] currentThreadName = Thread/getName(this: REF(currentThread));
+    Mutex/lock(this: _statesMtx);
+    PTR[ProfileState] state = RTP[PTR[ProfileState]](
+      Map/get(this: _states, key: RTP[ptr](currentThreadName))
+    );
+    if (RTP[int32](state) == 0)
+      System/fatal(reason: STR"called sus/Prof/end(section) in thread which didn't call start yet");
+    Mutex/unlock(this: _statesMtx);
+    
+    if (CString/equals(stringa: name, stringb: DRF(DRF(state).current).name) == no) 
+    {
+      int32 bufferLen = 128 
+        + CString/length(string: name)
+        + CString/length(string: DRF(DRF(state).current).name);
+      PTR[int8] buffer = ARR[int8](bufferLen);
+      StringStream stream = StringStream(buffer=buffer, length=bufferLen, position=0);
+      StringStream/append(stream: REF(stream), s: STR"called sus/Prof/end('");
+      StringStream/append(stream: REF(stream), s: name);
+      StringStream/append(stream: REF(stream), s: STR"') but current section is '");
+      StringStream/append(stream: REF(stream), s: DRF(DRF(state).current).name);
+      StringStream/append(stream: REF(stream), s: STR"'");
+      System/fatal(reason: buffer);
+    }
+    
+    #System/print(s: STR"   current, len:");
+    #System/print(s: DRF(DRF(state).current).name);
+    #System/print(s: STR", ");
+    #System/print(i: DRF(DRF(state).current).children.length);
+    #System/println();
+    
+    DRF(DRF(state).current).end = now;
+    DRF(state).current = DRF(DRF(state).current).parent;
+  }
+  
+  # List<int8>
+  func List createReport(Thread thread) {
+    # get state of thread
+    Time now = Time/now();
+    PTR[int8] currentThreadName = Thread/getName(this: REF(thread));
+    Mutex/lock(this: _statesMtx);
+    PTR[ProfileState] state = RTP[PTR[ProfileState]](
+      Map/get(this: _states, key: RTP[ptr](currentThreadName))
+    );
+    if (RTP[int32](state) == 0)
+      System/fatal(reason: STR"called sus/Prof/createReport(thread) for thread which didn't call start yet");
+    
+    # build result tree
+    List result = List/alloc(elementSize: size[int8](), capacity: 2000000); # start off with 2 mb
+    
+    createReport(state: state, node: REF(DRF(state).root), result: REF(result));
+    
+    Mutex/unlock(this: _statesMtx);
+    
+    done result; # note: this only works, if removeFirst is not used!
+  }
+  
+  func createReport(PTR[ProfileState] state, PTR[ProfNode] node, PTR[List] result) {
+    PTR[int8] str = RTP[PTR[int8]](0);
+    
+    # iterate over children
+    PTR[ProfNode] firstChild = RTP[PTR[ProfNode]](List/at(
+      this: REF(DRF(node).children),
+      i: 0
+    ));
+    PTR[ProfNode] currentChild = firstChild;
+    PTR[ProfNode] endChild = RTP[PTR[ProfNode]](List/at(
+      this: REF(DRF(node).children),
+      i: DRF(node).children.length
+    ));
+    while (RTP[int32](currentChild) != RTP[int32](endChild)) {
+      createReport(state: state, node: currentChild, result: result);
+      currentChild = currentChild + size[ProfNode]();
+    }
+    
+    # build list of parents
+    PTR[ProfNode] n = node;
+    List lineEls = List/alloc(elementSize: size[ProfNode]());
+    while (RTP[int32](n) != 0) {
+      PTR[ptr] _1 = List/add(this: REF(lineEls), element: RTP[ptr](n));
+      n = DRF(n).parent;
+    }
+    
+    # iterate in reverse order, to add the call stack chain from left (first function) to right (last function on top of stack)
+    PTR[ProfNode] first = RTP[PTR[ProfNode]](lineEls._memory);
+    PTR[ProfNode] last = RTP[PTR[ProfNode]](lineEls._memory) + (lineEls.length * size[ProfNode]());
+    PTR[ProfNode] current = last;
+    while (RTP[int32](current) != RTP[int32](first)) {
+      if (RTP[int32](last) != RTP[int32](current)) {
+        PTR[int8] v1 = STR";";
+        List/addArray(this: result, elements: RTP[ptr](v1), length: CString/length(string: v1));
+      }
+      
+      current = current - size[ProfNode]();
+      
+      PTR[int8] v2 = DRF(current).name;
+      List/addArray(this: result, elements: RTP[ptr](v2), length: CString/length(string: v2));
+    }
+    
+    List/free(this: REF(lineEls));
+    
+    str = STR" ";
+    List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
+    
+    str = ARR[int8](32);
+    CString/toString(i: Time/diff_mu(a: DRF(node).end, b: DRF(node).start), buffer: str, length: 32);
+    
+    List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
+    
+    str = STR"\n";
+    List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
+  }
+
+}
