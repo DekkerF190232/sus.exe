@@ -2152,7 +2152,9 @@ package sus/Prof {
       this: REF(DRF(node).children),
       i: DRF(node).children.length
     ));
+    Time childDuration = Time/zero();
     while (RTP[int32](currentChild) != RTP[int32](endChild)) {
+      childDuration = Time/add(a: childDuration, b: Time/sub(a: DRF(currentChild).end, b: DRF(currentChild).start));
       createReport(state: state, node: currentChild, result: result);
       currentChild = currentChild + size[ProfNode]();
     }
@@ -2174,9 +2176,7 @@ package sus/Prof {
         PTR[int8] v1 = STR";";
         List/addArray(this: result, elements: RTP[ptr](v1), length: CString/length(string: v1));
       }
-      
       current = current - size[ProfNode]();
-      
       PTR[int8] v2 = DRF(current).name;
       List/addArray(this: result, elements: RTP[ptr](v2), length: CString/length(string: v2));
     }
@@ -2187,7 +2187,9 @@ package sus/Prof {
     List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
     
     str = ARR[int8](32);
-    CString/toString(i: Time/diff_mu(a: DRF(node).end, b: DRF(node).start), buffer: str, length: 32);
+    Time totalDuration = Time/sub(a: DRF(node).end, b: DRF(node).start);
+    Time ownDuration = Time/sub(a: totalDuration, b: childDuration);
+    CString/toString(i: Time/mu(t: ownDuration), buffer: str, length: 32);
     
     List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
     

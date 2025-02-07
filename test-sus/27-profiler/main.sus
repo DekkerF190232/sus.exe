@@ -17,7 +17,7 @@ package test/Main {
     List report = Prof/createReport(thread: Thread/current());
     System/println(s: STR"made report.");
     
-    File/write(file: STR"report.txt", data: RTP[PTR[int8]](report._memory), length: report.length);
+    File/write(file: STR"report.spf", data: RTP[PTR[int8]](report._memory), length: report.length);
     List/free(this: REF(report));
 
     System/exit(code: 0);
@@ -34,15 +34,22 @@ package test/Main {
     
     Prof/begin(name: $HERE);
     while (n > 0) {
-      doMethod(n: n);
+      if (n%3 == 0) doMethod(n: n);
+      else doMethod2(n:n);
       n = n - 1;
     }
     Prof/end(name: $HERE);
   }
-
+  
   func doMethod(int32 n) {
     Prof/begin(name: $HERE);
-    Thread/sleep(ms: (n + (n % 2)) * 50);
+    Thread/sleep(ms: (n + (n % 2)) * 10);
+    Prof/end(name: $HERE);
+  }
+
+  func doMethod2(int32 n) {
+    Prof/begin(name: $HERE);
+    Thread/sleep(ms: (n + (n % 2)) * 10 + 5);
     Prof/end(name: $HERE);
   }
 
