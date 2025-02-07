@@ -89,6 +89,7 @@ package mogroft/world/WorldManager {
   
   func init(PTR[WorldManager] this) {
     Thread genThread = Thread/new(
+      name: STR"WorldLoader",
       run: RTP[funcptr[(ptr param)]](funcref(_runGenerator)),
       arg: RTP[ptr](this)
     );

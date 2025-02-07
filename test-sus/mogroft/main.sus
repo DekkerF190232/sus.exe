@@ -1,28 +1,22 @@
 package Main {
 
   use sus/System;
+  use sus/Prof;
   use sus/native/Win;
   
   main {
     System/initConsole();
+    Prof/init();
     
     Test/runTest();
     
-    System/println(s: STR"Starting mogroft written in sus.exe\n");
+    System/println(s: STR"Starting mogroft written in sus.exe, a compiler made by INC.\n");
     
     mogroft/Mogroft/runMogroft();
     
     System/println(s: STR"Closing normally.");
-    #int32 err = Win/GetLastError();
-    #System/print(s: STR"Last Error: ");
-    #System/print(i: err);
-    #System/print(s: STR" (0x");
-    #System/print(i_0x: err);
-    #System/print(s: STR")\n");
-    #System/exit(code: err);
 
     System/exit(code: 0);
-    
   }
 
 }
@@ -48,149 +42,8 @@ package Test {
     System/println(s: STR"------------------------------------------------------------------------------");
     System/exit(code: 0);
   }
- 
- 
   
   func doTest() {
-    #testFloorDiv();
-    #testBoo();
-    #testCalc();
-    #testList();
-    #testNoise();
-    #while (yes) testTime();
-    #testHash();
   }
-  
-  #func testFloorDiv() {
-  #  System/print(s: STR"-5/8: ");
-  #  System/print(i: -5/8);
-  #  System/println();
-  #  
-  #  System/print(s: STR"5/8: ");
-  #  System/print(i: 5/8);
-  #  System/println();
-  #  
-  #  System/print(s: STR"floor div: -5/8: ");
-  #  System/print(i: Math/floor_divi(x: -5, y: 8));
-  #  System/println();
-  #  
-  #  System/print(s: STR"floor div: 5/8: ");
-  #  System/print(i: Math/floor_divi(x: 5, y: 8));
-  #  System/println();
-  #}
-  
-  func testBoo() {
-    #ASM {
-    #  TEST1:
-    #}
-    #System/println(b: no);
-    #ASM {
-    #  Setti:
-    #}
-    #System/println(b: no == no);
-    #System/println(b: yes == no);
-  }
-  
-  #static int32 CALC_SIZE = 16;
-  #func testCalc() {
-  #  real32 playerz = -2345.0;
-  #  #ASM {
-  #  #  int 3
-  #  #}
-  #  int32 z = (cast[int32](playerz) + (CALC_SIZE / 2)) / CALC_SIZE;
-  #  System/println(i: z);
-  #}
-  
-  func int32 compareInt(PTR[ptr] a, PTR[ptr] b) {
-    PTR[int32] ia = RTP[PTR[int32]](a);
-    PTR[int32] ib = RTP[PTR[int32]](b);
-    if (DRF(ia) > DRF(ib)) done 1;
-    if (DRF(ia) < DRF(ib)) done -1;
-    done 0;
-  }
-  
-  func testList() {
-    List list = List/alloc(elementSize: size[int32]());
-    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @11111111;
-    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @55555555;
-    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @22222222;
-    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @33333333;
-    DRF(RTP[PTR[int32]](List/add(this: REF(list), element: RTP[ptr](0)))) = @44444444;
-    
-    # List copied = List/alloc(elementSize: 4);
-    # List/addAll(this: REF(copied), other: REF(list));
-    # List/clear(this: REF(copied));
-    # List/addAll(this: REF(copied), other: REF(list));
-    
-    
-    System/print(s: STR"Length: ");
-    System/print(i: list.length);
-    System/print(s: STR"\n");
-    System/printBytes(pointer: RTP[PTR[int8]](list._memory), count: list.length * 4);
-    System/println();
-    
-    
-    List/sort(this: REF(list), compare: funcref(compareInt));
-    
-    System/print(s: STR"Length: ");
-    System/print(i: list.length);
-    System/print(s: STR"\n");
-    System/printBytes(pointer: RTP[PTR[int8]](list._memory), count: list.length * 4);
-    System/println();
-  }
-  
-  #func testTime() {
-    #Time zero = Time/zero();
-    #Time time = Time(_low = cast[nat32](9993), _high = cast[nat32](0));
-    #
-    #Time/print(t: time);
-    #System/print(s: STR" + ");
-    #
-    #Time/print(t: zero);
-    #Time added = Time/add(a: zero, b: time);
-    #System/print(s: STR" = ");
-    #
-    #Time/print(t: added);
-    #
-    #System/println();
-  #}
-
-  #func testHash() {
-    #int32 i = 0;
-    #while (i < 50) {
-    #  System/println(i: Noise2D/hash(x: i));
-    #  i = i + 1;
-    #}
-  #}
-  
-  #func testNoise() {
-  #  real32 scale = 0.2;
-  #  int32 off = -10;
-  #  
-  #  int32 r = 0;
-  #  while (r < 40) {
-  #    int32 c = 0;
-  #    while (c < 55) {
-  #      real32 val = Noise2DFractal/noise(
-  #        x: cast[real32](c + off) * scale,
-  #        y: cast[real32](r + off) * scale,
-  #        levels: 3,
-  #        seed: 0
-  #      );
-  #      
-  #      PTR[int8] characters = STR"@O+-.  ";
-  #      int32 characterCount = 6;
-  #      int32 idx = cast[int32](val * cast[real32](characterCount));
-  #      PTR[int8] char = characters + idx;
-  #      
-  #      System/print(s: char, length: 1); 
-  #      System/print(s: STR" ");
-  #      
-  #      c = c + 1;
-  #    }
-  #    System/println();
-  #    r = r + 1;
-  #  }
-  #}
   
 }

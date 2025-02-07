@@ -1,0 +1,24 @@
+package test/Main {
+
+  use sus/System;
+  use sus/Prof;
+
+  main {
+    System/initConsole();
+    
+    doTest1();
+
+    System/exit(code: 0);
+  }
+
+  func doTest1() {
+    System/println(s: $HERE);
+    System/println(s: STR"done.");
+    doTest2();
+  }
+
+  func doTest2() {
+    System/println(s: $HERE);
+  }
+  
+}

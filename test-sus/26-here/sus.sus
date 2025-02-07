@@ -13,46 +13,6 @@ package sus/c/CMath {
   
 }
 
-package sus/c/CString {
-
-  use sus/Limits;
-  use sus/native/Win;
-  
-  func int32 length(PTR[int8] string) {
-    done Win/strnlen(buffer: string, size: Limits/INT32_MAX);
-  }
-  
-  func toString(int32 i, PTR[int8] buffer, int32 length) {
-    Win/_itoa_s(value: i, buffer: buffer, size: length, radix: 10);
-  }
-  
-  func int32 hash(PTR[int8] string) {
-    # https://stackoverflow.com/questions/7666509/hash-function-for-string
-    int32 hash = 5381;
-    PTR[int8] char = string;
-    while (RTP[int32](DRF(char)) != 0) {
-      hash = ((hash << cast[int8](8)) + hash) + cast[int32](DRF(char)); 
-      char = char + 1;
-    }
-    done hash;
-  }
-  
-  func boo equals(PTR[int8] stringa, PTR[int8] stringb) {
-    if (RTP[int32](stringa) == RTP[int32](stringb))
-      done yes;
-    
-    PTR[int8] chara = stringa;
-    PTR[int8] charb = stringb;
-    while (RTP[int32](DRF(chara)) != 0 && (RTP[int32](DRF(charb)) != 0)) {
-      if (cast[int32](DRF(chara)) != cast[int32](DRF(charb))) done no;
-      chara = chara + 1;
-      charb = charb + 1;
-    }
-    done cast[int32](DRF(chara)) == cast[int32](DRF(charb));
-  }
-
-}
-
 package sus/Math {
 
   use sus/c/CMath;
@@ -807,18 +767,6 @@ package sus/native/Win {
     PTR[int32] threadId         # can be 0
   ) EXT;
   
-  func CON(stdcall) int32 SetThreadDescription(
-    int32 handle,
-    PTR[int8] threadDescription
-  ) EXT;
-  
-  func CON(stdcall) int32 GetCurrentThread() EXT;
-  
-  func CON(stdcall) int32 GetThreadDescription(
-    int32 handle,
-    PTR[PTR[int8]] threadDescription
-  ) EXT;
-  
   struct CriticalSection (
     array[int8, 24] _data # i'm not declaring all of that
   );
@@ -910,7 +858,7 @@ package sus/Thread {
 
   struct Thread(int32 _handle);
   
-  func Thread new(PTR[int8] name, funcptr[(ptr param)] run, ptr arg) {
+  func Thread new(funcptr[(ptr param)] run, ptr arg) {
     int32 result = Win/CreateThread(
       securityAttributes: RTP[ptr](0),
       stackSize:          cast[nat32](0),
@@ -919,24 +867,7 @@ package sus/Thread {
       flags:              0,
       threadId:           RTP[PTR[int32]](0)
     );
-    int32 _1 = Win/SetThreadDescription(
-      handle:            result,
-      threadDescription: name
-    );
     done Thread(_handle = result);
-  }
-  
-  func Thread current() {
-    done Thread(_handle = Win/GetCurrentThread());
-  }
-  
-  func PTR[int8] getName(PTR[Thread] this) {
-    PTR[int8] name = RTP[PTR[int8]](0);
-    int32 _1 = Win/GetThreadDescription(
-      handle:            DRF(this)._handle,
-      threadDescription: REF(name)
-    );
-    done name;
   }
   
   func sleep(int32 ms) {
@@ -1443,23 +1374,10 @@ package sus/List {
       sort(this: this, low: pi + 1, high: high,   compare: compare);
     }
   }
-  
-  func addArray(PTR[List] this, ptr elements, int32 length) {
-    checkGrow(this: this, amount: length);
-    
-    PTR[ptr] end = DRF(this)._memory + (DRF(this).length * DRF(this)._elementSize);
-    int32 _0 = Memory/memcpy_s(
-      dest:     RTP[ptr](end),
-      destSize: Limits/INT32_MAX,
-      source:   elements,
-      bytes:    DRF(this)._elementSize * length
-    );
-    DRF(this).length = DRF(this).length + length;
-  }
 
   func addAll(PTR[List] this, PTR[List] other) {
     if (DRF(this)._elementSize != DRF(other)._elementSize)
-      System/fatal(reason: STR"sus/List/addAll(this, other): incompatible element sizes");
+      System/fatal(reason: STR"incompatible element sizes");
     
     checkGrow(this: this, amount: DRF(other).length);
     
@@ -1918,203 +1836,6 @@ package sus/System {
     }
 
     System/println();
-  }
-
-}
-
-package sus/Prof {
-
-  use sus/Thread;
-  use sus/Mutex;
-  use sus/AtomicBoo;
-  use sus/Memory;
-  use sus/Map;
-  use sus/List;
-  use sus/Time;
-  use sus/System;
-  use sus/StringStream;
-  use sus/c/CString;
-  
-  struct ProfileState(
-    ProfNode root,
-    PTR[ProfNode] current
-  );
-  
-  struct ProfNode(
-    PTR[ProfNode] parent,
-    PTR[int8] name,
-    Time start,
-    Time end,
-    # ProfNode
-    List children
-  );
-
-  # PTR[Thread] -> PTR[ProfileState]
-  static boo disabled = no;
-  static PTR[Map] _states = RTP[PTR[Map]](0);
-  static PTR[Mutex] _statesMtx = RTP[PTR[Mutex]](0);
-  
-  func int32 hashThread(ptr key) {
-    PTR[Thread] thread = RTP[PTR[Thread]](key);
-    done DRF(thread)._handle;
-  }
-  
-  func boo equalsThread(ptr keya, ptr keyb) {
-    PTR[Thread] threada = RTP[PTR[Thread]](keya);
-    PTR[Thread] threadb = RTP[PTR[Thread]](keyb);
-    done DRF(threada)._handle == DRF(threadb)._handle;
-  }
-  
-  func init() {
-    if (disabled) done;
-  
-    PTR[Map] map = RTP[PTR[Map]](Memory/malloc(bytes: size[Map]()));
-    DRF(map) = Map/alloc(hash: funcref(hashThread), equals: funcref(equalsThread));
-    _states = map;
-    
-    PTR[Mutex] statesMtx = RTP[PTR[Mutex]](Memory/malloc(bytes: size[Mutex]()));
-    DRF(statesMtx) = Mutex/alloc();
-    _statesMtx = statesMtx;
-  }
-  
-  # name: section name to start
-  func begin(PTR[int8] name) {
-    if (disabled) done;
-    
-    # get state of current thread
-    Thread currentThread = Thread/current();
-    PTR[int8] currentThreadName = Thread/getName(this: REF(currentThread));
-    Mutex/lock(this: _statesMtx);
-    PTR[ProfileState] state = RTP[PTR[ProfileState]](
-      Map/get(this: _states, key: RTP[ptr](currentThreadName))
-    );
-    if (RTP[int32](state) == 0) {
-      state = RTP[PTR[ProfileState]](Memory/malloc(bytes: size[ProfileState]()));
-      DRF(state) = ProfileState(
-        root = ProfNode(
-          parent = RTP[PTR[ProfNode]](0),
-          name = name,
-          start = Time/now(),
-          end = Time/zero(),
-          children = List/alloc(elementSize: size[ProfNode]())
-        ),
-        current = RTP[PTR[ProfNode]](0)
-      );
-      DRF(state).current = REF(DRF(state).root);
-      ptr _1 = Map/put(this: _states, key: RTP[ptr](currentThreadName), value: RTP[ptr](state));
-      
-      Mutex/unlock(this: _statesMtx);
-      done;
-    }
-    Mutex/unlock(this: _statesMtx);
-    
-    PTR[ProfNode] added = RTP[PTR[ProfNode]](
-      List/add(this: REF(DRF(DRF(state).current).children), element: RTP[ptr](0))
-    );
-    DRF(added) = ProfNode(
-      parent = DRF(state).current,
-      name = name,
-      start = Time/now(),
-      end = Time/zero(),
-      children = List/alloc(elementSize: size[ProfNode]())
-    );
-    DRF(state).current = added;
-  }
-  
-  # name: section name to end
-  func end(PTR[int8] name) {
-    if (disabled) done;
-    
-    # get state of current thread
-    Time now = Time/now();
-    Thread currentThread = Thread/current();
-    PTR[int8] currentThreadName = Thread/getName(this: REF(currentThread));
-    Mutex/lock(this: _statesMtx);
-    PTR[ProfileState] state = RTP[PTR[ProfileState]](
-      Map/get(this: _states, key: RTP[ptr](currentThreadName))
-    );
-    if (RTP[int32](state) == 0)
-      System/fatal(reason: STR"called sus/Prof/end(section) in thread which didn't call start yet");
-    Mutex/unlock(this: _statesMtx);
-    
-    if (CString/equals(stringa: name, stringb: DRF(DRF(state).current).name) == no) 
-    {
-      int32 bufferLen = 128 
-        + CString/length(string: name)
-        + CString/length(string: DRF(DRF(state).current).name);
-      PTR[int8] buffer = ARR[int8](bufferLen);
-      StringStream stream = StringStream(buffer=buffer, length=bufferLen, position=0);
-      StringStream/append(stream: REF(stream), s: STR"called sus/Prof/end('");
-      StringStream/append(stream: REF(stream), s: name);
-      StringStream/append(stream: REF(stream), s: STR"') but current section is '");
-      StringStream/append(stream: REF(stream), s: DRF(DRF(state).current).name);
-      StringStream/append(stream: REF(stream), s: STR"'");
-      System/fatal(reason: buffer);
-    }
-    DRF(DRF(state).current).end = now;
-    DRF(state).current = DRF(DRF(state).current).parent;
-  }
-  
-  func PTR[int8] createReport(Thread thread) {
-    # get state of thread
-    Time now = Time/now();
-    PTR[int8] currentThreadName = Thread/getName(this: REF(thread));
-    Mutex/lock(this: _statesMtx);
-    PTR[ProfileState] state = RTP[PTR[ProfileState]](
-      Map/get(this: _states, key: RTP[ptr](currentThreadName))
-    );
-    if (RTP[int32](state) == 0)
-      System/fatal(reason: STR"called sus/Prof/createReport(thread) for thread which didn't call start yet");
-    Mutex/unlock(this: _statesMtx);
-    
-    # build result tree
-    List result = List/alloc(elementSize: size[int8](), capacity: 2000000); # start off with 2 mb
-    
-    createReport(state: state, node: REF(DRF(state).root), result: REF(result));
-    
-    done RTP[PTR[int8]](result._memBlock); # note: this only works, if removeFirst is not used!
-  }
-  
-  func createReport(PTR[ProfileState] state, PTR[ProfNode] node, PTR[List] result) {
-    PTR[int8] str = RTP[PTR[int8]](0);
-    
-    # iterate over children
-    PTR[ProfNode] first = RTP[PTR[ProfNode]](List/at(
-      this: result,
-      i: 0
-    ));
-    PTR[ProfNode] current = first;
-    PTR[ProfNode] end = RTP[PTR[ProfNode]](List/at(
-      this: result,
-      i: DRF(result).length
-    ));
-    while (RTP[int32](current) != RTP[int32](end)) {
-      createReport(state: state, node: current, result: result);
-      current = current + size[ProfNode]();
-    }
-    
-    #if (RTP[int32](first) == RTP[int32](end)) {
-    PTR[ProfNode] n = node;
-    while (RTP[int32](n) != 0) {
-      if (RTP[int32](n) != RTP[int32](node)) {
-        str = STR";";
-        List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
-      }
-      
-      str = DRF(node).name;
-      List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str)); 
-    }
-    str = STR" ";
-    List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
-    
-    str = ARR[int8](32);
-    CString/toString(i: Time/diff_mu(a: DRF(node).end, b: DRF(node).start), buffer: str, length: 32);
-    
-    List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
-    
-    str = STR"\n";
-    List/addArray(this: result, elements: RTP[ptr](str), length: CString/length(string: str));
-    #}
   }
 
 }

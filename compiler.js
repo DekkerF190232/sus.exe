@@ -71,6 +71,7 @@ function parse(state) {
   const makeNodeExpr = (_) => makeNode('expr', {}, []);
   const makeNodeExprSym = (symbol) => makeNode('expr-sym', { symbol });
   const makeNodeExprOp = (op) => makeNode('expr-op', { op }, []);
+  const makeNodeExprHere = () => makeNode('expr-here', undefined, undefined);
   const makeNodeExprMemberName = (name) =>
     makeNode('expr-member', { name }, []);
   const makeNodeExprLitDecReal = (decReal) =>
@@ -614,6 +615,10 @@ function parse(state) {
         if (!eat(/^STR[\t ]*(?=")/)) return;
         let value = eatLitStr();
         return makeNodeExprLitPtrStr(value);
+      },
+      () => {
+        if (!eat(/^\$HERE/)) return;
+        return makeNodeExprHere();
       },
       () => {
         if (!eat(/^ARR/)) return;
@@ -1658,6 +1663,8 @@ function compile(state) {
       return evalTypeCast(expr, scope, addressScope);
     } else if (expr.name === 'expr-siz') {
       return makeTypePrim('int32');
+    } else if (expr.name === 'expr-here') {
+      return makeTypePrim('PTR', [makeTypePrim('int8')]);
     } else if (expr.name === 'expr-lit') {
       return evalTypeLit(expr, scope, addressScope);
     } else if (expr.name === 'expr-op') {
@@ -1971,14 +1978,31 @@ function compile(state) {
     return line(`db      ${rp}`);
   }
 
+  function getHereValue(sig, node) {
+    // return `"hihi"`;
+    if (sig === undefined) throw makeErr(node.i, 'not in a function');
+    return `"${sig.packageAddress}/${sig.name}"`;
+  }
+
   function baseCompileDataTable() {
     let r = '';
 
     dataTable = makeDataTable({});
 
+    let addressScope = undefined;
+
     function traverse(node) {
       // const makeNodeExprLitPtrStr = (str) => makeNode('expr-lit', { litType: 'ptr-str', value: str });
-      if (node.name === 'expr-lit' && node.props.litType === 'ptr-str') {
+      if (node.name === 'package') {
+        addressScope = buildAddressScope(state.ctx, node);
+      } else if (node.name === 'func') {
+        _ass(addressScope);
+        let simpleName = node.props.name;
+        let packageAddress = getCurrentPkg(addressScope);
+        let paramNames = node.kids[0].kids.map((x) => x.props.name);
+        let sig = findFunc(state.ctx, packageAddress, simpleName, paramNames);
+        state.currentSig = sig;
+      } else if (node.name === 'expr-lit' && node.props.litType === 'ptr-str') {
         let value = node.props.value;
         if (!findAsmNameLitPtrStr(value)) {
           r += line(`;   str at ${getLoc(node.i)}`, 0);
@@ -1987,8 +2011,31 @@ function compile(state) {
           r += line('db ' + strLitToAsm(node));
           dataTable.strings[value] = makeDataTableRowStr(asmName);
         }
+      } else if (node.name === 'expr-here') {
+        function makeNode(name, props, kids) {
+          return { name, props, kids };
+        }
+        const makeNodeExprLitPtrStr = (str) =>
+          makeNode('expr-lit', { litType: 'ptr-str', value: str });
+
+        let value = getHereValue(state.currentSig, node);
+
+        if (!findAsmNameLitPtrStr(value)) {
+          r += line(`;   here string at ${getLoc(node.i)}`, 0);
+          let asmName = newAsmNameLitPtrStr();
+          r += line(asmName + ':', 0);
+          let artNode = makeNodeExprLitPtrStr(value);
+          r += line('db ' + strLitToAsm(artNode));
+          dataTable.strings[value] = makeDataTableRowStr(asmName);
+        }
       }
       for (const k of node.kids ?? []) traverse(k);
+
+      if (node.name === 'package') {
+        addressScope = undefined;
+      } else if (node.name === 'func') {
+        state.currentSig = undefined;
+      }
     }
     traverse(state.root);
 
@@ -2056,7 +2103,13 @@ function compile(state) {
         if (func.props.external) {
           r += compileExtFunc(func, addressScope);
         } else {
+          let simpleName = func.props.name;
+          let packageAddress = getCurrentPkg(addressScope);
+          let paramNames = func.kids[0].kids.map((x) => x.props.name);
+          let sig = findFunc(state.ctx, packageAddress, simpleName, paramNames);
+          state.currentSig = sig;
           r += compileFunc(func, addressScope);
+          state.currentSig = undefined;
         }
       }
     }
@@ -3352,6 +3405,8 @@ function compile(state) {
       asm += line(`push    ${size}`);
     } else if (expr.name === 'expr-lit') {
       asm += compileExprLit(expr, scope, addressScope);
+    } else if (expr.name === 'expr-here') {
+      asm += compileExprHere(expr, scope, addressScope);
     } else if (expr.name === 'expr-op') {
       asm += compileExprOp(expr, scope, addressScope);
     } else if (expr.name === 'expr-sym') {
@@ -4010,6 +4065,12 @@ function compile(state) {
     buffer.writeFloatBE(parseFloat(str));
     return '0' + buffer.toString('hex') + 'h';
   }
+  
+  function compileExprHere(expr, scope, addressScope) {
+    let asmName = findAsmNameLitPtrStr(getHereValue(state.currentSig, expr));
+    _ass(asmName);
+    return line(`push    ${asmName}`);
+  }
 
   function compileExprLit(expr, scope, addressScope) {
     let asm = '';
@@ -4035,6 +4096,7 @@ function compile(state) {
         break;
       case 'ptr-str':
         let asmName = findAsmNameLitPtrStr(expr.props.value);
+        _ass(asmName);
         asm += line('push    ' + asmName);
         break;
       default:
